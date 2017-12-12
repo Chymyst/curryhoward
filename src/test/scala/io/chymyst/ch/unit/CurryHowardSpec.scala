@@ -2,9 +2,10 @@ package io.chymyst.ch.unit
 
 import io.chymyst.ch.CHTypes._
 import io.chymyst.ch.CurryHoward._
-import io.chymyst.ch.{CHTypes, CurryHoward, FreshIdents, ITP}
+import io.chymyst.ch._
+import io.chymyst.ch.unit.Subformulas._
 import org.scalatest.{FlatSpec, Matchers}
-import Subformulas._
+
 // This is now only for testing.
 object Subformulas {
   private val freshSubformulas = new FreshIdents(prefix = "f")
