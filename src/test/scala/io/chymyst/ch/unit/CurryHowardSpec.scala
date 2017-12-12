@@ -225,7 +225,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   //    f1(true) shouldEqual true
   //  }
 
-  behavior of "proof search"
+  behavior of "proof search - internal details"
 
   it should "correctly explode sequences of integers" in {
     explode[Int](Seq(Seq(1, 2))) shouldEqual Seq(Seq(1), Seq(2))
@@ -295,6 +295,8 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     )
   }
 
+  behavior of "proof search - high-level API, rule ->R"
+
   it should "find proof term for the I combinator using rule ->R" in {
     val typeExpr = TP(1) :-> TP(1)
     val proofs = ITP.findProofs(typeExpr)
@@ -307,5 +309,13 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     proofs shouldEqual Seq(
       CurriedE(List(PropE("x16", TP(2)), PropE("x17", TP(1))), PropE("x17", TP(1)))
     )
+  }
+
+  behavior of "proof search - high-level API, rule +Rn"
+
+  it should "find proof term for simple instance of +Rn" in {
+    val typeExpr = TP(1) :-> DisjunctT(Seq(TP(1), TP(2)))
+    val proofs = ITP.findProofs(typeExpr)
+    proofs shouldEqual Seq(CurriedE(List(PropE("x19", TP(1))), DisjunctE(0, 2, PropE("x19", TP(1)), DisjunctT(Seq(TP(1), TP(2))))))
   }
 }

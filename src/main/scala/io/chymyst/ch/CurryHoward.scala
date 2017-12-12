@@ -367,7 +367,12 @@ object CHTypes {
       case CurriedE(heads, body) => s"\\(${heads.reverse.mkString(" -> ")} -> $body)"
       case UnitE(tExpr) => "()"
       case ConjunctE(terms) => "(" + terms.map(_.toString).mkString(", ") + ")"
-      case DisjunctE(index, total, term, _) => "(" + Seq.fill(index)("0").mkString(" + ") + term.toString + Seq.fill(total - index - 1)("0").mkString(" + ") + ")"
+      case DisjunctE(index, total, term, _) ⇒
+        val leftZeros = Seq.fill(index)("0")
+        val leftZerosString = if (leftZeros.isEmpty) "" else " + "
+        val rightZeros = Seq.fill(total - index - 1)("0")
+        val rightZerosString = if (rightZeros.isEmpty) "" else " + "
+        "(" + leftZeros.mkString(" + ") + leftZerosString + term.toString + rightZerosString + rightZeros.mkString(" + ") + ")"
     }
 
     def map[U](f: T ⇒ U): TermExpr[U]
