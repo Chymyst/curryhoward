@@ -48,6 +48,12 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     result._2 shouldEqual "(<basic>String, <basic>String)"
   }
 
+  it should "get printable representation of enclosing owner's type with function syntax" in {
+    def result[A, B, C](x: A, y: B)(z: C): (String, String) = testType
+    // TODO: implement detection of types on the LHS
+    result[Int, Boolean, Double](123, true)(1.0)._2 shouldEqual "<constructor>[A, B, C](x: A, y: B)(z: C)(String, String)"
+  }
+
   it should "get printable representation of basic types" in {
     def result[A, B, C]: (String, String) = testType[Int]
 
