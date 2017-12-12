@@ -2,6 +2,8 @@ package io.chymyst.ch
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import io.chymyst.ch.TermExpr.ProofTerm
+
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 import scala.reflect.macros.whitebox
@@ -45,10 +47,6 @@ object CHTypes {
       } yield prev :+ next
     }
   }
-
-  // Subformula index.
-  type SFIndex = Int
-
   // Premises are reverse ordered.
   final case class Sequent[T](premises: List[TypeExpr[T]], goal: TypeExpr[T]) {
     val premiseVars: List[PropE[T]] = premises.map(PropE(freshVar(), _))
@@ -65,12 +63,6 @@ object CHTypes {
 
     def constructResultTerm(result: TermExpr[T]): TermExpr[T] = CurriedE(premiseVars, result)
   }
-
-  type ProofTerm[T] = TermExpr[T]
-
-  type BackTransform[T] = Seq[ProofTerm[T]] ⇒ ProofTerm[T]
-
-  final case class ForwardRule[T](name: String, applyTo: Sequent[T] ⇒ Option[(Seq[Sequent[T]], BackTransform[T])])
 
   private val freshVar = new FreshIdents(prefix = "x")
 
@@ -97,14 +89,14 @@ object CHTypes {
     sequent.goal match {
       case a :-> b ⇒
         val newSequent = sequent.copy(premises = a :: sequent.premises, goal = b)
-        Some(Seq(newSequent), { proofTerms ⇒
+        Some(RuleResult(Seq(newSequent), { proofTerms ⇒
           // This rule expects only one sub-proof term.
           val subProof = proofTerms.head
           // `subProof` is the proof of (G, A) |- B, and we need a proof of G |- A ⇒ B.
           // `subProof` is x ⇒ y ⇒ ... ⇒ z ⇒ a ⇒ <some term depending on (a, x, y, z)>
           // This proof will be exactly what we need if we reverse the order of curried arguments w.r.t. the list order of premises.
           subProof
-        })
+        }))
       case _ ⇒ None
     })
 
@@ -162,7 +154,7 @@ object CHTypes {
   // G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
   private def ruleConjunctionAtRight[T] = ForwardRule[T](name = "&R", sequent ⇒
     sequent.goal match {
-      case conjunctType: ConjunctT[T] ⇒ Some((conjunctType.terms.map(t ⇒ sequent.copy(goal = t)), { proofTerms ⇒
+      case conjunctType: ConjunctT[T] ⇒ Some(RuleResult(conjunctType.terms.map(t ⇒ sequent.copy(goal = t)), { proofTerms ⇒
         // This rule takes any number of proof terms.
         sequent.constructResultTerm(ConjunctE(proofTerms.map(p ⇒ sequent.substitute(p))))
       })
@@ -177,7 +169,7 @@ object CHTypes {
     sequent.goal match {
       case disjunctType: DisjunctT[T] ⇒
         val mainExpression = disjunctType.terms(indexInDisjunct)
-        Some((List(sequent.copy(goal = mainExpression)), { proofTerms ⇒
+        Some(RuleResult(List(sequent.copy(goal = mainExpression)), { proofTerms ⇒
           // This rule expects a single proof term.
           val proofTerm = proofTerms.head
           proofTerm match {
@@ -196,7 +188,7 @@ object CHTypes {
   // (G*, (A ⇒ B) ⇒ C) |- D when (G*, C) |- D and (G*, B ⇒ C) |- A ⇒ B  -- rule ->L4
   // This rule needs a lemma:  |-  ((A ⇒ B) ⇒ C) ⇒ B ⇒ C
   private def ruleImplicationAtLeft4[T] = ForwardRule[T](name = "->L4", sequent ⇒
-    Some((List(sequent.copy(goal = ???)), { proofTerms ⇒
+    Some(RuleResult(List(sequent.copy(goal = ???)), { proofTerms ⇒
       // This rule expects two different proof terms.
       ???
     }
@@ -228,7 +220,7 @@ object CHTypes {
 
     // We try applying just one invertible rule and proceed from there.
     val fromRules: Seq[ProofTerm[T]] = invertibleRules[T].view.flatMap(_.applyTo(sequent)).headOption match {
-      case Some((newSequents, backTransform)) ⇒
+      case Some(RuleResult(newSequents, backTransform)) ⇒
         // All the new sequents need to be proved before we can continue. They may have several proofs each.
         val newProofs: Seq[Seq[ProofTerm[T]]] = newSequents.map(findProofTerms)
         val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = explode(newProofs)
@@ -243,7 +235,7 @@ object CHTypes {
         // Use flatMap to concatenate all results from all applicable non-invertible rules.
         val fromNoninvertibleRules: Seq[ProofTerm[T]] = nonInvertibleRules[T](sequent)
           .flatMap(_.applyTo(sequent))
-          .flatMap { case ((newSequents, backTransform)) ⇒
+          .flatMap { case RuleResult(newSequents, backTransform) ⇒
             val newProofs: Seq[Seq[ProofTerm[T]]] = newSequents.map(findProofTerms)
             val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = explode(newProofs)
             val finalNewProofs: Seq[ProofTerm[T]] = explodedNewProofs.map(backTransform)

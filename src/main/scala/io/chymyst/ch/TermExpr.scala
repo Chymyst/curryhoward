@@ -10,6 +10,7 @@ object TermExpr {
     case _ ⇒ Set()
   }
 
+  type ProofTerm[T] = TermExpr[T]
 }
 
 sealed trait TermExpr[+T] {
