@@ -318,4 +318,10 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     val proofs = ITP.findProofs(typeExpr)
     proofs shouldEqual Seq(CurriedE(List(PropE("x19", TP(1))), DisjunctE(0, 2, PropE("x19", TP(1)), DisjunctT(Seq(TP(1), TP(2))))))
   }
+
+  it should "find proof term for simple instance of +Rn with several disjuncts" in {
+    val typeExpr = TP(2) :-> DisjunctT(Seq(TP(1), TP(2), TP(3)))
+    val proofs = ITP.findProofs(typeExpr)
+    proofs shouldEqual Seq(CurriedE(List(PropE("x23", TP(2))), DisjunctE(1, 3, PropE("x23", TP(2)), DisjunctT(Seq(TP(1), TP(2), TP(3))))))
+  }
 }
