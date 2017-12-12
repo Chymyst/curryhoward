@@ -2,8 +2,26 @@ package io.chymyst.ch.unit
 
 import io.chymyst.ch.CHTypes._
 import io.chymyst.ch.CurryHoward._
-import io.chymyst.ch.{CHTypes, CurryHoward, ITP}
+import io.chymyst.ch.{CHTypes, CurryHoward, FreshIdents, ITP}
 import org.scalatest.{FlatSpec, Matchers}
+import Subformulas._
+// This is now only for testing.
+object Subformulas {
+  private val freshSubformulas = new FreshIdents(prefix = "f")
+
+  def subformulas[T](typeStructure: TypeExpr[T]): Set[TypeExpr[T]] = Set(typeStructure) ++ (typeStructure match {
+    case DisjunctT(terms) ⇒ terms.flatMap(subformulas)
+    case ConjunctT(terms) ⇒ terms.flatMap(subformulas)
+    case head :-> body ⇒ subformulas(head) ++ subformulas(body) ++ (head match {
+      case DisjunctT(terms) ⇒ terms.flatMap(t ⇒ subformulas(:->(t, body)))
+      case ConjunctT(terms) ⇒ subformulas(terms.foldRight(body) { case (t, prev) ⇒ t :-> prev })
+      case _ :-> bd ⇒ subformulas(bd :-> body) // Special subformula case for implication of the form (hd ⇒ bd) ⇒ body
+      case _ ⇒ Seq() // `head` is an atomic type
+    })
+    case _ ⇒ Seq() // `typeStructure` is an atomic type
+  }).toSet
+
+}
 
 class CurryHowardSpec extends FlatSpec with Matchers {
 
@@ -123,6 +141,20 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     result._1 shouldEqual "(" + CurryHoward.basicTypes.map("<basic>" + _).mkString(", ") + ")"
   }
 
+  it should "get printable representation of case class" in {
+    sealed trait Test1[T]
+    case class A[T](x: Int, y: T) extends Test1[T]
+    case class B(y: String) extends Test1[String]
+
+    sealed abstract class Test2
+    case class C(x: Int)(y: Double) extends Test2
+    case class D(y: String) extends Test2
+
+    def result[T]: (String, String) = testType[Test1[T] ⇒ Test2]
+
+    result._1 shouldEqual "(<constructor>Test1[T]) ..=>.. <other>Test2"
+  }
+
   behavior of "syntax of `inhabit`"
 
   it should "compile" in {
@@ -206,13 +238,13 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   }
 
   // TODO: make this work
-  //  it should "generate correct code for the identity function on a=>b" in {
-  //    def f2[X, Y]: (X ⇒ Y) ⇒ X ⇒ Y = implement
+    it should "generate correct code for the identity function on a=>b" in {
+      "def f2[X, Y]: (X ⇒ Y) ⇒ X ⇒ Y = implement" shouldNot compile
   //
   //    val printInt: Int ⇒ String = _.toString
   //
   //    f2(printInt)(123) shouldEqual "123"
-  //  }
+    }
 
   it should "generate correct code for the const function with more unused arguments of coincident type" in {
     def f1[X, A, B]: A ⇒ X ⇒ A ⇒ B ⇒ X = implement
@@ -223,13 +255,13 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   }
 
   // TODO: make this work too!
-  //  it should "generate correct code for the identity function with explicit arguments" in {
-  //    def f1[X](x: X): X = implement
-  //
-  //    f1(123) shouldEqual 123
-  //    f1("abc") shouldEqual "abc"
-  //    f1(true) shouldEqual true
-  //  }
+  it should "generate correct code for the identity function with explicit arguments" in {
+    "def f1[X](x: X): X = implement" shouldNot compile
+    //
+    //    f1(123) shouldEqual 123
+    //    f1("abc") shouldEqual "abc"
+    //    f1(true) shouldEqual true
+  }
 
   behavior of "proof search - internal details"
 
@@ -241,17 +273,15 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     explode[Int](Seq(Seq(1, 2), Seq(10, 20, 30))) shouldEqual Seq(Seq(1, 10), Seq(1, 20), Seq(1, 30), Seq(2, 10), Seq(2, 20), Seq(2, 30))
   }
 
-  val sfIndexMap: Map[TypeExpr[Int], SFIndex] = (0 to 3).map(x ⇒ TP(x) → x).toMap
-
   it should "correctly produce proofs from the Id axiom" in {
-    followsFromAxioms(Sequent[Int](List(3, 2, 1), 0, sfIndexMap)) shouldEqual Seq()
+    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(0))) shouldEqual Seq()
 
-    followsFromAxioms(Sequent[Int](List(3, 2, 1), 1, sfIndexMap)) shouldEqual Seq(
+    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(1))) shouldEqual Seq(
       CurriedE(List(PropE("x4", TP(3)), PropE("x5", TP(2)), PropE("x6", TP(1))), PropE("x6", TP(1)))
     )
   }
   it should "produce several proofs from the Id axiom" in {
-    followsFromAxioms(Sequent[Int](List(1, 2, 1), 1, sfIndexMap)) shouldEqual Seq(
+    followsFromAxioms(Sequent[Int](List(TP(1), TP(2), TP(1)), TP(1))) shouldEqual Seq(
       CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x7", TP(1))),
       CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x9", TP(1)))
     )
@@ -293,9 +323,9 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   }
 
   it should "find proof term for given sequent with premises" in {
-    val sequent = Sequent(List(1), 1, sfIndexMap)
+    val sequent = Sequent(List(TP(1)), TP(1))
     CHTypes.findProofTerms(sequent) shouldEqual Seq(CurriedE(List(PropE("x10", TP(1))), PropE("x10", TP(1))))
-    val sequent2 = Sequent(List(3, 2, 1), 2, sfIndexMap)
+    val sequent2 = Sequent(List(TP(3), TP(2), TP(1)), TP(2))
     CHTypes.findProofTerms(sequent2) shouldEqual Seq(
       CurriedE(List(PropE("x11", TP(3)), PropE("x12", TP(2)), PropE("x13", TP(1))), PropE("x12", TP(2)))
     )
@@ -329,5 +359,13 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     val typeExpr = TP(2) :-> DisjunctT(Seq(TP(1), TP(2), TP(3)))
     val proofs = ITP.findProofs(typeExpr)
     proofs shouldEqual Seq(CurriedE(List(PropE("x23", TP(2))), DisjunctE(1, 3, PropE("x23", TP(2)), DisjunctT(Seq(TP(1), TP(2), TP(3))))))
+  }
+
+  it should "inhabit type using +Rn" in {
+    "def f[X]: X ⇒ Option[X] = implement" shouldNot compile
+
+    //    f(1) shouldEqual Some(1)
+
+    //    def f[X, Y]: X ⇒ Either[X, Y] = implement
   }
 }

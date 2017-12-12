@@ -8,7 +8,9 @@ import scala.reflect.macros.whitebox
 
 // TODO:
 /*  Priority is given in parentheses.
-- refactor disjuncts to contain at most 2 elements (0) ??? probably not necessary.
+
+- support named conjunctions (case classes) explicitly (1) and support disjunctions on that basis
+- implement Option and Either in inhabited terms (2)
 - reverse the direction of CurriedE because we want to reuse argument lists more (0)
 - implement all rules of the LJT calculus (1)
 - check unused arguments and sort results accordingly (3)
@@ -35,20 +37,6 @@ class FreshIdents(prefix: String) {
 }
 
 object CHTypes {
-  private val freshSubformulas = new FreshIdents(prefix = "f")
-
-  def subformulas[T](typeStructure: TypeExpr[T]): Set[TypeExpr[T]] = Set(typeStructure) ++ (typeStructure match {
-    case DisjunctT(terms) ⇒ terms.flatMap(subformulas)
-    case ConjunctT(terms) ⇒ terms.flatMap(subformulas)
-    case head :-> body ⇒ subformulas(head) ++ subformulas(body) ++ (head match {
-      case DisjunctT(terms) ⇒ terms.flatMap(t ⇒ subformulas(:->(t, body)))
-      case ConjunctT(terms) ⇒ subformulas(terms.foldRight(body) { case (t, prev) ⇒ t :-> prev })
-      case _ :-> bd ⇒ subformulas(bd :-> body) // Special subformula case for implication of the form (hd ⇒ bd) ⇒ body
-      case _ ⇒ Seq() // `head` is an atomic type
-    })
-    case _ ⇒ Seq() // `typeStructure` is an atomic type
-  }).toSet
-
   def explode[T](src: Seq[Seq[T]]): Seq[Seq[T]] = {
     src.foldLeft[Seq[Seq[T]]](Seq(Seq())) { case (prevSeqSeq, newSeq) ⇒
       for {
@@ -62,10 +50,8 @@ object CHTypes {
   type SFIndex = Int
 
   // Premises are reverse ordered.
-  final case class Sequent[T](premises: List[SFIndex], goal: SFIndex, sfIndexOfTExpr: Map[TypeExpr[T], SFIndex]) {
-    val tExprAtSFIndex: Map[SFIndex, TypeExpr[T]] = sfIndexOfTExpr.map { case (k, v) ⇒ v → k }
-
-    val premiseVars: List[PropE[T]] = premises.map { premiseSFIndex ⇒ PropE(freshVar(), tExprAtSFIndex(premiseSFIndex)) }
+  final case class Sequent[T](premises: List[TypeExpr[T]], goal: TypeExpr[T]) {
+    val premiseVars: List[PropE[T]] = premises.map(PropE(freshVar(), _))
 
     def substitute(p: ProofTerm[T]): ProofTerm[T] = {
       // Assuming that p takes as many arguments as our premises, substitute all premises into p.
@@ -78,9 +64,6 @@ object CHTypes {
     }
 
     def constructResultTerm(result: TermExpr[T]): TermExpr[T] = CurriedE(premiseVars, result)
-
-    // Convenience method.
-    def goalExpr: TypeExpr[T] = tExprAtSFIndex(goal)
   }
 
   type ProofTerm[T] = TermExpr[T]
@@ -96,13 +79,13 @@ object CHTypes {
 
     val fromIdAxiom: Seq[TermExpr[T]] = sequent.premiseVars
       .zip(sequent.premises)
-      .filter(_._2 == sequent.goal && sequent.goalExpr.isAtomic)
+      .filter(_._2 == sequent.goal && sequent.goal.isAtomic)
       .map { case (premiseVar, _) ⇒
         // Generate a new term x1 ⇒ x2 ⇒ ... ⇒ xN ⇒ xK with fresh names. Here `xK` is one of the variables, selecting the premise that is equal to the goal.
         // At this iteration, we already selected the premise that is equal to the goal.
         sequent.constructResultTerm(premiseVar)
       }
-    val fromTAxiom: Seq[TermExpr[T]] = sequent.goalExpr match {
+    val fromTAxiom: Seq[TermExpr[T]] = sequent.goal match {
       case unitT: UnitT[T] ⇒ Seq(sequent.constructResultTerm(UnitE(unitT)))
       case _ ⇒ Seq()
     }
@@ -111,11 +94,9 @@ object CHTypes {
 
   // G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
   private def ruleImplicationAtRight[T] = ForwardRule[T](name = "->R", sequent ⇒
-    sequent.goalExpr match {
+    sequent.goal match {
       case a :-> b ⇒
-        val aIndex = sequent.sfIndexOfTExpr(a)
-        val bIndex = sequent.sfIndexOfTExpr(b)
-        val newSequent = sequent.copy(premises = aIndex :: sequent.premises, goal = bIndex)
+        val newSequent = sequent.copy(premises = a :: sequent.premises, goal = b)
         Some(Seq(newSequent), { proofTerms ⇒
           // This rule expects only one sub-proof term.
           val subProof = proofTerms.head
@@ -132,11 +113,11 @@ object CHTypes {
   // We can signal this error early since this rule is invertible.
   private def ruleImplicationAtLeft1[T] = ForwardRule[T](name = "->L1", sequent ⇒
     for {
-      atomicPremise ← sequent.premises.find(sfIndex ⇒ sequent.tExprAtSFIndex(sfIndex).isAtomic)
-      implicationPremise ← sequent.premises.find(sfIndex ⇒ sequent.tExprAtSFIndex(sfIndex) match {
-        case head :-> body ⇒ sequent.sfIndexOfTExpr(head) == atomicPremise
+      atomicPremise ← sequent.premises.find(_.isAtomic)
+      implicationPremise ← sequent.premises.find{
+        case head :-> body ⇒ head == atomicPremise
         case _ ⇒ false
-      })
+      }
     } yield {
 
       ???
@@ -180,8 +161,8 @@ object CHTypes {
 
   // G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
   private def ruleConjunctionAtRight[T] = ForwardRule[T](name = "&R", sequent ⇒
-    sequent.goalExpr match {
-      case conjunctType: ConjunctT[T] ⇒ Some((conjunctType.terms.map(t ⇒ sequent.copy(goal = sequent.sfIndexOfTExpr(t))), { proofTerms ⇒
+    sequent.goal match {
+      case conjunctType: ConjunctT[T] ⇒ Some((conjunctType.terms.map(t ⇒ sequent.copy(goal = t)), { proofTerms ⇒
         // This rule takes any number of proof terms.
         sequent.constructResultTerm(ConjunctE(proofTerms.map(p ⇒ sequent.substitute(p))))
       })
@@ -193,10 +174,10 @@ object CHTypes {
   // G* |- A + B when G* |- A  -- rule +R1
   // Generate all such rules for any disjunct.
   private def ruleDisjunctionAtRight[T](indexInDisjunct: Int) = ForwardRule[T](name = "+R1", sequent ⇒
-    sequent.goalExpr match {
+    sequent.goal match {
       case disjunctType: DisjunctT[T] ⇒
         val mainExpression = disjunctType.terms(indexInDisjunct)
-        Some((List(sequent.copy(goal = sequent.sfIndexOfTExpr(mainExpression))), { proofTerms ⇒
+        Some((List(sequent.copy(goal = mainExpression)), { proofTerms ⇒
           // This rule expects a single proof term.
           val proofTerm = proofTerms.head
           proofTerm match {
@@ -226,7 +207,7 @@ object CHTypes {
 
   def nonInvertibleRules[T](sequent: Sequent[T]): Seq[ForwardRule[T]] = {
     // Generate all +Rn rules if the sequent has a disjunction goal.
-    (sequent.goalExpr match {
+    (sequent.goal match {
       case DisjunctT(terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
       case _ ⇒ Seq()
     }) ++ Seq(
@@ -474,7 +455,9 @@ object CurryHoward {
         q"($param ⇒ $prevTree)"
       }
       case UnitE(_) => q"()"
-      case ConjunctE(terms) => q"(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
+      case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
+      case DisjunctE(index, total, term, tExpr) ⇒
+        ???
     }
   }
 
@@ -532,8 +515,7 @@ object ITP {
 
   def findProofs[T](typeStructure: CHTypes.TypeExpr[T]): List[CHTypes.TermExpr[T]] = {
     import CHTypes._
-    val subformulaDictionary: Map[TypeExpr[T], SFIndex] = CHTypes.subformulas(typeStructure).zipWithIndex.toMap
-    val mainSequent = Sequent[T](List(), subformulaDictionary(typeStructure), subformulaDictionary)
+    val mainSequent = Sequent[T](List(), typeStructure)
     val proofs: Seq[ProofTerm[T]] = CHTypes.findProofTerms(mainSequent)
     proofs.toList
   }
