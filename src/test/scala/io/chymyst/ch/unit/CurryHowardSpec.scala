@@ -2,6 +2,7 @@ package io.chymyst.ch.unit
 
 import io.chymyst.ch.CHTypes._
 import io.chymyst.ch.CurryHoward._
+import io.chymyst.ch.{CHTypes, CurryHoward, ITP}
 import org.scalatest.{FlatSpec, Matchers}
 
 class CurryHowardSpec extends FlatSpec with Matchers {
@@ -164,7 +165,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     f2(false)(1.0) shouldEqual 1.0
   }
 
-    it should "generate correct code for the identity function with standard syntax" in {
+  it should "generate correct code for the identity function with standard syntax" in {
     def f1[X]: X ⇒ X = implement
 
     f1(123) shouldEqual 123
@@ -194,35 +195,35 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     def f1[X, A, B]: X ⇒ A ⇒ B ⇒ X = implement
 
     f1(123)("q")(true) shouldEqual 123
-    f1("abc")(Some((1,1)))(Map()) shouldEqual "abc"
+    f1("abc")(Some((1, 1)))(Map()) shouldEqual "abc"
     f1(true)(123.0)('blah) shouldEqual true
   }
 
   // TODO: make this work
-//  it should "generate correct code for the identity function on a=>b" in {
-//    def f2[X, Y]: (X ⇒ Y) ⇒ X ⇒ Y = implement
-//
-//    val printInt: Int ⇒ String = _.toString
-//
-//    f2(printInt)(123) shouldEqual "123"
-//  }
+  //  it should "generate correct code for the identity function on a=>b" in {
+  //    def f2[X, Y]: (X ⇒ Y) ⇒ X ⇒ Y = implement
+  //
+  //    val printInt: Int ⇒ String = _.toString
+  //
+  //    f2(printInt)(123) shouldEqual "123"
+  //  }
 
   it should "generate correct code for the const function with more unused arguments of coincident type" in {
     def f1[X, A, B]: A ⇒ X ⇒ A ⇒ B ⇒ X = implement
 
     f1("b")(123)("q")(true) shouldEqual 123
-    f1(Some((3, 4)))("abc")(Some((1,1)))(Map()) shouldEqual "abc"
+    f1(Some((3, 4)))("abc")(Some((1, 1)))(Map()) shouldEqual "abc"
     f1(0.0)(true)(123.0)('blah) shouldEqual true
   }
 
   // TODO: make this work too!
-//  it should "generate correct code for the identity function with explicit arguments" in {
-//    def f1[X](x: X): X = implement
-//
-//    f1(123) shouldEqual 123
-//    f1("abc") shouldEqual "abc"
-//    f1(true) shouldEqual true
-//  }
+  //  it should "generate correct code for the identity function with explicit arguments" in {
+  //    def f1[X](x: X): X = implement
+  //
+  //    f1(123) shouldEqual 123
+  //    f1("abc") shouldEqual "abc"
+  //    f1(true) shouldEqual true
+  //  }
 
   behavior of "proof search"
 

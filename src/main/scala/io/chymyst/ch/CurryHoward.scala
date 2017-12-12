@@ -412,9 +412,9 @@ object CurryHoward {
 
   import CHTypes._
 
-  private[example] def testType[T]: (String, String) = macro testTypeImpl[T]
+  private[ch] def testType[T]: (String, String) = macro testTypeImpl[T]
 
-  private[example] val basicTypes = List("Int", "String", "Boolean", "Float", "Double", "Long", "Symbol", "Char")
+  private[ch] val basicTypes = List("Int", "String", "Boolean", "Float", "Double", "Long", "Symbol", "Char")
   private val basicRegex = s"(?:scala.|java.lang.)*(${basicTypes.mkString("|")})".r
 
   // TODO: use c.Type instead of String

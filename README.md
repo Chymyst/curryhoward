@@ -27,6 +27,10 @@ object MyApp extends App {
 
 ```
 
+# Unit tests
+
+`sbt test`
+
 # Status
 
 Very early development. First examples are working as proof-of-concept.
