@@ -158,14 +158,14 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     result._1 shouldEqual "(<constructor>Test1[T]) ..=>.. <other>Test2"
   }
 
-  behavior of "syntax of `inhabit`"
+  behavior of "syntax of `implement` and `typeOf`"
 
   it should "compile" in {
     def f1[X, Y]: X ⇒ Y ⇒ X = implement
 
-    // This does not work because `inhabit` needs to access the type of the enclosing owner!
+    // This does not work because `implement` needs to access the type of the enclosing owner!
     // The compiler error is "recursive method f2 needs type".
-    " def f2a[X, Y] = inhabit[X ⇒ Y ⇒ X] " shouldNot compile
+    " def f2a[X, Y] = implement[X ⇒ Y ⇒ X] " shouldNot compile
 
     def f2[X, Y] = ofType[X ⇒ Y ⇒ X]
 
@@ -232,6 +232,8 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     "def f1[X, A, B]: X ⇒ A ⇒ X ⇒ X = implement" shouldNot compile
   }
 
+  // def f[A,B]: ((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B
+
   it should "generate correct code for the const function with extra unused arguments" in {
     def f1[X, A, B]: X ⇒ A ⇒ B ⇒ X = implement
 
@@ -269,14 +271,14 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   behavior of "proof search - internal details"
 
   it should "correctly explode sequences of integers" in {
-    ITP.explode[Int](Seq(Seq(1, 2))) shouldEqual Seq(Seq(1), Seq(2))
-    ITP.explode[Int](Seq(Seq(1, 2), Seq())) shouldEqual Seq()
-    ITP.explode[Int](Seq(Seq())) shouldEqual Seq()
-    ITP.explode[Int](Seq()) shouldEqual Seq(Seq())
-    ITP.explode[Int](Seq(Seq(1, 2), Seq(10, 20, 30))) shouldEqual Seq(Seq(1, 10), Seq(1, 20), Seq(1, 30), Seq(2, 10), Seq(2, 20), Seq(2, 30))
+    TheoremProver.explode[Int](Seq(Seq(1, 2))) shouldEqual Seq(Seq(1), Seq(2))
+    TheoremProver.explode[Int](Seq(Seq(1, 2), Seq())) shouldEqual Seq()
+    TheoremProver.explode[Int](Seq(Seq())) shouldEqual Seq()
+    TheoremProver.explode[Int](Seq()) shouldEqual Seq(Seq())
+    TheoremProver.explode[Int](Seq(Seq(1, 2), Seq(10, 20, 30))) shouldEqual Seq(Seq(1, 10), Seq(1, 20), Seq(1, 30), Seq(2, 10), Seq(2, 20), Seq(2, 30))
   }
 
-  private val freshVar = ITP.freshVar
+  private val freshVar = TheoremProver.freshVar
 
   it should "correctly produce proofs from the Id axiom" in {
     followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(0), freshVar)) shouldEqual Seq()
@@ -329,9 +331,9 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
   it should "find proof term for given sequent with premises" in {
     val sequent = Sequent(List(TP(1)), TP(1), freshVar)
-    LJT.findProofTerms(sequent) shouldEqual Seq(CurriedE(List(PropE("x10", TP(1))), PropE("x10", TP(1))))
+    TheoremProver.findProofTerms(sequent) shouldEqual Seq(CurriedE(List(PropE("x10", TP(1))), PropE("x10", TP(1))))
     val sequent2 = Sequent(List(TP(3), TP(2), TP(1)), TP(2), freshVar)
-    LJT.findProofTerms(sequent2) shouldEqual Seq(
+    TheoremProver.findProofTerms(sequent2) shouldEqual Seq(
       CurriedE(List(PropE("x11", TP(3)), PropE("x12", TP(2)), PropE("x13", TP(1))), PropE("x12", TP(2)))
     )
   }
@@ -340,13 +342,13 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
   it should "find proof term for the I combinator using rule ->R" in {
     val typeExpr = TP(1) :-> TP(1)
-    val proofs = ITP.findProofs(typeExpr)
+    val proofs = TheoremProver.findProofs(typeExpr)
     proofs shouldEqual Seq(CurriedE(List(PropE("x14", TP(1))), PropE("x14", TP(1))))
   }
 
   it should "find proof term for the K combinator using rule ->R" in {
     val typeExpr = TP(1) :-> (TP(2) :-> TP(1))
-    val proofs = ITP.findProofs(typeExpr)
+    val proofs = TheoremProver.findProofs(typeExpr)
     proofs shouldEqual Seq(
       CurriedE(List(PropE("x16", TP(2)), PropE("x17", TP(1))), PropE("x17", TP(1)))
     )
@@ -356,13 +358,13 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
   it should "find proof term for simple instance of +Rn" in {
     val typeExpr = TP(1) :-> DisjunctT(Seq(TP(1), TP(2)))
-    val proofs = ITP.findProofs(typeExpr)
+    val proofs = TheoremProver.findProofs(typeExpr)
     proofs shouldEqual Seq(CurriedE(List(PropE("x19", TP(1))), DisjunctE(0, 2, PropE("x19", TP(1)), DisjunctT(Seq(TP(1), TP(2))))))
   }
 
   it should "find proof term for simple instance of +Rn with several disjuncts" in {
     val typeExpr = TP(2) :-> DisjunctT(Seq(TP(1), TP(2), TP(3)))
-    val proofs = ITP.findProofs(typeExpr)
+    val proofs = TheoremProver.findProofs(typeExpr)
     proofs shouldEqual Seq(CurriedE(List(PropE("x23", TP(2))), DisjunctE(1, 3, PropE("x23", TP(2)), DisjunctT(Seq(TP(1), TP(2), TP(3))))))
   }
 

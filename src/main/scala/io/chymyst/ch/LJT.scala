@@ -2,6 +2,36 @@ package io.chymyst.ch
 
 import io.chymyst.ch.TermExpr.ProofTerm
 
+/*
+The calculus LJT as presented by Galmiche and Larchey-Wendling (1998).
+
+Axioms:
+-------
+
+(G*, X) |- X  -- axiom Id -- here X is atomic, although the same rule would be valid for non-atomic X, we will not use it because in that way we avoid duplication of derivations.
+G* |- 1  -- axiom T -- here 1 represents the Unit type, and the expression must be constructed somehow in the term.
+(G*, 0) |- A  -- axiom F -- we will not use it. Instead, we will treat `Nothing` as just another type parameter. (We will treat `Any` in this way, too.)
+
+Invertible rules:
+-----------------
+
+(G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
+G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
+(G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
+G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
+(G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1 -- here X is atomic, although the same rule would be valid for non-atomic X.
+(G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
+(G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
+
+Non-invertible rules:
+---------------------
+
+G* |- A + B when G* |- A  -- rule +R1
+G* |- A + B when G* |- B  -- rule +R2
+(G*, (A ⇒ B) ⇒ C) |- D when (G*, C) |- D and (G*, B ⇒ C) |- A ⇒ B  -- rule ->L4
+
+ */
+
 object LJT {
   def followsFromAxioms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
     // The LJT calculus has three axioms. We use the Id axiom and the T axiom only, because the F axiom is not useful for code generation.
@@ -52,35 +82,6 @@ object LJT {
       ???
     }
   )
-
-  /*
-
-  Axioms:
-  -------
-
-  (G*, X) |- X  -- axiom Id -- here X is atomic, although the same rule would be valid for non-atomic X, we will not use it because in that way we avoid duplication of derivations.
-  G* |- 1  -- axiom T -- here 1 represents the Unit type, and the expression must be constructed somehow in the term.
-  (G*, 0) |- A  -- axiom F -- we will not use it. Instead, we will treat `Nothing` as just another type parameter. (We will treat `Any` in this way, too.)
-
-  Invertible rules:
-  -----------------
-
-  (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
-  G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
-  (G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
-  G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
-  (G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1 -- here X is atomic, although the same rule would be valid for non-atomic X.
-  (G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
-  (G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
-
-  Non-invertible rules:
-  ---------------------
-
-  G* |- A + B when G* |- A  -- rule +R1
-  G* |- A + B when G* |- B  -- rule +R2
-  (G*, (A ⇒ B) ⇒ C) |- D when (G*, C) |- D and (G*, B ⇒ C) |- A ⇒ B  -- rule ->L4
-
-   */
 
   def invertibleRules[T]: Seq[ForwardRule[T]] = Seq(
     ruleImplicationAtRight,
@@ -134,7 +135,7 @@ object LJT {
     )
   )
 
-  def nonInvertibleRules[T](sequent: Sequent[T]): Seq[ForwardRule[T]] = {
+  def nonInvertibleRulesForSequent[T](sequent: Sequent[T]): Seq[ForwardRule[T]] = {
     // Generate all +Rn rules if the sequent has a disjunction goal.
     (sequent.goal match {
       case DisjunctT(terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
@@ -143,46 +144,5 @@ object LJT {
       //    ruleImplicationAtLeft4
     )
   }
-
-  // Main recursive function that computes the list of available proofs for a sequent.
-  // The main assumption is that the depth-first proof search terminates.
-  // No loop checking is performed on sequents.
-  def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
-    // Check whether the sequent follows directly from an axiom.
-    val fromAxioms: Seq[ProofTerm[T]] = followsFromAxioms(sequent) // This could be empty or non-empty.
-    // Even if the sequent follows from axioms, we should try applying rules in hopes of getting more proofs.
-
-    // Try each rule on sequent. If rule applies, obtain the next sequent.
-    // If all rules were invertible, we would return `fromAxioms ++ fromInvertibleRules`.
-
-    // We try applying just one invertible rule and proceed from there.
-    val fromRules: Seq[ProofTerm[T]] = invertibleRules[T].view.flatMap(_.applyTo(sequent)).headOption match {
-      case Some(RuleResult(newSequents, backTransform)) ⇒
-        // All the new sequents need to be proved before we can continue. They may have several proofs each.
-        val newProofs: Seq[Seq[ProofTerm[T]]] = newSequents.map(findProofTerms)
-        val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = ITP.explode(newProofs)
-        explodedNewProofs.map(backTransform) ++ fromAxioms
-
-      case None ⇒
-        // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
-        // Each non-invertible rule will generate some proofs or none.
-        // If a rule generates no proofs, another rule should be used.
-        // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
-        // If no more rules apply here, we return `fromAxioms`.
-        // Use flatMap to concatenate all results from all applicable non-invertible rules.
-        val fromNoninvertibleRules: Seq[ProofTerm[T]] = nonInvertibleRules[T](sequent)
-          .flatMap(_.applyTo(sequent))
-          .flatMap { case RuleResult(newSequents, backTransform) ⇒
-            val newProofs: Seq[Seq[ProofTerm[T]]] = newSequents.map(findProofTerms)
-            val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = ITP.explode(newProofs)
-            val finalNewProofs: Seq[ProofTerm[T]] = explodedNewProofs.map(backTransform)
-            finalNewProofs
-          }
-        fromNoninvertibleRules ++ fromAxioms
-    }
-    fromRules
-  }
-
-
 
 }

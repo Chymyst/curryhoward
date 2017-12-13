@@ -1,7 +1,5 @@
 package io.chymyst.ch
 
-import io.chymyst.ch.TermExpr.ProofTerm
-
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 import scala.reflect.macros.whitebox
@@ -106,9 +104,6 @@ object CurryHowardMacros {
     c.Expr[(String, String)](q"($s1,$s2)")
   }
 
-  def ofType[T]: T = macro ofTypeImpl[T]
-
-  def implement[T]: T = macro inhabitImpl[T]
 
   // TODO: can we replace this with blackbox? Probably, as long as `def f3[X, Y]: X ⇒ Y ⇒ X = ofType` does not work with whitebox anyway.
   def ofTypeImpl[T: c.WeakTypeTag](c: whitebox.Context): c.Tree = {
@@ -124,7 +119,7 @@ object CurryHowardMacros {
   def inhabitInternal(c: whitebox.Context)(typeT: c.Type): c.Tree = {
     import c.universe._
     val typeStructure: TypeExpr[String] = matchType(c)(typeT)
-    val termFound: TermExpr[String] = ITP(typeStructure) match {
+    val termFound: TermExpr[String] = TheoremProver(typeStructure) match {
       case Nil ⇒
         c.error(c.enclosingPosition, s"type $typeStructure cannot be inhabited")
         null
@@ -139,26 +134,5 @@ object CurryHowardMacros {
     val result = reifyTerms(c)(termFound, paramTerms)
     println(s"DEBUG: returning code: ${showCode(result)}")
     result
-  }
-}
-
-object ITP {
-  def explode[T](src: Seq[Seq[T]]): Seq[Seq[T]] = {
-    src.foldLeft[Seq[Seq[T]]](Seq(Seq())) { case (prevSeqSeq, newSeq) ⇒
-      for {
-        prev ← prevSeqSeq
-        next ← newSeq
-      } yield prev :+ next
-    }
-  }
-
-  def apply(typeStructure: TypeExpr[String]): List[TermExpr[String]] = findProofs(typeStructure)
-
-  private[ch] val freshVar = new FreshIdents(prefix = "x")
-
-  def findProofs[T](typeStructure: TypeExpr[T]): List[TermExpr[T]] = {
-    val mainSequent = Sequent[T](List(), typeStructure, freshVar)
-    val proofs: Seq[ProofTerm[T]] = LJT.findProofTerms(mainSequent)
-    proofs.toList
   }
 }
