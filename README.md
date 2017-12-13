@@ -39,6 +39,8 @@ object MyApp extends App {
   def f[X, Y]: X => Y => X = implement
 
   // The code `(x: X) => (y: Y) => x` is generated for the function `f`.
+  
+  f(123)("abc") // returns 123
 }
 
 ```
