@@ -6,7 +6,8 @@ import io.chymyst.ch._
 import io.chymyst.ch.unit.Subformulas._
 import org.scalatest.{FlatSpec, Matchers}
 
-// This is now only for testing.
+// This is now only for testing. Subformula property may not hold in a further iteration of the theorem prover,
+// and it is not bringing an obvious advantage to the implementation.
 object Subformulas {
   private val freshSubformulas = new FreshIdents(prefix = "f")
 
@@ -29,6 +30,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   behavior of "syntax for untyped functions"
 
   it should "define syntax for untyped lambda calculus with products" in {
+    // This is for testing only. We need to represent terms by a polynomial type, not by functions.
     sealed trait Term {
       def apply[T](x: T): Term = this // dummy implementation to simplify code
     }
@@ -274,15 +276,17 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     explode[Int](Seq(Seq(1, 2), Seq(10, 20, 30))) shouldEqual Seq(Seq(1, 10), Seq(1, 20), Seq(1, 30), Seq(2, 10), Seq(2, 20), Seq(2, 30))
   }
 
-  it should "correctly produce proofs from the Id axiom" in {
-    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(0))) shouldEqual Seq()
+  private val freshVar = ITP.freshVar
 
-    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(1))) shouldEqual Seq(
+  it should "correctly produce proofs from the Id axiom" in {
+    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(0), freshVar)) shouldEqual Seq()
+
+    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(1), freshVar)) shouldEqual Seq(
       CurriedE(List(PropE("x4", TP(3)), PropE("x5", TP(2)), PropE("x6", TP(1))), PropE("x6", TP(1)))
     )
   }
   it should "produce several proofs from the Id axiom" in {
-    followsFromAxioms(Sequent[Int](List(TP(1), TP(2), TP(1)), TP(1))) shouldEqual Seq(
+    followsFromAxioms(Sequent[Int](List(TP(1), TP(2), TP(1)), TP(1), freshVar)) shouldEqual Seq(
       CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x7", TP(1))),
       CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x9", TP(1)))
     )
@@ -324,9 +328,9 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   }
 
   it should "find proof term for given sequent with premises" in {
-    val sequent = Sequent(List(TP(1)), TP(1))
+    val sequent = Sequent(List(TP(1)), TP(1), freshVar)
     CHTypes.findProofTerms(sequent) shouldEqual Seq(CurriedE(List(PropE("x10", TP(1))), PropE("x10", TP(1))))
-    val sequent2 = Sequent(List(TP(3), TP(2), TP(1)), TP(2))
+    val sequent2 = Sequent(List(TP(3), TP(2), TP(1)), TP(2), freshVar)
     CHTypes.findProofTerms(sequent2) shouldEqual Seq(
       CurriedE(List(PropE("x11", TP(3)), PropE("x12", TP(2)), PropE("x13", TP(1))), PropE("x12", TP(2)))
     )

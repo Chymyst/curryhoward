@@ -1,6 +1,5 @@
 package io.chymyst.ch
 
-import io.chymyst.ch.CHTypes.Sequent
 import io.chymyst.ch.ForwardRule.BackTransform
 import io.chymyst.ch.TermExpr.ProofTerm
 

@@ -7,17 +7,27 @@
 # curryhoward
 A library for automatic implementation of fully type-parametric functions via the Curry-Howard isomorphism.
 
-The Curry-Howard isomorphism maps functions with fully parametric types to theorems in propositional logic with universally quantified propositions.
-For example,
+The Curry-Howard isomorphism maps functions with fully parametric types to theorems in the intuitionistic propositional logic (IPL) with universally quantified propositions.
+
+For example, the type of the function
 
 ```scala
-def f[X, Y]: X => Y => X = (x: X) => (y: Y) => X
+def f[X, Y]: X ⇒ Y ⇒ X = (x: X) ⇒ (y: Y) ⇒ X
 
 ```
 
-is mapped to the propositional theorem `forall X, Y: X => (Y => X)` in the intuitionistic propositional logic (IPL).
+is mapped to the propositional theorem `forall X, Y: X => (Y => X)` in the IPL.
 
-This project is a Scala utility that generates code for such functions using a decision procedure algorithm for IPL.
+This project is a Scala utility that generates code for such functions using a decision algorithm for IPL.
+
+The current implementation uses the calculus called LJT as presented in:
+
+[D. Galmiche , D. Larchey-Wendling. _Formulae-as-Resources Management for an Intuitionistic Theorem Prover_ (1998)](http://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.35.2618). 	In 5th Workshop on Logic, Language, Information and Computation, WoLLIC'98, Sao Paulo.
+
+The original presentation of the LJT rules are found in:
+
+R. Dyckhoff, _Contraction-Free Sequent Calculi for Intuitionistic Logic_, The Journal of Symbolic Logic, Vol. 57, No. 3, (Sep., 1992), pp. 795-807.
+
 
 # Usage
 
