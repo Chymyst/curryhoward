@@ -1,7 +1,7 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.CHTypes._
-import io.chymyst.ch.CurryHoward._
+import io.chymyst.ch.LJT._
+import io.chymyst.ch.CurryHowardMacros._
 import io.chymyst.ch._
 import io.chymyst.ch.unit.Subformulas._
 import org.scalatest.{FlatSpec, Matchers}
@@ -141,7 +141,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   it should "get printable representation of tuple of basic types" in {
     def result[A, B, C]: (String, String) = testType[(Int, String, Boolean, Float, Double, Long, Symbol, Char)]
 
-    result._1 shouldEqual "(" + CurryHoward.basicTypes.map("<basic>" + _).mkString(", ") + ")"
+    result._1 shouldEqual "(" + CurryHowardMacros.basicTypes.map("<basic>" + _).mkString(", ") + ")"
   }
 
   it should "get printable representation of case class" in {
@@ -269,11 +269,11 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   behavior of "proof search - internal details"
 
   it should "correctly explode sequences of integers" in {
-    explode[Int](Seq(Seq(1, 2))) shouldEqual Seq(Seq(1), Seq(2))
-    explode[Int](Seq(Seq(1, 2), Seq())) shouldEqual Seq()
-    explode[Int](Seq(Seq())) shouldEqual Seq()
-    explode[Int](Seq()) shouldEqual Seq(Seq())
-    explode[Int](Seq(Seq(1, 2), Seq(10, 20, 30))) shouldEqual Seq(Seq(1, 10), Seq(1, 20), Seq(1, 30), Seq(2, 10), Seq(2, 20), Seq(2, 30))
+    ITP.explode[Int](Seq(Seq(1, 2))) shouldEqual Seq(Seq(1), Seq(2))
+    ITP.explode[Int](Seq(Seq(1, 2), Seq())) shouldEqual Seq()
+    ITP.explode[Int](Seq(Seq())) shouldEqual Seq()
+    ITP.explode[Int](Seq()) shouldEqual Seq(Seq())
+    ITP.explode[Int](Seq(Seq(1, 2), Seq(10, 20, 30))) shouldEqual Seq(Seq(1, 10), Seq(1, 20), Seq(1, 30), Seq(2, 10), Seq(2, 20), Seq(2, 30))
   }
 
   private val freshVar = ITP.freshVar
@@ -329,9 +329,9 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
   it should "find proof term for given sequent with premises" in {
     val sequent = Sequent(List(TP(1)), TP(1), freshVar)
-    CHTypes.findProofTerms(sequent) shouldEqual Seq(CurriedE(List(PropE("x10", TP(1))), PropE("x10", TP(1))))
+    LJT.findProofTerms(sequent) shouldEqual Seq(CurriedE(List(PropE("x10", TP(1))), PropE("x10", TP(1))))
     val sequent2 = Sequent(List(TP(3), TP(2), TP(1)), TP(2), freshVar)
-    CHTypes.findProofTerms(sequent2) shouldEqual Seq(
+    LJT.findProofTerms(sequent2) shouldEqual Seq(
       CurriedE(List(PropE("x11", TP(3)), PropE("x12", TP(2)), PropE("x13", TP(1))), PropE("x12", TP(2)))
     )
   }

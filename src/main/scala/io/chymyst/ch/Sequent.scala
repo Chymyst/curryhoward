@@ -1,5 +1,7 @@
 package io.chymyst.ch
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import io.chymyst.ch.TermExpr.ProofTerm
 
 // Premises are reverse ordered.
@@ -17,4 +19,12 @@ final case class Sequent[T](premises: List[TypeExpr[T]], goal: TypeExpr[T], fres
   }
 
   def constructResultTerm(result: TermExpr[T]): TermExpr[T] = CurriedE(premiseVars, result)
+}
+
+class FreshIdents(prefix: String) {
+  private val identCount = new AtomicInteger(0)
+
+  private def newIdentCount: Int = identCount.incrementAndGet()
+
+  def apply(): String = prefix + newIdentCount.toString
 }
