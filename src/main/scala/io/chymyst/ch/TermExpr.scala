@@ -1,5 +1,9 @@
 package io.chymyst.ch
 
+import io.chymyst.ch.TermExpr.VarName
+
+import scala.annotation.tailrec
+
 object TermExpr {
   def propositions[T](termExpr: TermExpr[T]): Set[PropE[T]] = termExpr match {
     case p: PropE[T] ⇒ Set(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
@@ -10,12 +14,39 @@ object TermExpr {
     case _ ⇒ Set()
   }
 
+  type VarName = String
   type ProofTerm[T] = TermExpr[T]
+
+  private val freshIdents = new FreshIdents("z")
+
+  private val makeFreshNames: Iterator[VarName] = Iterator.iterate(freshIdents())(_ ⇒ freshIdents())
+
+  def allFreshNames(names1: Seq[VarName], names2: Seq[VarName], namesToExclude: Set[VarName]): Seq[VarName] = {
+    val requiredNumber = names1.length
+    val allExcluded = (names1 ++ names2 ++ namesToExclude).toSet
+    makeFreshNames.filterNot(allExcluded.contains).take(requiredNumber).toSeq
+  }
 
   // Apply this term to a number of vars at once.
   def applyToVars[T](termExpr: TermExpr[T], args: List[TermExpr[T]]): TermExpr[T] = {
     args.foldLeft[TermExpr[T]](termExpr) { case (prev, arg) ⇒ AppE(prev, arg) }
   }
+
+  // Compare terms up to renaming. Note: this is not alpha-conversion yet.
+  @tailrec
+  def equiv[T](e1: TermExpr[T], e2: TermExpr[T]): Boolean = e1 match {
+    case CurriedE(heads1, body1) ⇒ e2 match {
+      case CurriedE(heads2, body2) if heads1.lengthCompare(heads2.length) == 0 ⇒
+        // rename all vars to new names
+        val vars1 = heads1.map(_.name)
+        val vars2 = heads2.map(_.name)
+        val freshNames = allFreshNames(vars1, vars2, body1.freeVars ++ body2.freeVars)
+        equiv(e1.renameAllVars(vars1, freshNames), e2.renameAllVars(vars2, freshNames))
+      case _ ⇒ false
+    }
+    case _ ⇒ e1 == e2
+  }
+
 }
 
 sealed trait TermExpr[+T] {
@@ -37,17 +68,38 @@ sealed trait TermExpr[+T] {
 
   def map[U](f: T ⇒ U): TermExpr[U]
 
-  lazy val freeVars: Set[String] = this match {
+  lazy val freeVars: Set[VarName] = this match {
     case PropE(name, tExpr) ⇒ Set(name)
     case AppE(head, arg) ⇒ head.freeVars ++ arg.freeVars
     case CurriedE(heads, body) ⇒ body.freeVars -- heads.map(_.name).toSet
     case UnitE(tExpr) ⇒ Set()
     case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars).toSet
-    case DisjunctE(index, total, term, tExpr) ⇒ term.freeVars
+    case d: DisjunctE[T] ⇒ d.term.freeVars
+  }
+
+  // Rename a variable *everywhere* in the expression.
+  def renameVar(oldName: VarName, newName: VarName): TermExpr[T] = {
+    def rename(t: TermExpr[T]): TermExpr[T] = t.renameVar(oldName, newName)
+
+    this match {
+      case PropE(name, tExpr) ⇒
+        val replacedName = if (name == oldName) newName else name
+        PropE(replacedName, tExpr)
+      case AppE(head, arg) ⇒ AppE(rename(head), rename(arg))
+      case CurriedE(heads, body) ⇒ CurriedE(heads.map(h ⇒ rename(h).asInstanceOf[PropE[T]]), rename(body))
+      case UnitE(tExpr) ⇒ this
+      case ConjunctE(terms) ⇒ ConjunctE(terms.map(rename))
+      case d: DisjunctE[T] ⇒ d.copy(term = rename(d.term))
+    }
+  }
+
+  def renameAllVars(oldNames: Seq[VarName], newNames: Seq[VarName]): TermExpr[T] = {
+    oldNames.zip(newNames)
+      .foldLeft(this) { case (prev, (oldName, newName)) ⇒ prev.renameVar(oldName, newName) }
   }
 }
 
-final case class PropE[T](name: String, tExpr: TypeExpr[T]) extends TermExpr[T] {
+final case class PropE[T](name: VarName, tExpr: TypeExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): PropE[U] = PropE(name, tExpr map f)
 }
 
