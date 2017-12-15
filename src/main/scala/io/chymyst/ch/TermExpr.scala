@@ -11,6 +11,11 @@ object TermExpr {
   }
 
   type ProofTerm[T] = TermExpr[T]
+
+  // Apply this term to a number of vars at once.
+  def applyToVars[T](termExpr: TermExpr[T], args: List[TermExpr[T]]): TermExpr[T] = {
+    args.foldLeft[TermExpr[T]](termExpr) { case (prev, arg) ⇒ AppE(prev, arg) }
+  }
 }
 
 sealed trait TermExpr[+T] {
@@ -19,7 +24,7 @@ sealed trait TermExpr[+T] {
   override def toString: String = this match {
     case PropE(name, tExpr) => s"($name:$tExpr)"
     case AppE(head, arg) => s"($head)($arg)"
-    case CurriedE(heads, body) => s"\\(${heads.reverse.mkString(" -> ")} -> $body)"
+    case CurriedE(heads, body) => s"\\(${heads.mkString(" -> ")} -> $body)"
     case UnitE(tExpr) => "()"
     case ConjunctE(terms) => "(" + terms.map(_.toString).mkString(", ") + ")"
     case DisjunctE(index, total, term, _) ⇒
@@ -40,16 +45,19 @@ final case class PropE[T](name: String, tExpr: TypeExpr[T]) extends TermExpr[T] 
 final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = AppE(head map f, arg map f)
 
-  def tExpr: TypeExpr[T] = head match {
-    case CurriedE(heads, body) ⇒ CurriedE(heads.drop(1), body).tExpr
+  // The type of AppE is computed from the types of its arguments.
+  def tExpr: TypeExpr[T] = head.tExpr match {
+    case hd :-> body if hd == arg.tExpr ⇒ body
+    case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application, ${head.tExpr}: must be a function with argument type ${arg.tExpr}")
   }
 }
 
-// Note: the order of `heads` is reversed, so `CurriedE(List(1,2,3), body, ...)` represents the term `x3 -> x2 -> x1 -> body`
+// The order of `heads` is straight, so `CurriedE(List(x1, x2, x3), body)` represents the term `x1 -> x2 -> x2 -> body`
 final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = CurriedE(heads map (_ map f), body map f)
 
-  def tExpr: TypeExpr[T] = heads.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr :-> prev }
+  // The type is t1 -> t2 -> t3 -> b
+  def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr :-> prev }
 }
 
 final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T] {

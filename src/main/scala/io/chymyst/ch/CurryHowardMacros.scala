@@ -7,21 +7,27 @@ import scala.reflect.macros.whitebox
 // TODO:
 /*  Priority is given in parentheses.
 
-- support named conjunctions (case classes) explicitly (1) and support disjunctions on that basis
-- implement Option and Either in inhabited terms (2)
-- reverse the direction of CurriedE because we want to reuse argument lists more (0)
 - implement all rules of the LJT calculus (1)
-- check unused arguments and sort results accordingly (3)
-- only output the results with smallest number of unused arguments (3)
-- implement uncurried functions (6)
+- implement Option and Either in inhabited terms (2)
 - make sure Unit works (2)
+- support named conjunctions (case classes) explicitly (3) and support disjunctions on that basis
+- check unused arguments and sort results accordingly (3)
+- only output the results with smallest number of unused arguments, if that is unique (3)
 - support natural syntax def f[T](x: T): T = implement (3)
-- use c.Type instead of String (3)
+- use c.Type instead of String for correct code generation (3)
 - use blackbox macros instead of whitebox if possible (5)
-- use a special subclass of Function1 that also carries symbolic information about the lambda-term (6)
 - add more error messages: print alternative lambda-terms when we refuse to implement (5)
 - use a symbolic evaluator to simplify the lambda-terms (5)
 - support sealed traits / case classes (5)
+- implement uncurried functions and multiple argument lists (6)
+- use a special subclass of Function1 that also carries symbolic information about the lambda-term (6)
+
+- implement a new API of the form `val a: Int = from(x, y, z)` or `val a = make[Int](x, y, z)`, equivalent to
+
+```scala
+def f[T,X,Y,Z]: X => Y => Z => T = implement
+val a: Int = f[Int, X, Y, Z](x, y, z)
+```
 
  Release as a separate open-source project after (1)-(4) are done.
  */
@@ -59,6 +65,7 @@ object CurryHowardMacros {
   def reifyParam(c: whitebox.Context)(term: PropE[String]): c.Tree = {
     import c.universe._
     term match {
+        // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case PropE(name, tExpr) ⇒
         val tpt = tExpr match {
           case _: NothingT[String] ⇒ tq""

@@ -5,7 +5,7 @@ import io.chymyst.ch.TermExpr.ProofTerm
 
 final case class ForwardRule[T](
   name: String,
-  applyTo: Sequent[T] ⇒ Option[RuleResult[T]]
+  applyTo: Sequent[T] ⇒ Seq[RuleResult[T]]
 )
 
 object ForwardRule {

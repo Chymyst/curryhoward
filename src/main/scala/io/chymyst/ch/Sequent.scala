@@ -4,19 +4,17 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import io.chymyst.ch.TermExpr.ProofTerm
 
-// Premises are reverse ordered.
+// Premises are straight ordered, so (A, B, C) |- D is Sequent(List(A, B, C), D, _)
 final case class Sequent[T](premises: List[TypeExpr[T]], goal: TypeExpr[T], freshVar: FreshIdents) {
-  val premiseVars: List[PropE[T]] = premises.map(PropE(freshVar(), _))
+  lazy val premiseVars: List[PropE[T]] = premises.map(PropE(freshVar(), _))
 
-  def substitute(p: ProofTerm[T]): ProofTerm[T] = {
-    // Assuming that p takes as many arguments as our premises, substitute all premises into p.
-    // AppE( AppE( AppE(p, premise3), premise2), premise1)
-    premiseVars.foldLeft(p) { case (prev, premise) ⇒ AppE(prev, premise) }
-  }
-
-  private def constructResultType(result: TypeExpr[T], skip: Int = 0): TypeExpr[T] = {
-    premiseVars.drop(skip).foldLeft(result) { case (prev, premiseVar) ⇒ premiseVar.tExpr :-> prev }
-  }
+  /** Assuming that p takes as many arguments as our premises, substitute all premises into p.
+    * This will construct the term AppE( AppE( AppE(p, premise1), premise2), premise3)
+    *
+    * @param p Proof term to apply to our premises.
+    * @return Resulting term.
+    */
+  def substitute(p: ProofTerm[T]): ProofTerm[T] = TermExpr.applyToVars(p, premiseVars)
 
   def constructResultTerm(result: TermExpr[T]): TermExpr[T] = CurriedE(premiseVars, result)
 }

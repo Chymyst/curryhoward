@@ -50,7 +50,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     val a4 = \(x ⇒ \(y ⇒ \(z ⇒ x(y(z)))))
     val a5 = \(x ⇒ \(y ⇒ \(z ⇒ z(x(y)))))
     val a6 = \(x ⇒ (x, \(y ⇒ (x, y, x(y))))) // can use tuples
-    val qqq = \ { x ⇒ x() } // can apply to unit
+    val qqq = \ { x ⇒ x(()) } // can apply to unit
     val a7 = \: { case (x: Term, y: Term) ⇒ x(y(x)) } // use tuples as argument types, need annotations
   }
 
