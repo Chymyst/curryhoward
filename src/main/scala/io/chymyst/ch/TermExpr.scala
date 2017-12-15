@@ -21,12 +21,12 @@ object TermExpr {
 sealed trait TermExpr[+T] {
   def tExpr: TypeExpr[T]
 
-  override def toString: String = this match {
-    case PropE(name, tExpr) => s"($name:$tExpr)"
-    case AppE(head, arg) => s"($head)($arg)"
-    case CurriedE(heads, body) => s"\\(${heads.mkString(" -> ")} -> $body)"
-    case UnitE(tExpr) => "()"
-    case ConjunctE(terms) => "(" + terms.map(_.toString).mkString(", ") + ")"
+  override lazy val toString: String = this match {
+    case PropE(name, tExpr) ⇒ s"($name:$tExpr)"
+    case AppE(head, arg) ⇒ s"($head)($arg)"
+    case CurriedE(heads, body) ⇒ s"\\(${heads.mkString(" -> ")} -> $body)"
+    case UnitE(tExpr) ⇒ "()"
+    case ConjunctE(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
       val leftZerosString = if (leftZeros.isEmpty) "" else " + "
@@ -36,6 +36,15 @@ sealed trait TermExpr[+T] {
   }
 
   def map[U](f: T ⇒ U): TermExpr[U]
+
+  lazy val freeVars: Set[String] = this match {
+    case PropE(name, tExpr) ⇒ Set(name)
+    case AppE(head, arg) ⇒ head.freeVars ++ arg.freeVars
+    case CurriedE(heads, body) ⇒ body.freeVars -- heads.map(_.name).toSet
+    case UnitE(tExpr) ⇒ Set()
+    case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars).toSet
+    case DisjunctE(index, total, term, tExpr) ⇒ term.freeVars
+  }
 }
 
 final case class PropE[T](name: String, tExpr: TypeExpr[T]) extends TermExpr[T] {
@@ -64,7 +73,7 @@ final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = UnitE(tExpr map f)
 }
 
-final case class ConjunctE[T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
+final case class ConjunctE[+T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = ConjunctE(terms.map(_.map(f)))
 
   def tExpr: TypeExpr[T] = ConjunctT(terms.map(_.tExpr))

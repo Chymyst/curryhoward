@@ -1,7 +1,7 @@
 package io.chymyst.ch
 
 sealed trait TypeExpr[+T] {
-  override def toString: String = this match {
+  override lazy val toString: String = this match {
     case DisjunctT(terms) ⇒ terms.map(_.toString).mkString(" + ")
     case ConjunctT(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
     case head :-> body ⇒ s"($head) ..=>.. $body"
