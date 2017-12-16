@@ -201,11 +201,12 @@ object LJT {
       premiseABCi ← indexedPremises.collect { case ((headA #-> headB) #-> bodyC, ind) ⇒ (headA, headB, bodyC, ind) }
     } yield {
       val (a, b, c, i) = premiseABCi
-      val newPremisesCD = c :: indexedPremises.filterNot(_._2 == i).map(_._1)
-      val newPremisesBCAB = (b ->: c) :: indexedPremises.filterNot(_._2 == i).map(_._1)
+      val premisesWithoutI = indexedPremises.filterNot(_._2 == i).map(_._1)
+      val newPremisesCD = c :: premisesWithoutI
+      val newPremisesBCAB = (b ->: c) :: premisesWithoutI
       RuleResult[T]("->L4", List(sequent.copy(premises = newPremisesBCAB, goal = a ->: b), sequent.copy(premises = newPremisesCD)), { proofTerms ⇒
         // This rule expects two different proof terms.
-        val Seq(termCD, termBCAB) = proofTerms
+        val Seq(termBCAB, termCD) = proofTerms
         val CurriedE(termCDheads, termCDbody) = termCD
         val CurriedE(termBCABheads, termBCABbody) = termCD
         val implPremiseVarABC = sequent.premiseVars(i) // (A ⇒ B) ⇒ C

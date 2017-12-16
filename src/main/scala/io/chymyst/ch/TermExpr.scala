@@ -48,7 +48,8 @@ object TermExpr {
   }
 
   def subst[T](replaceVar: PropE[T], expr: TermExpr[T], inExpr: TermExpr[T]): TermExpr[T] = inExpr match {
-    case PropE(name, tExpr) if name == replaceVar.name ⇒ expr
+    case PropE(name, tExpr) if name == replaceVar.name ⇒
+      if (tExpr == replaceVar.tExpr) expr else throw new Exception(s"Incorrect type ${replaceVar.tExpr} in subst($replaceVar, $expr, $inExpr), expected $tExpr")
     case AppE(head, arg) ⇒ AppE(subst(replaceVar, expr, head), subst(replaceVar, expr, arg))
     case CurriedE(heads: List[PropE[T]], body) ⇒ CurriedE(heads, TermExpr.subst(replaceVar, expr, body))
     case ConjunctE(terms) ⇒ ConjunctE(terms.map(t ⇒ TermExpr.subst(replaceVar, expr, t)))
@@ -118,9 +119,10 @@ final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T
   override def map[U](f: T ⇒ U): TermExpr[U] = AppE(head map f, arg map f)
 
   // The type of AppE is computed from the types of its arguments.
-  def tExpr: TypeExpr[T] = head.tExpr match {
+  // Make this a `val` to catch bugs early.
+  val tExpr: TypeExpr[T] = head.tExpr match {
     case hd #-> body if hd == arg.tExpr ⇒ body
-    case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application, ${head.tExpr}: must be a function with argument type ${arg.tExpr}")
+    case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application $this: `${head.tExpr}` must be a function with argument type `${arg.tExpr}`")
   }
 
   override def simplify: TermExpr[T] = {

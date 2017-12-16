@@ -28,21 +28,23 @@ object TheoremProver {
   // The main assumption is that the depth-first proof search terminates.
   // No loop checking is performed on sequents.
   def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
-    def concatProofs[T](ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
-      println(s"debug: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents}")
+    def concatProofs(ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
+//      println(s"debug: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents}")
       // All the new sequents need to be proved before we can continue. They may have several proofs each.
       val newProofs: Seq[Seq[ProofTerm[T]]] = ruleResult.newSequents.map(findProofTerms)
       val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
-      val transformedProofs = explodedNewProofs.map(ruleResult.backTransform).map(_.simplify)
-      println(s"debug: transformed proof terms $transformedProofs")
-      transformedProofs
+      val transformedProofs = explodedNewProofs.map(ruleResult.backTransform).distinct
+      val result = transformedProofs.map(_.simplify)
+//      println(s"debug: transformed ${transformedProofs.length} proof terms $transformedProofs, after simplify: $result")
+//      println(s"debug: types of transformed proofs: ${transformedProofs.map(_.tExpr)}, after simplify: ${result.map(_.tExpr)}")
+      result
     }
 
     // Check whether the sequent follows directly from an axiom.
     val fromAxioms: Seq[ProofTerm[T]] = followsFromAxioms(sequent) // This could be empty or non-empty.
     // Even if the sequent follows directly from axioms, we should try applying rules in hopes of getting more proofs.
 
-    if (fromAxioms.nonEmpty) println(s"debug: sequent $sequent followsFromAxioms: $fromAxioms")
+//    if (fromAxioms.nonEmpty) println(s"debug: sequent $sequent followsFromAxioms: $fromAxioms")
 
     // Try each rule on sequent. If rule applies, obtain the next sequent.
     // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
@@ -75,7 +77,7 @@ object TheoremProver {
         }
     }
     val terms = fromRules.distinct
-    println(s"debug: returning terms $terms")
+//    println(s"debug: returning terms $terms")
     terms
   }
 

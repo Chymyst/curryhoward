@@ -153,7 +153,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   }
 
   it should "get the list of propositions" in {
-    TermExpr.propositions(CurriedE(List(PropE("A", TP("A"))), AppE(PropE("A", TP("A")), PropE("B", TP("B"))))) shouldEqual Set(PropE("A", TP("A")), PropE("B", TP("B")))
+    TermExpr.propositions(CurriedE(List(PropE("A", TP("A"))), AppE(PropE("B", TP("B") ->: TP("A")), PropE("B", TP("B"))))) shouldEqual Set(PropE("A", TP("A")), PropE("B", TP("B")), PropE("B", TP("B") ->: TP("A")))
   }
 
   it should "generate correct code for the identity function with `ofType[]` syntax" in {
@@ -211,8 +211,6 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     "def f1[X, A, B]: X ⇒ A ⇒ X ⇒ X = implement" shouldNot compile
   }
 
-  // def f[A,B]: ((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B
-
   it should "generate correct code for the const function with extra unused arguments" in {
     def f1[X, A, B]: X ⇒ A ⇒ B ⇒ X = implement
 
@@ -221,14 +219,13 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     f1(true)(123.0)('blah) shouldEqual true
   }
 
-  // TODO: make this work
-    it should "generate correct code for the identity function on a=>b" in {
-      "def f2[X, Y]: (X ⇒ Y) ⇒ X ⇒ Y = implement" shouldNot compile
-  //
-  //    val printInt: Int ⇒ String = _.toString
-  //
-  //    f2(printInt)(123) shouldEqual "123"
-    }
+  it should "generate correct code for the identity function on a=>b" in {
+    def f2[X, Y]: (X ⇒ Y) ⇒ X ⇒ Y = implement
+
+        val printInt: Int ⇒ String = _.toString
+
+        f2(printInt)(123) shouldEqual "123"
+  }
 
   it should "generate correct code for the const function with more unused arguments of coincident type" in {
     def f1[X, A, B]: A ⇒ X ⇒ A ⇒ B ⇒ X = implement

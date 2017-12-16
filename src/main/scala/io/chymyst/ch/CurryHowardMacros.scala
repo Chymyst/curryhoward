@@ -141,13 +141,13 @@ object CurryHowardMacros {
         c.error(c.enclosingPosition, s"type $typeStructure cannot be inhabited")
         q"null"
       case List(termFound) ⇒
-        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
+//        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
         val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(c)(p)).toMap
         val result = reifyTerms(c)(termFound, paramTerms)
         val resultType = tq"${typeT.finalResultType}"
         val resultWithType = q"$result: $resultType"
 
-        println(s"DEBUG: returning code: ${showCode(result)}")
+//        println(s"DEBUG: returning code: ${showCode(result)}")
         result //WithType
       case list ⇒
         c.error(c.enclosingPosition, s"type $typeStructure can be inhabited in ${list.length} different ways")

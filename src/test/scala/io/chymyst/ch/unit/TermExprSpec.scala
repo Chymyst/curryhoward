@@ -42,7 +42,7 @@ class TermExprSpec extends FlatSpec with Matchers {
   it should "simplify identity function application" in {
     val termExpr0 = PropE("y", TP(1))
     val termExpr1 = CurriedE(List(PropE("x", TP(1) ->: TP(1))), termExpr0) // x: A -> x
-    val termExpr2 = AppE(termExpr1, PropE("z", TP(1)))
+    val termExpr2 = AppE(termExpr1, PropE("z", TP(1) ->: TP(1)))
     termExpr2.simplify shouldEqual termExpr0 // (x: A -> y)(z) == y
   }
 
