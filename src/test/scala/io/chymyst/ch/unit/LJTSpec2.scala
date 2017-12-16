@@ -16,11 +16,11 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   behavior of "implicational fragment"
 
-//  it should "generate code for modus ponens" in {
-//    def f1[A, B]: A ⇒ (A ⇒ B) ⇒ B = implement
-//
-//    def f2: Int ⇒ String = _.toString
-//
-//    f1(123)(f2) shouldEqual "123"
-//  }
+  it should "generate code for modus ponens" in {
+    def f1[A, B]: A ⇒ (A ⇒ B) ⇒ B = implement
+
+    def f2: Int ⇒ String = _.toString
+
+    f1(123)(f2) shouldEqual "123"
+  }
 }

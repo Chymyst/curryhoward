@@ -65,12 +65,15 @@ object CurryHowardMacros {
   def reifyType(c: whitebox.Context)(typeExpr: TypeExpr[String]): c.Tree = {
     import c.universe._
     typeExpr match {
+      case head ->: body ⇒ tq"${reifyType(c)(head)} => ${reifyType(c)(body)}"
       // TODO: Stop using String as type parameter T, use c.Type instead
       // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case TP(nameT) ⇒
         val tpn = TypeName(nameT)
         tq"$tpn"
       case _ ⇒ tq""
+//      case DisjunctT(terms) =>
+//      case ConjunctT(terms) =>
     }
   }
 
