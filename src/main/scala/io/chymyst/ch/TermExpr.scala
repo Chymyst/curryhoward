@@ -80,6 +80,8 @@ sealed trait TermExpr[+T] {
 
   def simplify: TermExpr[T] = this
 
+  def unusedArgs: Set[VarName] = Set()
+
   lazy val freeVars: Set[VarName] = this match {
     case PropE(name, tExpr) ⇒ Set(name)
     case AppE(head, arg) ⇒ head.freeVars ++ arg.freeVars
@@ -150,6 +152,8 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
   def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr ->: prev }
 
   override def simplify: TermExpr[T] = this.copy(body = body.simplify)
+
+  override def unusedArgs: Set[VarName] = heads.map(_.name).toSet -- body.freeVars
 }
 
 final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T] {

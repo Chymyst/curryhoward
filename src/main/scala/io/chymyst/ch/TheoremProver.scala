@@ -20,8 +20,17 @@ object TheoremProver {
 
   def findProofs[T](typeStructure: TypeExpr[T]): List[TermExpr[T]] = {
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
-    val proofs: Seq[ProofTerm[T]] = findProofTerms(mainSequent)
-    proofs.toList
+    findProofTerms(mainSequent)
+      // Return the group of proofs that leave the smallest number of arguments unused.
+      .map(proofTerm ⇒ (proofTerm, proofTerm.unusedArgs.size))
+      .groupBy(_._2) // Map[Int, Seq[(ProofTerm[T], Int)]]
+      .mapValues(_.map(_._1)) // Map[Int, Seq[ProofTerm[T]]]
+      .toSeq.sortBy(_._1) // Seq[(Int, Seq[ProofTerm[T]])]
+      .headOption match {
+      case Some((_, proofTerms)) ⇒ proofTerms.toList
+      case None ⇒ List()
+    }
+
   }
 
   // Main recursive function that computes the list of available proofs for a sequent.
@@ -29,14 +38,14 @@ object TheoremProver {
   // No loop checking is performed on sequents.
   def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
     def concatProofs(ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
-//      println(s"debug: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents}")
+      //      println(s"debug: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents}")
       // All the new sequents need to be proved before we can continue. They may have several proofs each.
       val newProofs: Seq[Seq[ProofTerm[T]]] = ruleResult.newSequents.map(findProofTerms)
       val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
       val transformedProofs = explodedNewProofs.map(ruleResult.backTransform).distinct
       val result = transformedProofs.map(_.simplify)
-//      println(s"debug: transformed ${transformedProofs.length} proof terms $transformedProofs, after simplify: $result")
-//      println(s"debug: types of transformed proofs: ${transformedProofs.map(_.tExpr)}, after simplify: ${result.map(_.tExpr)}")
+      //      println(s"debug: transformed ${transformedProofs.length} proof terms $transformedProofs, after simplify: $result")
+      //      println(s"debug: types of transformed proofs: ${transformedProofs.map(_.tExpr)}, after simplify: ${result.map(_.tExpr)}")
       result
     }
 
@@ -44,7 +53,7 @@ object TheoremProver {
     val fromAxioms: Seq[ProofTerm[T]] = followsFromAxioms(sequent) // This could be empty or non-empty.
     // Even if the sequent follows directly from axioms, we should try applying rules in hopes of getting more proofs.
 
-//    if (fromAxioms.nonEmpty) println(s"debug: sequent $sequent followsFromAxioms: $fromAxioms")
+    //    if (fromAxioms.nonEmpty) println(s"debug: sequent $sequent followsFromAxioms: $fromAxioms")
 
     // Try each rule on sequent. If rule applies, obtain the next sequent.
     // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
@@ -77,7 +86,7 @@ object TheoremProver {
         }
     }
     val terms = fromRules.distinct
-//    println(s"debug: returning terms $terms")
+    //    println(s"debug: returning terms $terms")
     terms
   }
 

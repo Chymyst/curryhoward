@@ -6,18 +6,18 @@ import scala.reflect.macros.whitebox
 
 // TODO:
 /*  Priority is given in parentheses.
-
++ finish the implicational fragment (0)
 - implement all rules of the LJT calculus (1)
 - implement Option and Either in inhabited terms (2)
-- make sure Unit works (2)
++ make sure Unit works (2)
 - support named conjunctions (case classes) explicitly (3) and support disjunctions on that basis
-- check unused arguments and sort results accordingly (3)
-- only output the results with smallest number of unused arguments, if that is unique (3)
++ check unused arguments and sort results accordingly (3)
++ only output the results with smallest number of unused arguments, if that is unique (3)
 - support natural syntax def f[T](x: T): T = implement (3)
 - use c.Type instead of String for correct code generation (3)
 - use blackbox macros instead of whitebox if possible (5)
-- add more error messages: print alternative lambda-terms when we refuse to implement (5)
-- use a symbolic evaluator to simplify the lambda-terms (5)
++ add more error messages: print alternative lambda-terms when we refuse to implement (5)
++ use a symbolic evaluator to simplify the lambda-terms (5)
 - support sealed traits / case classes (5)
 - implement uncurried functions and multiple argument lists (6)
 - use a special subclass of Function1 that also carries symbolic information about the lambda-term (6)
@@ -64,16 +64,21 @@ object CurryHowardMacros {
 
   def reifyType(c: whitebox.Context)(typeExpr: TypeExpr[String]): c.Tree = {
     import c.universe._
+
+    def makeName(nameT: String): c.universe.Tree = {
+      val tpn = TypeName(nameT)
+      tq"$tpn"
+    }
+
     typeExpr match {
       case head #-> body ⇒ tq"${reifyType(c)(head)} => ${reifyType(c)(body)}"
       // TODO: Stop using String as type parameter T, use c.Type instead
       // TODO: make match exhaustive on tExpr, by using c.Type instead of String
-      case TP(nameT) ⇒
-        val tpn = TypeName(nameT)
-        tq"$tpn"
+      case TP(nameT) ⇒ makeName(nameT)
+      case UnitT(nameT) ⇒ makeName(nameT)
       case _ ⇒ tq""
-//      case DisjunctT(terms) =>
-//      case ConjunctT(terms) =>
+      //      case DisjunctT(terms) =>
+      //      case ConjunctT(terms) =>
     }
   }
 
@@ -141,16 +146,16 @@ object CurryHowardMacros {
         c.error(c.enclosingPosition, s"type $typeStructure cannot be inhabited")
         q"null"
       case List(termFound) ⇒
-//        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
+        //        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
         val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(c)(p)).toMap
         val result = reifyTerms(c)(termFound, paramTerms)
         val resultType = tq"${typeT.finalResultType}"
         val resultWithType = q"$result: $resultType"
 
-//        println(s"DEBUG: returning code: ${showCode(result)}")
+        //        println(s"DEBUG: returning code: ${showCode(result)}")
         result //WithType
       case list ⇒
-        c.error(c.enclosingPosition, s"type $typeStructure can be inhabited in ${list.length} different ways")
+        c.error(c.enclosingPosition, s"type $typeStructure can be inhabited in ${list.length} different ways: ${list.mkString("; ")}")
         q"null"
     }
 

@@ -13,6 +13,14 @@ class LJTSpec2 extends FlatSpec with Matchers {
     proofs.length shouldEqual 1
   }
 
+  behavior of "functions using Unit"
+
+  it should "generate code for a function returning Unit" in {
+    def f1[A, B]: A ⇒ B ⇒ Unit = implement
+    def f2[A, B]: A ⇒ Unit ⇒ B ⇒ Unit = implement
+    def f3[A, B]: A ⇒ Unit ⇒ B ⇒ A = implement
+  }
+
   behavior of "implicational fragment"
 
   it should "generate code for modus ponens" in {

@@ -53,3 +53,11 @@ object MyApp extends App {
 
 Very early development. First examples are working as proof-of-concept.
 
+The implicational fragment of the IPL is working.
+
+```scala
+// "Weak" Peirce's law:
+def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
+
+```
+
