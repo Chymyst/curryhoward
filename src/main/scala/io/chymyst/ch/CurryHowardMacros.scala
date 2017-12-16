@@ -78,6 +78,7 @@ object CurryHowardMacros {
       // TODO: Stop using String as type parameter T, use c.Type instead
       // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case TP(nameT) ⇒ makeName(nameT)
+      case BasicT(nameT) ⇒ makeName(nameT)
       case UnitT(nameT) ⇒ makeName(nameT)
       case ConjunctT(terms) ⇒
         val tpts = terms.map(t ⇒ reifyType(c)(t))

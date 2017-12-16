@@ -51,8 +51,6 @@ object MyApp extends App {
 
 # Status
 
-Early development.
-
 The implicational fragment of the IPL is working.
 
 ```scala
@@ -61,3 +59,12 @@ def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
 
 ```
 
+Unit types, tuples, and constant types are supported.
+
+```scala
+
+def f[A, B]: A ⇒ Int ⇒ (A, Int) = implement
+
+f("abc")(123) // returns the tuple ("abc", 123)
+
+```

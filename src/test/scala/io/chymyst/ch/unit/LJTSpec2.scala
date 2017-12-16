@@ -69,7 +69,7 @@ class LJTSpec2 extends FlatSpec with Matchers {
     f(123)("abc") shouldEqual ((123, "abc"))
   }
 
-val g: Int ⇒ String = _.toString
+  val g: Int ⇒ String = _.toString
 
   it should "generate code that consumes product types" in {
     def f[A, B, C] = ofType[A ⇒ ((A ⇒ B, C)) ⇒ B]
@@ -86,6 +86,28 @@ val g: Int ⇒ String = _.toString
     def h[A, B, C] = ofType[A ⇒ ((A ⇒ B, A ⇒ C)) ⇒ (B, C)]
 
     h(123)((g, (i: Int) ⇒ i.toString + "abc")) shouldEqual (("123", "123abc"))
+  }
+
+  behavior of "constant types"
+
+  it should "generate code that uses constant types" in {
+    def f[A]: A ⇒ Int ⇒ A = implement
+
+    f("abc")(123) shouldEqual "abc"
+
+    def g[A]: A ⇒ Int ⇒ Int = implement
+
+    g("abc")(123) shouldEqual 123
+  }
+
+  it should "generate code that uses constant types, product types, and function types" in {
+    def f[A, B]: A ⇒ Int ⇒ (A, Int) = implement
+
+    f("abc")(123) shouldEqual (("abc", 123))
+
+    def g[A, B]: A ⇒ (Int ⇒ Int) ⇒ (A, Int ⇒ Int) = implement
+
+    g("abc")(_ + 1)._2(100) shouldEqual 101
   }
 
 }
