@@ -2,6 +2,8 @@ package io.chymyst.ch
 
 import io.chymyst.ch.TermExpr.ProofTerm
 
+import scala.collection.immutable
+
 /*
 The calculus LJT as presented by Galmiche and Larchey-Wendling (1998).
 
@@ -15,7 +17,7 @@ Axioms:
 Invertible rules:
 -----------------
 
-(G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
++ (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
 + G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
 (G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
 + G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
@@ -33,6 +35,9 @@ Non-invertible rules:
  */
 
 object LJT {
+
+  private def omitPremise[C](indexedPremises: Seq[(C, Int)], index: Int): List[C] = indexedPremises.filterNot(_._2 == index).map(_._1).toList
+
   def followsFromAxioms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
     // The LJT calculus has three axioms. We use the Id axiom and the T axiom only, because the F axiom is not useful for code generation.
 
@@ -52,47 +57,81 @@ object LJT {
   }
 
   // (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
-  private def ruleConjunctionAtLeft[T] = ForwardRule[T](name = "&L", sequent ⇒
-    Seq(RuleResult("&L", List(sequent.copy(goal = ???)), { proofTerms ⇒
-      // This rule expects two different proof terms.
-      ???
+  // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
+  private def ruleConjunctionAtLeft[T] = ForwardRule[T](name = "&L", { sequent ⇒
+    val indexedPremises = sequent.premises.zipWithIndex
+    indexedPremises.collectFirst { case (ConjunctT(heads), index) ⇒ (heads, index) } match {
+      case Some((heads, i)) ⇒
+        val newPremises: List[TypeExpr[T]] = (heads ++ omitPremise(indexedPremises, i)).toList
+        Seq(RuleResult("&L", List(sequent.copy(premises = newPremises)), { proofTerms ⇒
+          // This rule expects one proof term.
+          val proofTerm = proofTerms.head
+          val thePremiseVarAB = sequent.premiseVars(i)
+          val valuesAB: List[TermExpr[T]] = heads.indices.map(ProjectE(_, thePremiseVarAB)).toList
+          val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
+          val result = TermExpr.applyToVars(proofTerm, valuesAB ++ oldPremisesWithoutI)
+          sequent.constructResultTerm(result)
+        }
+        )
+        )
+      case None ⇒ Seq()
     }
-    )
 
-    )
+  }
   )
 
   // (G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
-  private def ruleDisjunctionAtLeft[T] = ForwardRule[T](name = "+L", sequent ⇒
-    Seq(RuleResult("+L", List(sequent.copy(goal = ???)), { proofTerms ⇒
+  // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
+  private def ruleDisjunctionAtLeft[T] = ForwardRule[T](name = "+L", { sequent ⇒
+    val indexedPremises = sequent.premises.zipWithIndex
+    Seq(RuleResult("+L", List(sequent.copy(premises = ???)), { proofTerms ⇒
       // This rule expects two different proof terms.
       ???
     }
     )
 
     )
+  }
   )
 
   // (G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
-  private def ruleImplicationAtLeft2[T] = ForwardRule[T](name = "->L2", sequent ⇒
-    Seq(RuleResult("->L2", List(sequent.copy(goal = ???)), { proofTerms ⇒
-      // This rule expects two different proof terms.
-      ???
+  // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
+  private def ruleImplicationAtLeft2[T] = ForwardRule[T](name = "->L2", { sequent ⇒
+    val indexedPremises = sequent.premises.zipWithIndex
+    indexedPremises.collectFirst { case (ConjunctT(heads) #-> argC, index) ⇒ (heads, argC, index) } match {
+      case Some((heads, argC, i)) ⇒
+        val newPremiseABC = heads.reverse.foldLeft(argC) { case (prev, h) ⇒ h ->: prev }
+        val newPremises: List[TypeExpr[T]] = newPremiseABC :: omitPremise(indexedPremises, i)
+        Seq(RuleResult("->L2", List(sequent.copy(premises = newPremises)), { proofTerms ⇒
+          // This rule expects one proof term.
+          val proofTerm = proofTerms.head
+          val thePremiseVarAB = sequent.premiseVars(i)
+          ???
+          val valuesAB: List[TermExpr[T]] = heads.indices.map(ProjectE(_, thePremiseVarAB)).toList
+          val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
+          val result = TermExpr.applyToVars(proofTerm, valuesAB ++ oldPremisesWithoutI)
+          sequent.constructResultTerm(result)
+        }
+        )
+        )
+      case None ⇒ Seq()
     }
-    )
 
-    )
+  }
   )
 
   // (G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
-  private def ruleImplicationAtLeft3[T] = ForwardRule[T](name = "->L3", sequent ⇒
-    Seq(RuleResult("->L3", List(sequent.copy(goal = ???)), { proofTerms ⇒
-      // This rule expects two different proof terms.
+  // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
+  private def ruleImplicationAtLeft3[T] = ForwardRule[T](name = "->L3", { sequent ⇒
+    val indexedPremises = sequent.premises.zipWithIndex
+    Seq(RuleResult("->L3", List(sequent.copy(premises = ???)), { proofTerms ⇒
+      // This rule expects one proof term.
       ???
     }
     )
 
     )
+  }
   )
 
   // G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
@@ -106,10 +145,10 @@ object LJT {
             // `proofTerms.head` is the proof of (G*, A) |- B, and we need a proof of G* |- A ⇒ B.
             // `proofTerms.head` must be of the form a ⇒ x ⇒ ... ⇒ y ⇒ ... ⇒ z ⇒ f(a, x, y, ..., z),
             // where f is some term depending on (a, x, y, ..., z), and the type B is Y ⇒ ... ⇒ Z ⇒ F.
-            case CurriedE(heads, f) ⇒
+            case CurriedE(args, f) ⇒
               // We need to construct x ⇒ ... ⇒ a ⇒ y ⇒ ... ⇒ z ⇒ f instead.
               // Note that sequent.premises.length is the number of implications in x ⇒ ... before ⇒ a.
-              val newHeads = heads.tail.take(sequent.premises.length) ++ Seq(heads.head) ++ heads.drop(sequent.premises.length + 1)
+              val newHeads = args.tail.take(sequent.premises.length) ++ Seq(args.head) ++ args.drop(sequent.premises.length + 1)
               CurriedE(newHeads, f)
           }
         }))
@@ -117,7 +156,8 @@ object LJT {
     })
 
   // (G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1
-  // Note: there may be several ways of choosing X and X ⇒ A, which lead to equivalent derivations - if so, we have an ambiguous implementation, which is an error.
+  // Note: there may be several ways of choosing X and X ⇒ A having the same types,
+  // which lead to equivalent derivations - if so, we have an ambiguous implementation, which is an error.
   // We can signal this error early since this rule is invertible.
   private def ruleImplicationAtLeft1[T] = ForwardRule[T](name = "->L1", { sequent ⇒
     val indexedPremises = sequent.premises.zipWithIndex
@@ -130,7 +170,7 @@ object LJT {
     } yield {
       // Build the sequent (G*, X, A) |- B by excluding the premise X ⇒ A from the initial context, and by prepending A to it.
       // In other words, the new premises are (A, G* \ { X ⇒ A }).
-      val newPremises = implPremiseA :: indexedPremises.filterNot(_._2 == implPremiseI).map(_._1)
+      val newPremises = implPremiseA :: omitPremise(indexedPremises, implPremiseI)
       val newSequent = sequent.copy(premises = newPremises)
       RuleResult[T]("->L1", Seq(newSequent), { proofTerms ⇒
         // This rule expects only one sub-proof term.
@@ -145,7 +185,7 @@ object LJT {
 
         val valueA = AppE(implPremiseVar, atomicPremiseVar)
         // The list of vars is (A, P1, P2, ..., X, ... PN)
-        val oldPremisesWithoutImplPremiseA = sequent.premiseVars.zipWithIndex.filterNot(_._2 == implPremiseI).map(_._1)
+        val oldPremisesWithoutImplPremiseA = omitPremise(sequent.premiseVars.zipWithIndex, implPremiseI)
         val result = TermExpr.applyToVars(proofTerm, valueA :: oldPremisesWithoutImplPremiseA)
         sequent.constructResultTerm(result)
       })
@@ -155,6 +195,7 @@ object LJT {
 
   def invertibleRules[T]: Seq[ForwardRule[T]] = Seq(
     ruleImplicationAtRight,
+    ruleConjunctionAtLeft,
     ruleConjunctionAtRight // Put this later in the sequence because it duplicates the context G*.
   )
 
@@ -211,7 +252,7 @@ object LJT {
         val CurriedE(termBCABheads, termBCABbody) = termCD
         val implPremiseVarABC = sequent.premiseVars(i) // (A ⇒ B) ⇒ C
 
-        val oldPremisesWithoutImplPremise = sequent.premiseVars.zipWithIndex.filterNot(_._2 == i).map(_._1)
+        val oldPremisesWithoutImplPremise = omitPremise(sequent.premiseVars.zipWithIndex, i)
 
         // Using the lemma |-  ((A ⇒ B) ⇒ C) ⇒ B ⇒ C, construct the proof of the original sequent.
         val varB = PropE(sequent.freshVar(), b)
@@ -233,9 +274,7 @@ object LJT {
     (sequent.goal match {
       case DisjunctT(terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
       case _ ⇒ Seq[ForwardRule[T]]()
-    }) ++ Seq(
-          ruleImplicationAtLeft4[T]
-    )
+    }) ++ Seq(ruleImplicationAtLeft4[T])
   }
 
 }

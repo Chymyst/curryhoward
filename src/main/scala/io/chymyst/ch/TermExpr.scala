@@ -12,6 +12,7 @@ object TermExpr {
     case l: CurriedE[T] ⇒ // Can't pattern-match directly for some reason! Some trouble with the type parameter T.
       l.heads.toSet ++ propositions(l.body)
     case ConjunctE(terms) ⇒ terms.flatMap(propositions).toSet
+    case ProjectE(index, term) ⇒ propositions(term)
     case _ ⇒ Set()
   }
 
@@ -26,7 +27,7 @@ object TermExpr {
   }
 
   // Apply this term to a number of vars at once.
-  def applyToVars[T](termExpr: TermExpr[T], args: List[TermExpr[T]]): TermExpr[T] = {
+  def applyToVars[T](termExpr: TermExpr[T], args: Seq[TermExpr[T]]): TermExpr[T] = {
     args.foldLeft[TermExpr[T]](termExpr) { case (prev, arg) ⇒ AppE(prev, arg) }
   }
 
@@ -53,6 +54,7 @@ object TermExpr {
     case AppE(head, arg) ⇒ AppE(subst(replaceVar, expr, head), subst(replaceVar, expr, arg))
     case CurriedE(heads: List[PropE[T]], body) ⇒ CurriedE(heads, TermExpr.subst(replaceVar, expr, body))
     case ConjunctE(terms) ⇒ ConjunctE(terms.map(t ⇒ TermExpr.subst(replaceVar, expr, t)))
+    case ProjectE(index, term) ⇒ ProjectE(index, TermExpr.subst(replaceVar, expr, term))
     case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, TermExpr.subst(replaceVar, expr, term), tExpr)
     case _ ⇒ inExpr
   }
@@ -68,6 +70,7 @@ sealed trait TermExpr[+T] {
     case CurriedE(heads, body) ⇒ s"\\(${heads.mkString(" -> ")} -> $body)"
     case UnitE(tExpr) ⇒ "()"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
+    case ProjectE(index, term) ⇒ term.toString + "._" + (index + 1).toString
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
       val leftZerosString = if (leftZeros.isEmpty) "" else " + "
@@ -88,6 +91,7 @@ sealed trait TermExpr[+T] {
     case CurriedE(heads, body) ⇒ body.freeVars -- heads.map(_.name).toSet
     case UnitE(tExpr) ⇒ Set()
     case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars).toSet
+    case p: ProjectE[T] ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
     case d: DisjunctE[T] ⇒ d.term.freeVars
   }
 
@@ -103,6 +107,7 @@ sealed trait TermExpr[+T] {
       case CurriedE(heads, body) ⇒ CurriedE(heads.map(h ⇒ rename(h).asInstanceOf[PropE[T]]), rename(body))
       case UnitE(tExpr) ⇒ this
       case ConjunctE(terms) ⇒ ConjunctE(terms.map(rename))
+      case ProjectE(index, term) ⇒ ProjectE(index, rename(term))
       case d: DisjunctE[T] ⇒ d.copy(term = rename(d.term))
     }
   }
@@ -160,12 +165,25 @@ final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = UnitE(tExpr map f)
 }
 
-final case class ConjunctE[+T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
+final case class ConjunctE[T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = ConjunctE(terms.map(_.map(f)))
 
   def tExpr: TypeExpr[T] = ConjunctT(terms.map(_.tExpr))
 
   override def simplify: TermExpr[T] = this.copy(terms = terms.map(_.simplify))
+}
+
+final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] {
+  override def map[U](f: T ⇒ U): TermExpr[U] = ProjectE(index, term map f)
+
+  def getProjection: Option[TermExpr[T]] = term match {
+    case c: ConjunctE[T] ⇒ Some(c.terms(index))
+    case _ ⇒ None
+  }
+
+  override def tExpr: TypeExpr[T] = term.tExpr.asInstanceOf[ConjunctT[T]].terms(index)
+
+  override def simplify: TermExpr[T] = this.copy(term = term.simplify)
 }
 
 final case class DisjunctE[T](index: Int, total: Int, term: TermExpr[T], tExpr: TypeExpr[T]) extends TermExpr[T] {

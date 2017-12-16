@@ -35,6 +35,8 @@ val a: Int = f[Int, X, Y, Z](x, y, z)
 
 object CurryHowardMacros {
 
+  private val debug = false
+
   private[ch] def testType[T]: (String, String) = macro testTypeImpl[T]
 
   private[ch] val basicTypes = List("Int", "String", "Boolean", "Float", "Double", "Long", "Symbol", "Char")
@@ -72,14 +74,16 @@ object CurryHowardMacros {
     }
 
     typeExpr match {
-      case head #-> body ⇒ tq"${reifyType(c)(head)} => ${reifyType(c)(body)}"
+      case head #-> body ⇒ tq"(${reifyType(c)(head)}) ⇒ ${reifyType(c)(body)}"
       // TODO: Stop using String as type parameter T, use c.Type instead
       // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case TP(nameT) ⇒ makeName(nameT)
       case UnitT(nameT) ⇒ makeName(nameT)
+      case ConjunctT(terms) ⇒
+        val tpts = terms.map(t ⇒ reifyType(c)(t))
+        tq"(..$tpts)"
       case _ ⇒ tq""
       //      case DisjunctT(terms) =>
-      //      case ConjunctT(terms) =>
     }
   }
 
@@ -109,8 +113,10 @@ object CurryHowardMacros {
       }
       case UnitE(_) => q"()"
       case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
-      case DisjunctE(index, total, term, tExpr) ⇒
-        ???
+      case ProjectE(index, term) ⇒
+        val accessor = TermName(s"_${index + 1}")
+        q"${reifyTerms(c)(term, paramTerms)}.$accessor"
+      case DisjunctE(index, total, term, tExpr) ⇒ ???
     }
   }
 
@@ -152,7 +158,7 @@ object CurryHowardMacros {
         val result = reifyTerms(c)(termFound, paramTerms)
         //        val resultType = tq"${typeT.finalResultType}"
         //        val resultWithType = q"$result: $resultType"
-        //        println(s"DEBUG: returning code: ${showCode(result)}")
+        if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
 
         // use resultWithType? Doesn't seem tow work.
         result

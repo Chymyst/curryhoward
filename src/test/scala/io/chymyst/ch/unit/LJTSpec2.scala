@@ -61,4 +61,31 @@ class LJTSpec2 extends FlatSpec with Matchers {
     "def f[A,B]: ((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B = implement" shouldNot compile
   }
 
+  behavior of "product type projectors"
+
+  it should "generate code that produces product types" in {
+    def f[A, B] = ofType[A ⇒ B ⇒ (A, B)]
+
+    f(123)("abc") shouldEqual ((123, "abc"))
+  }
+
+val g: Int ⇒ String = _.toString
+
+  it should "generate code that consumes product types" in {
+    def f[A, B, C] = ofType[A ⇒ ((A ⇒ B, C)) ⇒ B]
+
+
+    f(123)((g, "abc")) shouldEqual "123"
+  }
+
+  it should "generate code that consumes and produces product types" in {
+    def f[A, B, C] = ofType[A ⇒ ((A ⇒ B, C)) ⇒ (B, C)]
+
+    f(123)((g, "abc")) shouldEqual (("123", "abc"))
+
+    def h[A, B, C] = ofType[A ⇒ ((A ⇒ B, A ⇒ C)) ⇒ (B, C)]
+
+    h(123)((g, (i: Int) ⇒ i.toString + "abc")) shouldEqual (("123", "123abc"))
+  }
+
 }
