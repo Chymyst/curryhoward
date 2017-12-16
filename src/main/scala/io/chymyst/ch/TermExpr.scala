@@ -110,7 +110,7 @@ final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T
 
   // The type of AppE is computed from the types of its arguments.
   def tExpr: TypeExpr[T] = head.tExpr match {
-    case hd ->: body if hd == arg.tExpr ⇒ body
+    case hd #-> body if hd == arg.tExpr ⇒ body
     case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application, ${head.tExpr}: must be a function with argument type ${arg.tExpr}")
   }
 }

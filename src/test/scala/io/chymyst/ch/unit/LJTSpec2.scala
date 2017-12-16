@@ -1,6 +1,6 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.{TP, TheoremProver, implement}
+import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
 
 class LJTSpec2 extends FlatSpec with Matchers {
@@ -23,4 +23,17 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
     f1(123)(f2) shouldEqual "123"
   }
+/* TODO: fix spurious repeated inhabitation of this
+  it should "generate code for the 'lemma'" in {
+    def f1[A, B, C]: ((A ⇒ B) ⇒ C) ⇒ B ⇒ C = implement
+
+    val result: String => Boolean = f1[Int, String, Boolean](f ⇒ f(0) == "0")
+
+    result("0") shouldEqual true
+
+    result("abc") shouldEqual false
+
+    "def f2[A, B,C] = ofType[((A ⇒ B) ⇒ C) ⇒ A ⇒ B]" shouldNot compile
+  }
+*/
 }

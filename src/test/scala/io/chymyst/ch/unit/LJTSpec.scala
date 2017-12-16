@@ -1,7 +1,7 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch.LJT.followsFromAxioms
-import io.chymyst.ch.{->:, ConjunctT, CurriedE, DisjunctE, DisjunctT, FreshIdents, PropE, Sequent, TP, TermExpr, TheoremProver, TypeExpr}
+import io.chymyst.ch.{#->, ConjunctT, CurriedE, DisjunctE, DisjunctT, FreshIdents, PropE, Sequent, TP, TermExpr, TheoremProver, TypeExpr}
 import org.scalatest.{FlatSpec, Matchers}
 
 class LJTSpec extends FlatSpec with Matchers {

@@ -4,10 +4,10 @@ sealed trait TypeExpr[+T] {
   override lazy val toString: String = this match {
     case DisjunctT(terms) ⇒ terms.map(_.toString).mkString(" + ")
     case ConjunctT(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
-    case head ->: body ⇒ s"($head) ..=>.. $body"
+    case head #-> body ⇒ s"($head) → $body"
     case BasicT(name) ⇒ s"<basic>$name"
     case ConstructorT(fullExpr) ⇒ s"<constructor>$fullExpr"
-    case TP(name) ⇒ s"<tparam>$name"
+    case TP(name) ⇒ s"$name"
     case OtherT(name) ⇒ s"<other>$name"
     case NothingT(_) ⇒ "0"
     case UnitT(_) ⇒ "1"
@@ -30,7 +30,7 @@ sealed trait AtomicTypeExpr[T] {
 
 object TypeExpr {
 
-  private def makeImplication[T](tpe1: TypeExpr[T], tpe2: TypeExpr[T]): TypeExpr[T] = ->:(tpe1, tpe2)
+  private def makeImplication[T](tpe1: TypeExpr[T], tpe2: TypeExpr[T]): TypeExpr[T] = #->(tpe1, tpe2)
 
   implicit class WithImplication[T](tpe1: TypeExpr[T]) {
     def ->:(tpe2: TypeExpr[T]): TypeExpr[T] = makeImplication(tpe2, tpe1) // right-associative operators are desugared in the opposite order: a ->: b is b.->:(a)
@@ -46,8 +46,8 @@ final case class ConjunctT[T](terms: Seq[TypeExpr[T]]) extends TypeExpr[T] with 
   override def map[U](f: T ⇒ U): TypeExpr[U] = ConjunctT(terms.map(_.map(f)))
 }
 
-final case class ->:[T](head: TypeExpr[T], body: TypeExpr[T]) extends TypeExpr[T] with NonAtomicTypeExpr {
-  override def map[U](f: T ⇒ U): TypeExpr[U] = ->:(head.map(f), body.map(f))
+final case class #->[T](head: TypeExpr[T], body: TypeExpr[T]) extends TypeExpr[T] with NonAtomicTypeExpr {
+  override def map[U](f: T ⇒ U): TypeExpr[U] = #->(head.map(f), body.map(f))
 }
 
 final case class NothingT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T] {

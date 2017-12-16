@@ -98,7 +98,7 @@ object LJT {
   // G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
   private def ruleImplicationAtRight[T] = ForwardRule[T](name = "->R", sequent ⇒
     sequent.goal match {
-      case a ->: b ⇒ // The new sequent is (G*, A) |- B
+      case a #-> b ⇒ // The new sequent is (G*, A) |- B
         val newSequent = sequent.copy(premises = a :: sequent.premises, goal = b)
         Seq(RuleResult("->R", Seq(newSequent), { proofTerms ⇒
           // This rule expects only one sub-proof term, and it must be a function.
@@ -125,7 +125,7 @@ object LJT {
       atomicPremiseXi ← indexedPremises.filter(_._1.isAtomic)
       (atomicPremiseX, atomicPremiseI) = atomicPremiseXi
       // We only need to keep `body` and `ind` here.
-      implPremiseAi ← indexedPremises.collect { case (head ->: body, ind) if head == atomicPremiseX ⇒ (body, ind) }
+      implPremiseAi ← indexedPremises.collect { case (head #-> body, ind) if head == atomicPremiseX ⇒ (body, ind) }
       (implPremiseA, implPremiseI) = implPremiseAi
     } yield {
       // Build the sequent (G*, X, A) |- B by excluding the premise X ⇒ A from the initial context, and by prepending A to it.
@@ -198,7 +198,7 @@ object LJT {
   private def ruleImplicationAtLeft4[T] = ForwardRule[T](name = "->L4", { sequent ⇒
     val indexedPremises = sequent.premises.zipWithIndex
     for {
-      premiseABCi ← indexedPremises.collect { case ((headA ->: headB) ->: bodyC, ind) ⇒ (headA, headB, bodyC, ind) }
+      premiseABCi ← indexedPremises.collect { case ((headA #-> headB) #-> bodyC, ind) ⇒ (headA, headB, bodyC, ind) }
     } yield {
       val (a, b, c, i) = premiseABCi
       val newPremisesCD = c :: indexedPremises.filterNot(_._2 == i).map(_._1)
@@ -231,9 +231,9 @@ object LJT {
     // Generate all +Rn rules if the sequent has a disjunction goal.
     (sequent.goal match {
       case DisjunctT(terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
-      case _ ⇒ Seq()
+      case _ ⇒ Seq[ForwardRule[T]]()
     }) ++ Seq(
-      //    ruleImplicationAtLeft4
+          ruleImplicationAtLeft4[T]
     )
   }
 

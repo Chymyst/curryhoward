@@ -25,12 +25,12 @@ object TheoremProver {
   }
 
   def concatProofs[T](ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
-//    println(s"debug: applied rule ${ruleResult.ruleName}, new sequents ${ruleResult.newSequents}")
+    println(s"debug: applied rule ${ruleResult.ruleName}, new sequents ${ruleResult.newSequents}")
     // All the new sequents need to be proved before we can continue. They may have several proofs each.
     val newProofs: Seq[Seq[ProofTerm[T]]] = ruleResult.newSequents.map(findProofTerms)
     val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
     val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
-//    println(s"debug: transformed proof terms $transformedProofs")
+    println(s"debug: transformed proof terms $transformedProofs")
     transformedProofs
   }
 
@@ -42,7 +42,7 @@ object TheoremProver {
     val fromAxioms: Seq[ProofTerm[T]] = followsFromAxioms(sequent) // This could be empty or non-empty.
     // Even if the sequent follows directly from axioms, we should try applying rules in hopes of getting more proofs.
 
-//    if (fromAxioms.nonEmpty) println(s"debug: sequent $sequent followsFromAxioms: $fromAxioms")
+    if (fromAxioms.nonEmpty) println(s"debug: sequent $sequent followsFromAxioms: $fromAxioms")
 
     // Try each rule on sequent. If rule applies, obtain the next sequent.
     // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.

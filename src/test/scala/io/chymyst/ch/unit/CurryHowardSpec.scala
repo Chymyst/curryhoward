@@ -39,7 +39,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     def result[A, B, C]: (String, String) = testType[_ ⇒ B]
 
     val res = result._1
-    res shouldEqual "(<other>_) ..=>.. <tparam>B"
+    res shouldEqual "(<other>_) → B"
   }
 
   it should "get printable representation of enclosing owner's type" in {
@@ -63,38 +63,38 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   it should "get printable representation of parametric type" in {
     def result[A, B, C]: (String, String) = testType[A]
 
-    result._1 shouldEqual "<tparam>A"
+    result._1 shouldEqual "A"
   }
 
   it should "get printable representation of function types" in {
     def result[A, B, C]: (String, String) = testType[A ⇒ B]
 
-    result._1 shouldEqual "(<tparam>A) ..=>.. <tparam>B"
+    result._1 shouldEqual "(A) → B"
   }
 
   it should "get printable representation of fixed types with type constructors" in {
     def result[A, B, C]: (String, String) = testType[Option[Seq[Int]] ⇒ Option[List[Set[A]]] ⇒ B]
 
-    result._1 shouldEqual "(1 + <constructor>Seq[Int]) ..=>.. (1 + <constructor>List[Set[A]]) ..=>.. <tparam>B"
+    result._1 shouldEqual "(1 + <constructor>Seq[Int]) → (1 + <constructor>List[Set[A]]) → B"
   }
 
   it should "get printable representation of fixed types with type constructors with [_]" in {
     def result[A, B, C]: (String, String) = testType[Option[_] ⇒ B]
 
     val res = result._1
-    res shouldEqual "(1 + <other>_) ..=>.. <tparam>B"
+    res shouldEqual "(1 + <other>_) → B"
   }
 
   it should "get printable representation of Option types" in {
     def result[A, B, C]: (String, String) = testType[Option[A] ⇒ Either[A, B]]
 
-    result._1 shouldEqual "(1 + <tparam>A) ..=>.. <tparam>A + <tparam>B"
+    result._1 shouldEqual "(1 + A) → A + B"
   }
 
   it should "get printable representation of Any, Unit, and Nothing types" in {
     def result[A, B, C]: (String, String) = testType[Any ⇒ Nothing ⇒ Unit]
 
-    result._1 shouldEqual "(<other>_) ..=>.. (0) ..=>.. 1"
+    result._1 shouldEqual "(<other>_) → (0) → 1"
   }
 
   it should "not confuse a type parameter with a type inheriting from Any" in {
@@ -102,19 +102,19 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
     def result[A, B, C]: (String, String) = testType[A ⇒ Q]
 
-    result._1 shouldEqual "(<tparam>A) ..=>.. <other>Q"
+    result._1 shouldEqual "(A) → <other>Q"
   }
 
   it should "get printable representation of tuple types" in {
     def result[A, B, C]: (String, String) = testType[(Any, Nothing, Unit, A, B, C)]
 
-    result._1 shouldEqual "(<other>_, 0, 1, <tparam>A, <tparam>B, <tparam>C)"
+    result._1 shouldEqual "(<other>_, 0, 1, A, B, C)"
   }
 
   it should "get printable representation of tuple as function argument" in {
     def result[A, B, C]: (String, String) = testType[((A, B)) ⇒ C]
 
-    result._1 shouldEqual "((<tparam>A, <tparam>B)) ..=>.. <tparam>C"
+    result._1 shouldEqual "((A, B)) → C"
   }
 
   it should "get printable representation of tuple of basic types" in {
@@ -134,7 +134,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
     def result[T]: (String, String) = testType[Test1[T] ⇒ Test2]
 
-    result._1 shouldEqual "(<constructor>Test1[T]) ..=>.. <other>Test2"
+    result._1 shouldEqual "(<constructor>Test1[T]) → <other>Test2"
   }
 
   behavior of "syntax of `implement` and `typeOf`"
