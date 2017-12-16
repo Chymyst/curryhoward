@@ -66,6 +66,7 @@ object CurryHowardMacros {
     import c.universe._
     typeExpr match {
       // TODO: Stop using String as type parameter T, use c.Type instead
+      // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case TP(nameT) ⇒
         val tpn = TypeName(nameT)
         tq"$tpn"
@@ -76,7 +77,6 @@ object CurryHowardMacros {
   def reifyParam(c: whitebox.Context)(term: PropE[String]): c.Tree = {
     import c.universe._
     term match {
-        // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case PropE(name, typeExpr) ⇒
         val tpt = reifyType(c)(typeExpr)
         val termName = TermName("t_" + name)
@@ -93,7 +93,7 @@ object CurryHowardMacros {
         val tn = TermName("t_" + name)
         q"$tn"
       case AppE(head, arg) => q"${reifyTerms(c)(head, paramTerms)}(${reifyTerms(c)(arg, paramTerms)})"
-        // If `heads` = List(x, y, z) and `body` = b then the code must be x => y => z => b
+      // If `heads` = List(x, y, z) and `body` = b then the code must be x => y => z => b
       case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyTerms(c)(body, paramTerms)) { case (prevTree, paramE) ⇒
         val param = paramTerms(paramE)
         q"($param ⇒ $prevTree)"
@@ -151,6 +151,6 @@ object CurryHowardMacros {
     val resultWithType = q"$result: $resultType"
     println(s"DEBUG: returning code: ${showCode(resultWithType)}")
 
-    result//WithType
+    result //WithType
   }
 }
