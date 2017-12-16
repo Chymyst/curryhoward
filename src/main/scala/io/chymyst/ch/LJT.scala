@@ -8,26 +8,26 @@ The calculus LJT as presented by Galmiche and Larchey-Wendling (1998).
 Axioms:
 -------
 
-(G*, X) |- X  -- axiom Id -- here X is atomic, although the same rule would be valid for non-atomic X, we will not use it because in that way we avoid duplication of derivations.
-G* |- 1  -- axiom T -- here 1 represents the Unit type, and the expression must be constructed somehow in the term.
-(G*, 0) |- A  -- axiom F -- we will not use it. Instead, we will treat `Nothing` as just another type parameter. (We will treat `Any` in this way, too.)
++ (G*, X) |- X  -- axiom Id -- here X is atomic, although the same rule would be valid for non-atomic X, we will not use it because in that way we avoid duplication of derivations.
++ G* |- 1  -- axiom T -- here 1 represents the Unit type, and the expression must be constructed somehow in the term.
+- (G*, 0) |- A  -- axiom F -- we will not use it. Instead, we will treat `Nothing` as just another type parameter. (We will treat `Any` in this way, too.)
 
 Invertible rules:
 -----------------
 
 (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
-G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
++ G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
 (G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
-G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
-(G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1 -- here X is atomic, although the same rule would be valid for non-atomic X.
++ G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
++ (G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1 -- here X is atomic, although the same rule would be valid for non-atomic X.
 (G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
 (G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
 
 Non-invertible rules:
 ---------------------
 
-G* |- A + B when G* |- A  -- rule +R1
-G* |- A + B when G* |- B  -- rule +R2
++ G* |- A + B when G* |- A  -- rule +R1
++ G* |- A + B when G* |- B  -- rule +R2
 (G*, (A ⇒ B) ⇒ C) |- D when (G*, C) |- D and (G*, B ⇒ C) |- A ⇒ B  -- rule ->L4
 
  */
@@ -50,6 +50,50 @@ object LJT {
     }
     fromIdAxiom ++ fromTAxiom
   }
+
+  // (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
+  private def ruleConjunctionAtLeft[T] = ForwardRule[T](name = "&L", sequent ⇒
+    Seq(RuleResult("&L", List(sequent.copy(goal = ???)), { proofTerms ⇒
+      // This rule expects two different proof terms.
+      ???
+    }
+    )
+
+    )
+  )
+
+  // (G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
+  private def ruleDisjunctionAtLeft[T] = ForwardRule[T](name = "+L", sequent ⇒
+    Seq(RuleResult("+L", List(sequent.copy(goal = ???)), { proofTerms ⇒
+      // This rule expects two different proof terms.
+      ???
+    }
+    )
+
+    )
+  )
+
+  // (G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
+  private def ruleImplicationAtLeft2[T] = ForwardRule[T](name = "->L2", sequent ⇒
+    Seq(RuleResult("->L2", List(sequent.copy(goal = ???)), { proofTerms ⇒
+      // This rule expects two different proof terms.
+      ???
+    }
+    )
+
+    )
+  )
+
+  // (G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
+  private def ruleImplicationAtLeft3[T] = ForwardRule[T](name = "->L3", sequent ⇒
+    Seq(RuleResult("->L3", List(sequent.copy(goal = ???)), { proofTerms ⇒
+      // This rule expects two different proof terms.
+      ???
+    }
+    )
+
+    )
+  )
 
   // G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
   private def ruleImplicationAtRight[T] = ForwardRule[T](name = "->R", sequent ⇒
@@ -80,10 +124,8 @@ object LJT {
     for {
       atomicPremiseXi ← indexedPremises.filter(_._1.isAtomic)
       (atomicPremiseX, atomicPremiseI) = atomicPremiseXi
-      implPremiseAi ← indexedPremises.collect {
-        // We probably don't need to keep the `head` here. OTOH we need `body` and `ind`.
-        case (head :-> body, ind) if head == atomicPremiseX ⇒ (body, ind)
-      }
+      // We only need to keep `body` and `ind` here.
+      implPremiseAi ← indexedPremises.collect { case (head :-> body, ind) if head == atomicPremiseX ⇒ (body, ind) }
       (implPremiseA, implPremiseI) = implPremiseAi
     } yield {
       // Build the sequent (G*, X, A) |- B by excluding the premise X ⇒ A from the initial context, and by prepending A to it.
@@ -95,16 +137,17 @@ object LJT {
         val proofTerm = proofTerms.head
         // This term is of the type A => G* \ { X ⇒ A } => B.
         // We need to build the term G* => B, knowing that X is in G* at index atomicPremiseI, and X ⇒ A at index implPremiseI.
-
         // The arguments of proofTerm is the list (A, P1, P2, ..., X, ... PN) of some variables. We need to use sequent.premiseVars instead, or else sequent.constructResultTerm won't work.
         // That is, we need to apply the term CurriedE(heads, f) to our sequent's premise vars, slightly reordered.
         val implPremiseVar = sequent.premiseVars(implPremiseI) // X ⇒ A
+
         val atomicPremiseVar = sequent.premiseVars(atomicPremiseI) // X
 
         val valueA = AppE(implPremiseVar, atomicPremiseVar)
         // The list of vars is (A, P1, P2, ..., X, ... PN)
-        val result = TermExpr.applyToVars(proofTerm, valueA :: sequent.premiseVars.zipWithIndex.filterNot(_._2 == implPremiseI).map(_._1))
-        sequent.constructResultTerm(result) // use `substitute`?
+        val oldPremisesWithoutImplPremiseA = sequent.premiseVars.zipWithIndex.filterNot(_._2 == implPremiseI).map(_._1)
+        val result = TermExpr.applyToVars(proofTerm, valueA :: oldPremisesWithoutImplPremiseA)
+        sequent.constructResultTerm(result)
       })
     }
   }
@@ -144,7 +187,6 @@ object LJT {
             case _ ⇒ // The goal has no premises.
               DisjunctE(0, disjunctType.terms.length, proofTerm, disjunctType)
           }
-
         })
         )
       case _ ⇒ Seq()
@@ -153,14 +195,36 @@ object LJT {
 
   // (G*, (A ⇒ B) ⇒ C) |- D when (G*, C) |- D and (G*, B ⇒ C) |- A ⇒ B  -- rule ->L4
   // This rule needs a lemma:  |-  ((A ⇒ B) ⇒ C) ⇒ B ⇒ C
-  private def ruleImplicationAtLeft4[T] = ForwardRule[T](name = "->L4", sequent ⇒
-    Seq(RuleResult("->L4", List(sequent.copy(goal = ???)), { proofTerms ⇒
-      // This rule expects two different proof terms.
-      ???
-    }
-    )
+  private def ruleImplicationAtLeft4[T] = ForwardRule[T](name = "->L4", { sequent ⇒
+    val indexedPremises = sequent.premises.zipWithIndex
+    for {
+      premiseABCi ← indexedPremises.collect { case ((headA :-> headB) :-> bodyC, ind) ⇒ (headA, headB, bodyC, ind) }
+    } yield {
+      val (a, b, c, i) = premiseABCi
+      val newPremisesCD = c :: indexedPremises.filterNot(_._2 == i).map(_._1)
+      val newPremisesBCAB = (b :-> c) :: indexedPremises.filterNot(_._2 == i).map(_._1)
+      RuleResult[T]("->L4", List(sequent.copy(premises = newPremisesBCAB, goal = a :-> b), sequent.copy(premises = newPremisesCD)), { proofTerms ⇒
+        // This rule expects two different proof terms.
+        val Seq(termCD, termBCAB) = proofTerms
+        val CurriedE(termCDheads, termCDbody) = termCD
+        val CurriedE(termBCABheads, termBCABbody) = termCD
+        val implPremiseVarABC = sequent.premiseVars(i) // (A ⇒ B) ⇒ C
 
-    )
+        val oldPremisesWithoutImplPremise = sequent.premiseVars.zipWithIndex.filterNot(_._2 == i).map(_._1)
+
+        // Using the lemma |-  ((A ⇒ B) ⇒ C) ⇒ B ⇒ C, construct the proof of the original sequent.
+        val varB = PropE(sequent.freshVar(), b)
+        val varDummyA = PropE(sequent.freshVar(), a)
+        val valueConstAB = CurriedE(List(varDummyA), varB)
+        val valueBC = CurriedE(List(varB), AppE(implPremiseVarABC, valueConstAB))
+        val valueAB = TermExpr.applyToVars(termBCAB, valueBC :: oldPremisesWithoutImplPremise)
+        val valueC = AppE(implPremiseVarABC, valueAB)
+        val result = TermExpr.applyToVars(termCD, valueC :: oldPremisesWithoutImplPremise)
+        sequent.constructResultTerm(result)
+      }
+      )
+    }
+  }
   )
 
   def nonInvertibleRulesForSequent[T](sequent: Sequent[T]): Seq[ForwardRule[T]] = {
