@@ -8,7 +8,7 @@ class LJTSpec2 extends FlatSpec with Matchers {
   behavior of "proof search, rule ->L1"
 
   it should "inhabit type using ->L1" in {
-    val typeExpr = TP(1) #-> ((TP(1) #-> TP(2)) #-> TP(2))
+    val typeExpr = TP(1) ->: ((TP(1) ->: TP(2)) ->: TP(2))
     val proofs = TheoremProver.findProofs(typeExpr)
     proofs.length shouldEqual 1
 
