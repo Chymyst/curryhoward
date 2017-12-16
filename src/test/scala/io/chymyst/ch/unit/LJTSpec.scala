@@ -1,7 +1,7 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch.LJT.followsFromAxioms
-import io.chymyst.ch.{:->, ConjunctT, CurriedE, DisjunctE, DisjunctT, FreshIdents, PropE, Sequent, TP, TermExpr, TheoremProver, TypeExpr}
+import io.chymyst.ch.{#->, ConjunctT, CurriedE, DisjunctE, DisjunctT, FreshIdents, PropE, Sequent, TP, TermExpr, TheoremProver, TypeExpr}
 import org.scalatest.{FlatSpec, Matchers}
 
 class LJTSpec extends FlatSpec with Matchers {
@@ -116,14 +116,14 @@ class LJTSpec extends FlatSpec with Matchers {
   behavior of "proof search - high-level API, rule ->R"
 
   it should "find proof term for the I combinator using rule ->R" in {
-    val typeExpr = TP(1) :-> TP(1)
+    val typeExpr = TP(1) #-> TP(1)
     val proofs = TheoremProver.findProofs(typeExpr)
     proofs.length shouldEqual 1
     TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(1))), PropE("x", TP(1)))) shouldEqual true
   }
 
   it should "find proof term for the K combinator using rule ->R" in {
-    val typeExpr = TP(1) :-> (TP(2) :-> TP(1))
+    val typeExpr = TP(1) #-> (TP(2) #-> TP(1))
     val proofs = TheoremProver.findProofs(typeExpr)
     proofs.length shouldEqual 1
     println(proofs.head)
@@ -131,7 +131,7 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "find proof term for the flipped K combinator using rule ->R" in {
-    val typeExpr = TP(2) :-> (TP(1) :-> TP(1))
+    val typeExpr = TP(2) #-> (TP(1) #-> TP(1))
     val proofs = TheoremProver.findProofs(typeExpr)
     proofs.length shouldEqual 1
     println(proofs.head)
@@ -139,7 +139,7 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "find proof term for the constant function with 2 arguments using rule ->R" in {
-    val typeExpr = TP(0) :-> (TP(1) :-> (TP(2) :-> TP(0)))
+    val typeExpr = TP(0) #-> (TP(1) #-> (TP(2) #-> TP(0)))
     val proofs = TheoremProver.findProofs(typeExpr)
     proofs.length shouldEqual 1
     println(proofs.head)
@@ -147,7 +147,7 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "find proof term for the 1-switched constant function with 2 arguments using rule ->R" in {
-    val typeExpr = TP(0) :-> (TP(1) :-> (TP(2) :-> TP(1)))
+    val typeExpr = TP(0) #-> (TP(1) #-> (TP(2) #-> TP(1)))
     val proofs = TheoremProver.findProofs(typeExpr)
     proofs.length shouldEqual 1
     println(proofs.head)
@@ -155,7 +155,7 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "find proof term for the 2-switched constant function with 2 arguments using rule ->R" in {
-    val typeExpr = TP(0) :-> (TP(1) :-> (TP(2) :-> TP(2)))
+    val typeExpr = TP(0) #-> (TP(1) #-> (TP(2) #-> TP(2)))
     val proofs = TheoremProver.findProofs(typeExpr)
     proofs.length shouldEqual 1
     println(proofs.head)
@@ -165,14 +165,14 @@ class LJTSpec extends FlatSpec with Matchers {
   behavior of "proof search - high-level API, rule +Rn"
 
   it should "find proof term for simple instance of +Rn" in {
-    val typeExpr = TP(1) :-> DisjunctT(Seq(TP(1), TP(2)))
+    val typeExpr = TP(1) #-> DisjunctT(Seq(TP(1), TP(2)))
     val proofs = TheoremProver.findProofs(typeExpr)
     proofs.length shouldEqual 1
     TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(1))), DisjunctE(0, 2, PropE("x", TP(1)), DisjunctT(Seq(TP(1), TP(2)))))) shouldEqual true
   }
 
   it should "find proof term for simple instance of +Rn with several disjuncts" in {
-    val typeExpr = TP(2) :-> DisjunctT(Seq(TP(1), TP(2), TP(3)))
+    val typeExpr = TP(2) #-> DisjunctT(Seq(TP(1), TP(2), TP(3)))
     val proofs = TheoremProver.findProofs(typeExpr)
     proofs.length shouldEqual 1
     TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(2))), DisjunctE(1, 3, PropE("x", TP(2)), DisjunctT(Seq(TP(1), TP(2), TP(3)))))) shouldEqual true

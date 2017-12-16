@@ -110,7 +110,7 @@ final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T
 
   // The type of AppE is computed from the types of its arguments.
   def tExpr: TypeExpr[T] = head.tExpr match {
-    case hd :-> body if hd == arg.tExpr ⇒ body
+    case hd #-> body if hd == arg.tExpr ⇒ body
     case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application, ${head.tExpr}: must be a function with argument type ${arg.tExpr}")
   }
 }
@@ -120,7 +120,7 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
   override def map[U](f: T ⇒ U): TermExpr[U] = CurriedE(heads map (_ map f), body map f)
 
   // The type is t1 -> t2 -> t3 -> b; here `heads` = List(t1, t2, t3).
-  def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr :-> prev }
+  def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr #-> prev }
 }
 
 final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T] {

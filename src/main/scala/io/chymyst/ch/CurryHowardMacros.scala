@@ -49,7 +49,7 @@ object CurryHowardMacros {
 
     t.typeSymbol.fullName match {
       case name if name matches "scala.Tuple[0-9]+" ⇒ ConjunctT(args.map(matchType(c))) //s"(${args.map(matchType(c)).mkString(", ")})"
-      case "scala.Function1" ⇒ :->(matchType(c)(args.head), matchType(c)(args(1))) // s"${matchType(c)(args(0))} ..=>.. ${matchType(c)(args(1))}"
+      case "scala.Function1" ⇒ #->(matchType(c)(args.head), matchType(c)(args(1))) // s"${matchType(c)(args(0))} ..=>.. ${matchType(c)(args(1))}"
       case "scala.Option" ⇒ DisjunctT(Seq(UnitT("Unit"), matchType(c)(args.head))) //s"(1 + ${matchType(c)(args.head)})"
       case "scala.util.Either" ⇒ DisjunctT(Seq(matchType(c)(args.head), matchType(c)(args(1)))) //s"(${matchType(c)(args(0))} + ${matchType(c)(args(1))})"
       case "scala.Any" ⇒ OtherT("_")
@@ -68,12 +68,14 @@ object CurryHowardMacros {
         // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case PropE(name, tExpr) ⇒
         val tpt = tExpr match {
-          case _: NothingT[String] ⇒ tq""
           // TODO: Stop using String as type parameter T, use c.Type instead
           case TP(nameT) ⇒
             val tpn = TypeName(nameT)
             tq"$tpn"
+          case _ ⇒ tq""
         }
+//        val typeExpr = tExpr.
+//        val tpt =
         val termName = TermName("t_" + name)
         val param = q"val $termName: $tpt"
         param
@@ -124,10 +126,12 @@ object CurryHowardMacros {
     inhabitInternal(c)(typeT)
   }
 
+
   def inhabitInternal(c: whitebox.Context)(typeT: c.Type): c.Tree = {
     import c.universe._
-    val typeStructure: TypeExpr[String] = matchType(c)(typeT)
-    val termFound: TermExpr[String] = TheoremProver(typeStructure) match {
+    type TExprType = String // (String, c.Type)
+    val typeStructure: TypeExpr[TExprType] = matchType(c)(typeT)
+    val termFound: TermExpr[TExprType] = TheoremProver(typeStructure) match {
       case Nil ⇒
         c.error(c.enclosingPosition, s"type $typeStructure cannot be inhabited")
         null
@@ -140,7 +144,10 @@ object CurryHowardMacros {
     println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
     val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(c)(p)).toMap
     val result = reifyTerms(c)(termFound, paramTerms)
-    println(s"DEBUG: returning code: ${showCode(result)}")
-    result
+    val resultType = tq"${typeT.finalResultType}"
+    val resultWithType = q"$result: $resultType"
+    println(s"DEBUG: returning code: ${showCode(resultWithType)}")
+
+    result//WithType
   }
 }
