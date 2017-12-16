@@ -37,6 +37,27 @@ class TermExprSpec extends FlatSpec with Matchers {
     TermExpr.equiv(termExpr1a, termExpr1) shouldEqual true
   }
 
+  behavior of "TermExpr#simplify"
+
+  it should "simplify identity function application" in {
+    val termExpr0 = PropE("y", TP(1))
+    val termExpr1 = CurriedE(List(PropE("x", TP(1) ->: TP(1))), termExpr0) // x: A -> x
+    val termExpr2 = AppE(termExpr1, PropE("z", TP(1)))
+    termExpr2.simplify shouldEqual termExpr0 // (x: A -> y)(z) == y
+  }
+
+  it should "simplify nested terms" in {
+    val f1 = CurriedE(List(PropE("x4", TP(2)), PropE("x5", TP(1))), PropE("x4", TP(2))) // f1: (x4:B -> x5:A -> x4:B)
+    val x2 = PropE("x2", TP(1) ->: TP(2)) // x2: A → B
+    val x3 = PropE("x3", TP(1)) // x3: A
+    val t1 = AppE(f1, PropE("y", TP(2)))
+    t1.simplify shouldEqual CurriedE(List(PropE("x5", TP(1))), PropE("y", TP(2)))
+
+    // x3:A -> (x2:A → B) -> (x4:B  -> x5:A -> x4:B) ( (x2:A → B)(x3:A) ) (x3:A)
+    val termExpr4 = CurriedE(List(x3, x2), AppE( AppE(f1, AppE(x2, x3)), x3))
+    termExpr4.simplify shouldEqual CurriedE(List(x3, x2), AppE(x2, x3))
+  }
+
   behavior of "Sequent#constructResultTerm"
 
   it should "produce result terms in correct order" in {

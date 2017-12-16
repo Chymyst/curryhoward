@@ -2,9 +2,10 @@ package io.chymyst.ch
 
 import io.chymyst.ch.TermExpr.VarName
 
-import scala.annotation.tailrec
-
 object TermExpr {
+  type VarName = String
+  type ProofTerm[T] = TermExpr[T]
+
   def propositions[T](termExpr: TermExpr[T]): Set[PropE[T]] = termExpr match {
     case p: PropE[T] ⇒ Set(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
     case AppE(head, arg) ⇒ propositions(head) ++ propositions(arg)
@@ -13,9 +14,6 @@ object TermExpr {
     case ConjunctE(terms) ⇒ terms.flatMap(propositions).toSet
     case _ ⇒ Set()
   }
-
-  type VarName = String
-  type ProofTerm[T] = TermExpr[T]
 
   private val freshIdents = new FreshIdents("z")
 
@@ -49,6 +47,15 @@ object TermExpr {
     case _ ⇒ e1 == e2
   }
 
+  def subst[T](replaceVar: PropE[T], expr: TermExpr[T], inExpr: TermExpr[T]): TermExpr[T] = inExpr match {
+    case PropE(name, tExpr) if name == replaceVar.name ⇒ expr
+    case AppE(head, arg) ⇒ AppE(subst(replaceVar, expr, head), subst(replaceVar, expr, arg))
+    case CurriedE(heads: List[PropE[T]], body) ⇒ CurriedE(heads, TermExpr.subst(replaceVar, expr, body))
+    case ConjunctE(terms) ⇒ ConjunctE(terms.map(t ⇒ TermExpr.subst(replaceVar, expr, t)))
+    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, TermExpr.subst(replaceVar, expr, term), tExpr)
+    case _ ⇒ inExpr
+  }
+
 }
 
 sealed trait TermExpr[+T] {
@@ -69,6 +76,8 @@ sealed trait TermExpr[+T] {
   }
 
   def map[U](f: T ⇒ U): TermExpr[U]
+
+  def simplify: TermExpr[T] = this
 
   lazy val freeVars: Set[VarName] = this match {
     case PropE(name, tExpr) ⇒ Set(name)
@@ -113,6 +122,22 @@ final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T
     case hd #-> body if hd == arg.tExpr ⇒ body
     case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application, ${head.tExpr}: must be a function with argument type ${arg.tExpr}")
   }
+
+  override def simplify: TermExpr[T] = {
+    val headSimpl = head.simplify
+    val argSimpl = arg.simplify
+
+    headSimpl match {
+      case CurriedE(heads, body) ⇒
+        // substitute arg as first variable into body and return CurriedE unless we have no more arguments, else return new body
+        val result: TermExpr[T] = TermExpr.subst(heads.head, argSimpl, body.simplify).simplify
+        heads.tail match {
+          case Nil ⇒ result
+          case h ⇒ CurriedE(h, result)
+        }
+      case _ ⇒ this.copy(head = headSimpl, arg = argSimpl)
+    }
+  }
 }
 
 // The order of `heads` is straight, so `CurriedE(List(x1, x2, x3), body)` represents the term `x1 -> x2 -> x2 -> body`
@@ -121,6 +146,8 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
 
   // The type is t1 -> t2 -> t3 -> b; here `heads` = List(t1, t2, t3).
   def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr ->: prev }
+
+  override def simplify: TermExpr[T] = this.copy(body = body.simplify)
 }
 
 final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T] {
@@ -131,9 +158,12 @@ final case class ConjunctE[+T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = ConjunctE(terms.map(_.map(f)))
 
   def tExpr: TypeExpr[T] = ConjunctT(terms.map(_.tExpr))
+
+  override def simplify: TermExpr[T] = this.copy(terms = terms.map(_.simplify))
 }
 
 final case class DisjunctE[T](index: Int, total: Int, term: TermExpr[T], tExpr: TypeExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = DisjunctE(index, total, term map f, tExpr map f)
-}
 
+  override def simplify: TermExpr[T] = this.copy(term = term.simplify)
+}

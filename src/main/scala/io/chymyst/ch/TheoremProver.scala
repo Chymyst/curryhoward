@@ -24,20 +24,20 @@ object TheoremProver {
     proofs.toList
   }
 
-  def concatProofs[T](ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
-    println(s"debug: applied rule ${ruleResult.ruleName}, new sequents ${ruleResult.newSequents}")
-    // All the new sequents need to be proved before we can continue. They may have several proofs each.
-    val newProofs: Seq[Seq[ProofTerm[T]]] = ruleResult.newSequents.map(findProofTerms)
-    val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
-    val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
-    println(s"debug: transformed proof terms $transformedProofs")
-    transformedProofs
-  }
-
   // Main recursive function that computes the list of available proofs for a sequent.
   // The main assumption is that the depth-first proof search terminates.
   // No loop checking is performed on sequents.
   def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
+    def concatProofs[T](ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
+      println(s"debug: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents}")
+      // All the new sequents need to be proved before we can continue. They may have several proofs each.
+      val newProofs: Seq[Seq[ProofTerm[T]]] = ruleResult.newSequents.map(findProofTerms)
+      val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
+      val transformedProofs = explodedNewProofs.map(ruleResult.backTransform).map(_.simplify)
+      println(s"debug: transformed proof terms $transformedProofs")
+      transformedProofs
+    }
+
     // Check whether the sequent follows directly from an axiom.
     val fromAxioms: Seq[ProofTerm[T]] = followsFromAxioms(sequent) // This could be empty or non-empty.
     // Even if the sequent follows directly from axioms, we should try applying rules in hopes of getting more proofs.
@@ -74,7 +74,9 @@ object TheoremProver {
           fromNoninvertibleRules ++ fromAxioms
         }
     }
-    fromRules
+    val terms = fromRules.distinct
+    println(s"debug: returning terms $terms")
+    terms
   }
 
 }
