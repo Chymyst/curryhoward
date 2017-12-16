@@ -5,12 +5,12 @@ sealed trait TypeExpr[+T] {
     case DisjunctT(terms) ⇒ terms.map(_.toString).mkString(" + ")
     case ConjunctT(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
     case head #-> body ⇒ s"($head) → $body"
-    case BasicT(name) ⇒ s"<basic>$name"
-    case ConstructorT(fullExpr) ⇒ s"<constructor>$fullExpr"
+    case BasicT(name) ⇒ s"<c>$name" // well-known constant type such as Int
+    case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"
-    case OtherT(name) ⇒ s"<other>$name"
+    case OtherT(name) ⇒ s"<oc>$name" // other constant type
     case NothingT(_) ⇒ "0"
-    case UnitT(_) ⇒ "1"
+    case UnitT(name) ⇒ name.toString
   }
 
   def isAtomic: Boolean

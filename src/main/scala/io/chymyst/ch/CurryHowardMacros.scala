@@ -4,6 +4,21 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 import scala.reflect.macros.whitebox
 
+/* http://stackoverflow.com/questions/17494010/debug-scala-macros-with-intellij
+
+How to debug Scala macros:
+
+You need to start your sbt in debug mode and then connect the idea debugger remotely:
+
+start sbt with: sbt -jvm-debug 5005
+
+create a "Remote" "Run/Debug Config" in idea (defaults to port 5005 )
+
+Run the remote­debug config in idea. That will connect it to your running sbt. Then you can set breakpoints in your macro code and when running compile in sbt, idea should stop at the breakpoint.
+
+note: to re­run compile after a successful compile you need either to clean or change some code
+ */
+
 // TODO:
 /*  Priority is given in parentheses.
 + finish the implicational fragment (0)
@@ -44,16 +59,18 @@ object CurryHowardMacros {
   private val basicRegex = s"(?:scala.|java.lang.)*(${basicTypes.mkString("|")})".r
 
   // TODO: use c.Type instead of String
-  def matchType(c: whitebox.Context)(t: c.Type): TypeExpr[String] = {
+  private def matchType(c: whitebox.Context)(t: c.Type): TypeExpr[String] = {
     // Could be the weird type [X, Y] => (type expression), or it could be an actual tuple type.
     // `finalResultType` seems to help here.
     val args = t.finalResultType.typeArgs
-    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
 
+//    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
+//    val valParamLists = t.paramLists
+    // use something like t.paramLists(0)(0).typeSignature and also .isImplicit to extract types of function parameters
     t.typeSymbol.fullName match {
       case name if name matches "scala.Tuple[0-9]+" ⇒ ConjunctT(args.map(matchType(c))) //s"(${args.map(matchType(c)).mkString(", ")})"
-      case "scala.Function1" ⇒ #->(matchType(c)(args.head), matchType(c)(args(1))) // s"${matchType(c)(args(0))} → ${matchType(c)(args(1))}"
-      case "scala.Option" ⇒ DisjunctT(Seq(UnitT("Unit"), matchType(c)(args.head))) //s"(1 + ${matchType(c)(args.head)})"
+      case "scala.Function1" ⇒ matchType(c)(args.head) ->: matchType(c)(args(1)) // s"${matchType(c)(args(0))} → ${matchType(c)(args(1))}"
+      case "scala.Option" ⇒ DisjunctT(Seq(UnitT("None"), matchType(c)(args.head))) //s"(1 + ${matchType(c)(args.head)})"
       case "scala.util.Either" ⇒ DisjunctT(Seq(matchType(c)(args.head), matchType(c)(args(1)))) //s"(${matchType(c)(args(0))} + ${matchType(c)(args(1))})"
       case "scala.Any" ⇒ OtherT("_")
       case "scala.Nothing" ⇒ NothingT("Nothing")
@@ -65,10 +82,10 @@ object CurryHowardMacros {
     }
   }
 
-  def reifyType(c: whitebox.Context)(typeExpr: TypeExpr[String]): c.Tree = {
+  private def reifyType(c: whitebox.Context)(typeExpr: TypeExpr[String]): c.Tree = {
     import c.universe._
 
-    def makeName(nameT: String): c.universe.Tree = {
+    def makeTypeName(nameT: String): c.universe.Tree = {
       val tpn = TypeName(nameT)
       tq"$tpn"
     }
@@ -77,10 +94,11 @@ object CurryHowardMacros {
       case head #-> body ⇒ tq"(${reifyType(c)(head)}) ⇒ ${reifyType(c)(body)}"
       // TODO: Stop using String as type parameter T, use c.Type instead
       // TODO: make match exhaustive on tExpr, by using c.Type instead of String
-      case TP(nameT) ⇒ makeName(nameT)
-      case BasicT(nameT) ⇒ makeName(nameT)
-      case UnitT(nameT) ⇒ makeName(nameT)
-      case ConjunctT(terms) ⇒
+      case TP(nameT) ⇒ makeTypeName(nameT)
+      case BasicT(nameT) ⇒ makeTypeName(nameT)
+      case NothingT(nameT) ⇒ makeTypeName(nameT)
+      case UnitT(nameT) ⇒ makeTypeName(nameT)
+      case ConjunctT(terms) ⇒ // Assuming this is a tuple type.
         val tpts = terms.map(t ⇒ reifyType(c)(t))
         tq"(..$tpts)"
       case _ ⇒ tq""
@@ -88,28 +106,30 @@ object CurryHowardMacros {
     }
   }
 
-  def reifyParam(c: whitebox.Context)(term: PropE[String]): c.Tree = {
+  // Prepare the tree for a function parameter with the specified type.
+  private def reifyParam(c: whitebox.Context)(term: PropE[String]): c.Tree = {
     import c.universe._
     term match {
       case PropE(name, typeExpr) ⇒
         val tpt = reifyType(c)(typeExpr)
-        val termName = TermName("t_" + name)
+        val termName = TermName("t_" + name.toString)
         val param = q"val $termName: $tpt"
         param
     }
   }
 
-  def reifyTerms(c: whitebox.Context)(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree]): c.Tree = {
+  private def reifyTerms(c: whitebox.Context)(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree]): c.Tree = {
     import c.universe._
 
     termExpr match {
       case p@PropE(name, typeName) =>
-        val tn = TermName("t_" + name)
+        val tn = TermName("t_" + name.toString)
         q"$tn"
       case AppE(head, arg) => q"${reifyTerms(c)(head, paramTerms)}(${reifyTerms(c)(arg, paramTerms)})"
+
       // If `heads` = List(x, y, z) and `body` = b then the code must be x => y => z => b
       case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyTerms(c)(body, paramTerms)) { case (prevTree, paramE) ⇒
-        val param = paramTerms(paramE)
+        val param = paramTerms(paramE) // Look up the parameter in the precomputed table.
         q"($param ⇒ $prevTree)"
       }
       case UnitE(_) => q"()"
@@ -145,7 +165,7 @@ object CurryHowardMacros {
     inhabitInternal(c)(typeT)
   }
 
-  def inhabitInternal(c: whitebox.Context)(typeT: c.Type): c.Tree = {
+  private def inhabitInternal(c: whitebox.Context)(typeT: c.Type): c.Tree = {
     import c.universe._
     type TExprType = String // (String, c.Type)
     val typeStructure: TypeExpr[TExprType] = matchType(c)(typeT)
