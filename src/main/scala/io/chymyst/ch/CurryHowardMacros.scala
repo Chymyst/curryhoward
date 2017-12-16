@@ -62,20 +62,23 @@ object CurryHowardMacros {
     }
   }
 
+  def reifyType(c: whitebox.Context)(typeExpr: TypeExpr[String]): c.Tree = {
+    import c.universe._
+    typeExpr match {
+      // TODO: Stop using String as type parameter T, use c.Type instead
+      case TP(nameT) ⇒
+        val tpn = TypeName(nameT)
+        tq"$tpn"
+      case _ ⇒ tq""
+    }
+  }
+
   def reifyParam(c: whitebox.Context)(term: PropE[String]): c.Tree = {
     import c.universe._
     term match {
         // TODO: make match exhaustive on tExpr, by using c.Type instead of String
-      case PropE(name, tExpr) ⇒
-        val tpt = tExpr match {
-          // TODO: Stop using String as type parameter T, use c.Type instead
-          case TP(nameT) ⇒
-            val tpn = TypeName(nameT)
-            tq"$tpn"
-          case _ ⇒ tq""
-        }
-//        val typeExpr = tExpr.
-//        val tpt =
+      case PropE(name, typeExpr) ⇒
+        val tpt = reifyType(c)(typeExpr)
         val termName = TermName("t_" + name)
         val param = q"val $termName: $tpt"
         param
