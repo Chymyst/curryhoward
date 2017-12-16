@@ -17,8 +17,16 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   it should "generate code for a function returning Unit" in {
     def f1[A, B]: A ⇒ B ⇒ Unit = implement
+
+    f1("abc")(123) shouldEqual (())
+
     def f2[A, B]: A ⇒ Unit ⇒ B ⇒ Unit = implement
+
+    f2("abc")(())(123) shouldEqual (())
+
     def f3[A, B]: A ⇒ Unit ⇒ B ⇒ A = implement
+
+    f3("abc")(())(123) shouldEqual "abc"
   }
 
   behavior of "implicational fragment"
@@ -49,6 +57,7 @@ class LJTSpec2 extends FlatSpec with Matchers {
   it should "generate the weak Peirce law" in {
     def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
 
+    // This cannot be implemented.
     "def f[A,B]: ((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B = implement" shouldNot compile
   }
 

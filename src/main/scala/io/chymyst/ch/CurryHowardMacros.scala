@@ -7,13 +7,14 @@ import scala.reflect.macros.whitebox
 // TODO:
 /*  Priority is given in parentheses.
 + finish the implicational fragment (0)
+- add documentation using the `tut` plugin
+- support natural syntax def f[T](x: T): T = implement (3)
 - implement all rules of the LJT calculus (1)
 - implement Option and Either in inhabited terms (2)
 + make sure Unit works (2)
 - support named conjunctions (case classes) explicitly (3) and support disjunctions on that basis
 + check unused arguments and sort results accordingly (3)
 + only output the results with smallest number of unused arguments, if that is unique (3)
-- support natural syntax def f[T](x: T): T = implement (3)
 - use c.Type instead of String for correct code generation (3)
 - use blackbox macros instead of whitebox if possible (5)
 + add more error messages: print alternative lambda-terms when we refuse to implement (5)
@@ -143,19 +144,21 @@ object CurryHowardMacros {
     val typeStructure: TypeExpr[TExprType] = matchType(c)(typeT)
     TheoremProver(typeStructure) match {
       case Nil ⇒
-        c.error(c.enclosingPosition, s"type $typeStructure cannot be inhabited")
-        q"null"
+        c.error(c.enclosingPosition, s"type $typeStructure cannot be implemented")
+        q"null" // Avoid other spurious errors, return a valid tree here.
       case List(termFound) ⇒
         //        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
         val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(c)(p)).toMap
         val result = reifyTerms(c)(termFound, paramTerms)
-        val resultType = tq"${typeT.finalResultType}"
-        val resultWithType = q"$result: $resultType"
-
+        //        val resultType = tq"${typeT.finalResultType}"
+        //        val resultWithType = q"$result: $resultType"
         //        println(s"DEBUG: returning code: ${showCode(result)}")
-        result //WithType
+
+        // use resultWithType? Doesn't seem tow work.
+        result
+
       case list ⇒
-        c.error(c.enclosingPosition, s"type $typeStructure can be inhabited in ${list.length} different ways: ${list.mkString("; ")}")
+        c.error(c.enclosingPosition, s"type $typeStructure can be implemented in ${list.length} different ways: ${list.mkString("; ")}")
         q"null"
     }
 

@@ -51,7 +51,7 @@ object MyApp extends App {
 
 # Status
 
-Very early development. First examples are working as proof-of-concept.
+Early development.
 
 The implicational fragment of the IPL is working.
 
