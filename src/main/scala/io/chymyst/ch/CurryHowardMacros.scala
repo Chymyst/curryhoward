@@ -88,7 +88,8 @@ object CurryHowardMacros {
         val tn = TermName("t_" + name)
         q"$tn"
       case AppE(head, arg) => q"${reifyTerms(c)(head, paramTerms)}(${reifyTerms(c)(arg, paramTerms)})"
-      case CurriedE(heads, body) ⇒ heads.foldLeft(reifyTerms(c)(body, paramTerms)) { case (prevTree, paramE) ⇒
+        // If `heads` = List(x, y, z) and `body` = b then the code must be x => y => z => b
+      case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyTerms(c)(body, paramTerms)) { case (prevTree, paramE) ⇒
         val param = paramTerms(paramE)
         q"($param ⇒ $prevTree)"
       }

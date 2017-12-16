@@ -16,7 +16,14 @@ final case class Sequent[T](premises: List[TypeExpr[T]], goal: TypeExpr[T], fres
     */
   def substitute(p: ProofTerm[T]): ProofTerm[T] = TermExpr.applyToVars(p, premiseVars)
 
+  /** Construct a function term that takes all the sequent's premises as arguments and returns a given term.
+    *
+    * @param result A given term that should use the sequent's `premiseVars`.
+    * @return A function term.
+    */
   def constructResultTerm(result: TermExpr[T]): TermExpr[T] = CurriedE(premiseVars, result)
+
+  override lazy val toString: String = s"[(${premises.mkString(", ")}) |- $goal]"
 }
 
 class FreshIdents(prefix: String) {

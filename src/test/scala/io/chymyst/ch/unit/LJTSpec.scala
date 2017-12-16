@@ -30,30 +30,6 @@ class LJTSpec extends FlatSpec with Matchers {
 
   import Subformulas._
 
-  behavior of "proof search - internal details"
-
-  it should "correctly explode sequences of integers" in {
-    TheoremProver.explode[Int](Seq(Seq(1, 2))) shouldEqual Seq(Seq(1), Seq(2))
-    TheoremProver.explode[Int](Seq(Seq(1, 2), Seq())) shouldEqual Seq()
-    TheoremProver.explode[Int](Seq(Seq())) shouldEqual Seq()
-    TheoremProver.explode[Int](Seq()) shouldEqual Seq(Seq())
-    TheoremProver.explode[Int](Seq(Seq(1, 2), Seq(10, 20, 30))) shouldEqual Seq(Seq(1, 10), Seq(1, 20), Seq(1, 30), Seq(2, 10), Seq(2, 20), Seq(2, 30))
-  }
-
-  it should "correctly produce proofs from the Id axiom" in {
-    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(0), freshVar)) shouldEqual Seq()
-
-    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(1), freshVar)) shouldEqual Seq(
-      CurriedE(List(PropE("x4", TP(3)), PropE("x5", TP(2)), PropE("x6", TP(1))), PropE("x6", TP(1)))
-    )
-  }
-  it should "produce several proofs from the Id axiom" in {
-    followsFromAxioms(Sequent[Int](List(TP(1), TP(2), TP(1)), TP(1), freshVar)) shouldEqual Seq(
-      CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x7", TP(1))),
-      CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x9", TP(1)))
-    )
-  }
-
   // Note: we no longer use the subformula dictionary in the theorem prover.
   it should "correctly compute LJT subformulas" in {
     subformulas[Int](TP(1) :-> TP(1)) shouldEqual Set(TP(1) :-> TP(1), TP(1))
@@ -90,6 +66,32 @@ class LJTSpec extends FlatSpec with Matchers {
     )
   }
 */
+
+  behavior of "proof search - internal details"
+
+  it should "correctly explode sequences of integers" in {
+    TheoremProver.explode[Int](Seq(Seq(1, 2))) shouldEqual Seq(Seq(1), Seq(2))
+    TheoremProver.explode[Int](Seq(Seq(1, 2), Seq())) shouldEqual Seq()
+    TheoremProver.explode[Int](Seq(Seq())) shouldEqual Seq()
+    TheoremProver.explode[Int](Seq()) shouldEqual Seq(Seq())
+    TheoremProver.explode[Int](Seq(Seq(1, 2), Seq(10, 20, 30))) shouldEqual Seq(Seq(1, 10), Seq(1, 20), Seq(1, 30), Seq(2, 10), Seq(2, 20), Seq(2, 30))
+  }
+
+  it should "correctly produce proofs from the Id axiom" in {
+    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(0), freshVar)) shouldEqual Seq()
+
+    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(1), freshVar)) shouldEqual Seq(
+      CurriedE(List(PropE("x4", TP(3)), PropE("x5", TP(2)), PropE("x6", TP(1))), PropE("x6", TP(1)))
+    )
+  }
+
+  it should "produce several proofs from the Id axiom" in {
+    followsFromAxioms(Sequent[Int](List(TP(1), TP(2), TP(1)), TP(1), freshVar)) shouldEqual Seq(
+      CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x7", TP(1))),
+      CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x9", TP(1)))
+    )
+  }
+
   it should "find proof term for given sequent with premises" in {
     val sequent = Sequent(List(TP(1)), TP(1), freshVar)
     val terms = TheoremProver.findProofTerms(sequent)
@@ -104,20 +106,60 @@ class LJTSpec extends FlatSpec with Matchers {
     ) shouldEqual true
   }
 
+  it should "find proof term for the K combinator" in {
+    val sequent = Sequent(List(TP(1), TP(2)), TP(1), freshVar)
+    val terms = TheoremProver.findProofTerms(sequent)
+    terms.length shouldEqual 1
+    TermExpr.equiv(terms.head, CurriedE(List(PropE("a", TP(1)), PropE("b", TP(2))), PropE("a", TP(1)))) shouldEqual true
+  }
+
   behavior of "proof search - high-level API, rule ->R"
 
   it should "find proof term for the I combinator using rule ->R" in {
     val typeExpr = TP(1) :-> TP(1)
     val proofs = TheoremProver.findProofs(typeExpr)
-    proofs shouldEqual Seq(CurriedE(List(PropE("x5", TP(1))), PropE("x5", TP(1))))
+    proofs.length shouldEqual 1
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(1))), PropE("x", TP(1)))) shouldEqual true
   }
 
   it should "find proof term for the K combinator using rule ->R" in {
     val typeExpr = TP(1) :-> (TP(2) :-> TP(1))
     val proofs = TheoremProver.findProofs(typeExpr)
-    proofs shouldEqual Seq(
-      CurriedE(List(PropE("x7", TP(2)), PropE("x8", TP(1))), PropE("x7", TP(1)))
-    )
+    proofs.length shouldEqual 1
+    println(proofs.head)
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(1)), PropE("y", TP(2))), PropE("x", TP(1)))) shouldEqual true
+  }
+
+  it should "find proof term for the flipped K combinator using rule ->R" in {
+    val typeExpr = TP(2) :-> (TP(1) :-> TP(1))
+    val proofs = TheoremProver.findProofs(typeExpr)
+    proofs.length shouldEqual 1
+    println(proofs.head)
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(2)), PropE("y", TP(1))), PropE("y", TP(1)))) shouldEqual true
+  }
+
+  it should "find proof term for the constant function with 2 arguments using rule ->R" in {
+    val typeExpr = TP(0) :-> (TP(1) :-> (TP(2) :-> TP(0)))
+    val proofs = TheoremProver.findProofs(typeExpr)
+    proofs.length shouldEqual 1
+    println(proofs.head)
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(0)), PropE("y", TP(1)), PropE("z", TP(2))), PropE("x", TP(0)))) shouldEqual true
+  }
+
+  it should "find proof term for the 1-switched constant function with 2 arguments using rule ->R" in {
+    val typeExpr = TP(0) :-> (TP(1) :-> (TP(2) :-> TP(1)))
+    val proofs = TheoremProver.findProofs(typeExpr)
+    proofs.length shouldEqual 1
+    println(proofs.head)
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(0)), PropE("y", TP(1)), PropE("z", TP(2))), PropE("y", TP(1)))) shouldEqual true
+  }
+
+  it should "find proof term for the 2-switched constant function with 2 arguments using rule ->R" in {
+    val typeExpr = TP(0) :-> (TP(1) :-> (TP(2) :-> TP(2)))
+    val proofs = TheoremProver.findProofs(typeExpr)
+    proofs.length shouldEqual 1
+    println(proofs.head)
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(0)), PropE("y", TP(1)), PropE("z", TP(2))), PropE("z", TP(2)))) shouldEqual true
   }
 
   behavior of "proof search - high-level API, rule +Rn"
@@ -125,13 +167,15 @@ class LJTSpec extends FlatSpec with Matchers {
   it should "find proof term for simple instance of +Rn" in {
     val typeExpr = TP(1) :-> DisjunctT(Seq(TP(1), TP(2)))
     val proofs = TheoremProver.findProofs(typeExpr)
-    proofs shouldEqual Seq(CurriedE(List(PropE("x19", TP(1))), DisjunctE(0, 2, PropE("x19", TP(1)), DisjunctT(Seq(TP(1), TP(2))))))
+    proofs.length shouldEqual 1
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(1))), DisjunctE(0, 2, PropE("x", TP(1)), DisjunctT(Seq(TP(1), TP(2)))))) shouldEqual true
   }
 
   it should "find proof term for simple instance of +Rn with several disjuncts" in {
     val typeExpr = TP(2) :-> DisjunctT(Seq(TP(1), TP(2), TP(3)))
     val proofs = TheoremProver.findProofs(typeExpr)
-    proofs shouldEqual Seq(CurriedE(List(PropE("x23", TP(2))), DisjunctE(1, 3, PropE("x23", TP(2)), DisjunctT(Seq(TP(1), TP(2), TP(3))))))
+    proofs.length shouldEqual 1
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(2))), DisjunctE(1, 3, PropE("x", TP(2)), DisjunctT(Seq(TP(1), TP(2), TP(3)))))) shouldEqual true
   }
 
   it should "inhabit type using +Rn" in {

@@ -24,6 +24,16 @@ object TheoremProver {
     proofs.toList
   }
 
+  def concatProofs[T](ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
+    println(s"debug: applied rule ${ruleResult.ruleName}, new sequents ${ruleResult.newSequents}")
+    // All the new sequents need to be proved before we can continue. They may have several proofs each.
+    val newProofs: Seq[Seq[ProofTerm[T]]] = ruleResult.newSequents.map(findProofTerms)
+    val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
+    val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
+    println(s"debug: transformed proof terms $transformedProofs")
+    transformedProofs
+  }
+
   // Main recursive function that computes the list of available proofs for a sequent.
   // The main assumption is that the depth-first proof search terminates.
   // No loop checking is performed on sequents.
@@ -32,18 +42,15 @@ object TheoremProver {
     val fromAxioms: Seq[ProofTerm[T]] = followsFromAxioms(sequent) // This could be empty or non-empty.
     // Even if the sequent follows directly from axioms, we should try applying rules in hopes of getting more proofs.
 
+    if (fromAxioms.nonEmpty) println(s"debug: sequent $sequent followsFromAxioms: $fromAxioms")
+
     // Try each rule on sequent. If rule applies, obtain the next sequent.
     // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
 
     // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
     // We should apply that invertible rule and proceed from there.
     val fromRules: Seq[ProofTerm[T]] = invertibleRules[T].view.flatMap(_.applyTo(sequent)).headOption match {
-      case Some(RuleResult(newSequents, backTransform)) ⇒
-        // All the new sequents need to be proved before we can continue. They may have several proofs each.
-        val newProofs: Seq[Seq[ProofTerm[T]]] = newSequents.map(findProofTerms)
-        val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
-        explodedNewProofs.map(backTransform) ++ fromAxioms
-
+      case Some(ruleResult) ⇒ concatProofs(ruleResult) ++ fromAxioms
       case None ⇒
         // Try invertible ambiguous rules. Each of these rules may generate more than one new sequent,
         // and each of these sequents yields a proof if the original formula has a proof.
@@ -51,12 +58,7 @@ object TheoremProver {
         // We proceed to non-invertible rules only if no rules apply at this step.
         val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
           .flatMap(_.applyTo(sequent))
-          .flatMap { case RuleResult(newSequents, backTransform) ⇒
-            val newProofs: Seq[Seq[ProofTerm[T]]] = newSequents.map(findProofTerms)
-            val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
-            val finalNewProofs: Seq[ProofTerm[T]] = explodedNewProofs.map(backTransform)
-            finalNewProofs
-          }
+          .flatMap(concatProofs)
         if (fromInvertibleAmbiguousRules.nonEmpty)
           fromInvertibleAmbiguousRules ++ fromAxioms
         else {
@@ -68,12 +70,7 @@ object TheoremProver {
           // Use flatMap to concatenate all results from all applicable non-invertible rules.
           val fromNoninvertibleRules: Seq[ProofTerm[T]] = nonInvertibleRulesForSequent[T](sequent)
             .flatMap(_.applyTo(sequent))
-            .flatMap { case RuleResult(newSequents, backTransform) ⇒
-              val newProofs: Seq[Seq[ProofTerm[T]]] = newSequents.map(findProofTerms)
-              val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
-              val finalNewProofs: Seq[ProofTerm[T]] = explodedNewProofs.map(backTransform)
-              finalNewProofs
-            }
+            .flatMap(concatProofs)
           fromNoninvertibleRules ++ fromAxioms
         }
     }

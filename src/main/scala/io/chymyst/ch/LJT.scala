@@ -54,17 +54,18 @@ object LJT {
   // G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
   private def ruleImplicationAtRight[T] = ForwardRule[T](name = "->R", sequent ⇒
     sequent.goal match {
-      case a :-> b ⇒
+      case a :-> b ⇒ // The new sequent is (G*, A) |- B
         val newSequent = sequent.copy(premises = a :: sequent.premises, goal = b)
-        Seq(RuleResult(Seq(newSequent), { proofTerms ⇒
+        Seq(RuleResult("->R", Seq(newSequent), { proofTerms ⇒
           // This rule expects only one sub-proof term, and it must be a function.
           proofTerms.head match {
-            // `proofTerms.head` is the proof of (G, A) |- B, and we need a proof of G |- A ⇒ B.
-            // `proofTerms.head` must be of the form a ⇒ x ⇒ y ⇒ ... ⇒ z ⇒ f(a, x, y, ..., z),
-            // where f is some term depending on (a, x, y, ..., z).
+            // `proofTerms.head` is the proof of (G*, A) |- B, and we need a proof of G* |- A ⇒ B.
+            // `proofTerms.head` must be of the form a ⇒ x ⇒ ... ⇒ y ⇒ ... ⇒ z ⇒ f(a, x, y, ..., z),
+            // where f is some term depending on (a, x, y, ..., z), and the type B is Y ⇒ ... ⇒ Z ⇒ F.
             case CurriedE(heads, f) ⇒
-              // We need to construct x ⇒ y ⇒ ... ⇒ z ⇒ a ⇒ f instead.
-              val newHeads = heads.drop(1) ++ Seq(heads.head)
+              // We need to construct x ⇒ ... ⇒ a ⇒ y ⇒ ... ⇒ z ⇒ f instead.
+              // Note that sequent.premises.length is the number of implications in x ⇒ ... before ⇒ a.
+              val newHeads = heads.tail.take(sequent.premises.length) ++ Seq(heads.head) ++ heads.drop(sequent.premises.length + 1)
               CurriedE(newHeads, f)
           }
         }))
@@ -89,7 +90,7 @@ object LJT {
       // In other words, the new premises are (A, G* \ { X ⇒ A }).
       val newPremises = implPremiseA :: indexedPremises.filterNot(_._2 == implPremiseI).map(_._1)
       val newSequent = sequent.copy(premises = newPremises)
-      RuleResult[T](Seq(newSequent), { proofTerms ⇒
+      RuleResult[T]("->L1", Seq(newSequent), { proofTerms ⇒
         // This rule expects only one sub-proof term.
         val proofTerm = proofTerms.head
         // This term is of the type A => G* \ { X ⇒ A } => B.
@@ -119,7 +120,7 @@ object LJT {
   // G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
   private def ruleConjunctionAtRight[T] = ForwardRule[T](name = "&R", sequent ⇒
     sequent.goal match {
-      case conjunctType: ConjunctT[T] ⇒ Seq(RuleResult(conjunctType.terms.map(t ⇒ sequent.copy(goal = t)), { proofTerms ⇒
+      case conjunctType: ConjunctT[T] ⇒ Seq(RuleResult("&R", conjunctType.terms.map(t ⇒ sequent.copy(goal = t)), { proofTerms ⇒
         // This rule takes any number of proof terms.
         sequent.constructResultTerm(ConjunctE(proofTerms.map(sequent.substitute)))
       })
@@ -134,7 +135,7 @@ object LJT {
     sequent.goal match {
       case disjunctType: DisjunctT[T] ⇒
         val mainExpression = disjunctType.terms(indexInDisjunct)
-        Seq(RuleResult(List(sequent.copy(goal = mainExpression)), { proofTerms ⇒
+        Seq(RuleResult(s"+R$indexInDisjunct", List(sequent.copy(goal = mainExpression)), { proofTerms ⇒
           // This rule expects a single proof term.
           val proofTerm = proofTerms.head
           proofTerm match {
@@ -153,7 +154,7 @@ object LJT {
   // (G*, (A ⇒ B) ⇒ C) |- D when (G*, C) |- D and (G*, B ⇒ C) |- A ⇒ B  -- rule ->L4
   // This rule needs a lemma:  |-  ((A ⇒ B) ⇒ C) ⇒ B ⇒ C
   private def ruleImplicationAtLeft4[T] = ForwardRule[T](name = "->L4", sequent ⇒
-    Seq(RuleResult(List(sequent.copy(goal = ???)), { proofTerms ⇒
+    Seq(RuleResult("->L4", List(sequent.copy(goal = ???)), { proofTerms ⇒
       // This rule expects two different proof terms.
       ???
     }

@@ -12,4 +12,4 @@ object ForwardRule {
   type BackTransform[T] = Seq[ProofTerm[T]] ⇒ ProofTerm[T]
 }
 
-final case class RuleResult[T](newSequents: Seq[Sequent[T]], back: BackTransform[T])
+final case class RuleResult[T](ruleName: String, newSequents: Seq[Sequent[T]], backTransform: BackTransform[T])

@@ -33,7 +33,6 @@ object TermExpr {
   }
 
   // Compare terms up to renaming. Note: this is not alpha-conversion yet.
-  @tailrec
   def equiv[T](e1: TermExpr[T], e2: TermExpr[T]): Boolean = e1 match {
     case CurriedE(heads1, body1) ⇒ e2 match {
       case CurriedE(heads2, body2) if heads1.lengthCompare(heads2.length) == 0 ⇒
@@ -41,7 +40,10 @@ object TermExpr {
         val vars1 = heads1.map(_.name)
         val vars2 = heads2.map(_.name)
         val freshNames = allFreshNames(vars1, vars2, body1.freeVars ++ body2.freeVars)
-        equiv(e1.renameAllVars(vars1, freshNames), e2.renameAllVars(vars2, freshNames))
+        val e1New = e1.renameAllVars(vars1, freshNames)
+        val e2New = e2.renameAllVars(vars2, freshNames)
+        heads1.map(_.renameAllVars(vars1, freshNames)) == heads2.map(_.renameAllVars(vars2, freshNames)) &&
+          equiv(body1.renameAllVars(vars1, freshNames), body2.renameAllVars(vars2, freshNames))
       case _ ⇒ false
     }
     case _ ⇒ e1 == e2
@@ -117,7 +119,7 @@ final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T
 final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = CurriedE(heads map (_ map f), body map f)
 
-  // The type is t1 -> t2 -> t3 -> b
+  // The type is t1 -> t2 -> t3 -> b; here `heads` = List(t1, t2, t3).
   def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr :-> prev }
 }
 
