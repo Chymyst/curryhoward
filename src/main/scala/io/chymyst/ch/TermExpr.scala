@@ -52,7 +52,7 @@ object TermExpr {
     case PropE(name, tExpr) if name == replaceVar.name ⇒
       if (tExpr == replaceVar.tExpr) expr else throw new Exception(s"Incorrect type ${replaceVar.tExpr} in subst($replaceVar, $expr, $inExpr), expected $tExpr")
     case AppE(head, arg) ⇒ AppE(subst(replaceVar, expr, head), subst(replaceVar, expr, arg))
-    case CurriedE(heads: List[PropE[T]], body) ⇒ CurriedE(heads, TermExpr.subst(replaceVar, expr, body))
+    case CurriedE(heads, body) ⇒ CurriedE(heads.asInstanceOf[List[PropE[T]]], TermExpr.subst(replaceVar, expr, body))
     case ConjunctE(terms) ⇒ ConjunctE(terms.map(t ⇒ TermExpr.subst(replaceVar, expr, t)))
     case ProjectE(index, term) ⇒ ProjectE(index, TermExpr.subst(replaceVar, expr, term))
     case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, TermExpr.subst(replaceVar, expr, term), tExpr)
@@ -97,7 +97,7 @@ sealed trait TermExpr[+T] {
       "(" + leftZeros.mkString(" + ") + leftZerosString + term.prettyPrintParens(0) + rightZerosString + rightZeros.mkString(" + ") + ")"
   }
 
-  private val prettyVars: Iterator[String] = for {
+  private def prettyVars: Iterator[String] = for {
     number ← Iterator.single("") ++ Iterator.from(1).map(_.toString)
     letter ← ('a' to 'z').toIterator
   } yield s"$letter$number"
@@ -115,16 +115,24 @@ sealed trait TermExpr[+T] {
 
   def unusedArgs: Set[VarName] = Set()
 
-  lazy val usedTupleParts: Seq[(TermExpr[T], Int)] = usedTuplePartsSeq.distinct
+  private[ch] lazy val unusedTupleParts: Int =
+    usedTuplePartsSeq
+      .groupBy(_._1) // Map[TermExpr[T], Seq[(TermExpr[Int], Int)]]
+      .mapValues(_.map(_._2).distinct) // Map[TermExpr[T], Seq[Int]]
+      .map { case (term, parts) ⇒
+      val totalParts = term.tExpr.asInstanceOf[ConjunctT[T]].terms.length
+      totalParts - parts.length
+    }.count(_ > 0)
 
-  private lazy val usedTuplePartsSeq: Seq[(TermExpr[T], Int)] = this match {
+  // Can't use Set[TermExpr[T]] because of lack of covariance in `Set[A]`.
+  private[ch] lazy val usedTuplePartsSeq: Seq[(TermExpr[T], Int)] = this match {
     case PropE(name, tExpr) ⇒ Seq()
-    case AppE(head, arg) ⇒ head.usedTupleParts ++ arg.usedTupleParts
-    case CurriedE(heads, body) ⇒ body.usedTupleParts
+    case AppE(head, arg) ⇒ head.usedTuplePartsSeq ++ arg.usedTuplePartsSeq
+    case CurriedE(heads, body) ⇒ body.usedTuplePartsSeq
     case UnitE(tExpr) ⇒ Seq()
-    case ConjunctE(terms) ⇒ terms.flatMap(_.usedTupleParts)
-    case ProjectE(index, term) ⇒ Seq((term, index)) ++ term.usedTupleParts
-    case DisjunctE(index, total, term, tExpr) ⇒ term.usedTupleParts
+    case ConjunctE(terms) ⇒ terms.flatMap(_.usedTuplePartsSeq)
+    case ProjectE(index, term) ⇒ Seq((term, index + 1)) ++ term.usedTuplePartsSeq
+    case DisjunctE(index, total, term, tExpr) ⇒ term.usedTuplePartsSeq
   }
 
   lazy val freeVars: Set[VarName] = this match {
@@ -235,7 +243,10 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
 
   override def tExpr: TypeExpr[T] = term.tExpr.asInstanceOf[ConjunctT[T]].terms(index)
 
-  override def simplify: TermExpr[T] = this.copy(term = term.simplify)
+  override def simplify: TermExpr[T] = term.simplify match {
+    case ConjunctE(terms) ⇒ terms(index).simplify
+    case t ⇒ this.copy(term = t)
+  }
 }
 
 final case class DisjunctE[T](index: Int, total: Int, term: TermExpr[T], tExpr: TypeExpr[T]) extends TermExpr[T] {

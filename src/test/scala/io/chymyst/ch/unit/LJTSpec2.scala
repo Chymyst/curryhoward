@@ -124,17 +124,26 @@ class LJTSpec2 extends FlatSpec with Matchers {
     def f[S, A, B]: ((A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (B, S) = implement
   }
 
-  /*
-    it should "generate code for state monad update-mapping function using rule ->L2" in {
-      def f[S, A, B]: (S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
-    }
+  it should "generate identity for tuples" in {
+    def f1[A, B]: ((A, B)) ⇒ (A, B) = implement
 
-    it should "generate code for state monad's fmap" in {
-      def f[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
-    }
+    def f2[A, B, C]: A ⇒ ((A ⇒ B, C)) ⇒ (A, B) = implement
+  }
 
-      it should "generate code for various disjunctions" in {
-        def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
-      }
-  */
+  it should "generate code for state monad's fmap" in {
+    def f[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
+  }
+
+  it should "generate code for state monad update-mapping function using rule ->L2" in {
+    def f[S, A, B]: (S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
+  }
+
+  it should "generate code for state monad's flatmap" in {
+    def f[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
+  }
+
+//  it should "generate code using various disjunction rules" in {
+//    def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
+//  }
+
 }
