@@ -123,7 +123,7 @@ sealed trait TermExpr[+T] {
     case CurriedE(heads, body) ⇒ body.usedTupleParts
     case UnitE(tExpr) ⇒ Seq()
     case ConjunctE(terms) ⇒ terms.flatMap(_.usedTupleParts)
-    case ProjectE(index, term) ⇒ Seq((term, index))
+    case ProjectE(index, term) ⇒ Seq((term, index)) ++ term.usedTupleParts
     case DisjunctE(index, total, term, tExpr) ⇒ term.usedTupleParts
   }
 

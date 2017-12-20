@@ -23,9 +23,10 @@ object TheoremProver {
 
   def findProofs[T](typeStructure: TypeExpr[T]): List[TermExpr[T]] = {
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
-    findProofTerms(mainSequent)
-      // Return the group of proofs that leave the smallest number of arguments unused.
-      .map(proofTerm ⇒ (proofTerm, proofTerm.unusedArgs.size - proofTerm.usedTupleParts.size))
+    val pp = findProofTerms(mainSequent)
+    if (debug) println(s"debug: got proof terms ${pp.map(p ⇒ (p.prettyPrint, p.unusedArgs, p.usedTupleParts.map { case (te, i) ⇒ (te.prettyPrint, i) })).mkString("; ")}")
+    // Return the group of proofs that leave the smallest number of arguments unused.
+    pp.map(proofTerm ⇒ (proofTerm, proofTerm.unusedArgs.size - proofTerm.usedTupleParts.size))
       .groupBy(_._2) // Map[Int, Seq[(ProofTerm[T], Int)]]
       .mapValues(_.map(_._1)) // Map[Int, Seq[ProofTerm[T]]]
       .toSeq.sortBy(_._1) // Seq[(Int, Seq[ProofTerm[T]])]
