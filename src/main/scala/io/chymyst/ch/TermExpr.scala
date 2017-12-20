@@ -71,6 +71,7 @@ sealed trait TermExpr[+T] {
     case UnitE(tExpr) ⇒ "()"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
     case ProjectE(index, term) ⇒ term.toString + "._" + (index + 1).toString
+    case MatchE(term, cases) ⇒ "(" + term.toString + " match " + cases.map(_.toString).mkString(" + ") + ")"
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
       val leftZerosString = if (leftZeros.isEmpty) "" else " + "
@@ -89,6 +90,7 @@ sealed trait TermExpr[+T] {
     case UnitE(tExpr) ⇒ "1"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.prettyPrintParens(0)).mkString(", ") + ")"
     case ProjectE(index, term) ⇒ term.prettyPrintParens(1) + "._" + (index + 1).toString
+    case MatchE(term, cases) ⇒ "(" + term.prettyPrintParens(1) + " match " + cases.map(_.prettyPrintParens(0)).mkString(" + ") + ")"
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
       val leftZerosString = if (leftZeros.isEmpty) "" else " + "
@@ -132,6 +134,7 @@ sealed trait TermExpr[+T] {
     case UnitE(tExpr) ⇒ Seq()
     case ConjunctE(terms) ⇒ terms.flatMap(_.usedTuplePartsSeq)
     case ProjectE(index, term) ⇒ Seq((term, index + 1)) ++ term.usedTuplePartsSeq
+    case MatchE(term, cases) ⇒ term.usedTuplePartsSeq ++ cases.flatMap(_.usedTuplePartsSeq)
     case DisjunctE(index, total, term, tExpr) ⇒ term.usedTuplePartsSeq
   }
 
@@ -142,6 +145,7 @@ sealed trait TermExpr[+T] {
     case UnitE(tExpr) ⇒ Set()
     case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars).toSet
     case p: ProjectE[T] ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
+    case MatchE(term, cases) ⇒ term.freeVars ++ cases.flatMap(_.freeVars).toSet
     case d: DisjunctE[T] ⇒ d.term.freeVars
   }
 
@@ -152,6 +156,7 @@ sealed trait TermExpr[+T] {
     case UnitE(tExpr) ⇒ Set()
     case ConjunctE(terms) ⇒ terms.flatMap(_.usedVars).toSet
     case p: ProjectE[T] ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
+    case MatchE(term, cases) ⇒ term.usedVars ++ cases.flatMap(_.usedVars).toSet
     case d: DisjunctE[T] ⇒ d.term.usedVars
   }
 
@@ -168,6 +173,7 @@ sealed trait TermExpr[+T] {
       case UnitE(tExpr) ⇒ this
       case ConjunctE(terms) ⇒ ConjunctE(terms.map(rename))
       case ProjectE(index, term) ⇒ ProjectE(index, rename(term))
+      case MatchE(term, cases) ⇒ ???
       case d: DisjunctE[T] ⇒ d.copy(term = rename(d.term))
     }
   }
@@ -249,6 +255,24 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
   }
 }
 
+// Match a disjunct term with n functions.
+final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends TermExpr[T] {
+  override def map[U](f: T ⇒ U): TermExpr[U] = MatchE(term map f, cases map (_.map(f)))
+
+  override def tExpr: TypeExpr[T] = cases match {
+    case te :: tail ⇒
+      val tpe = te.tExpr
+      if (tail.exists(_.tExpr != tpe))
+        throw new Exception(s"Internal error: unequal expression types in cases for $this")
+      else
+        tpe
+    case _ ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
+  }
+
+  override def simplify: TermExpr[T] = MatchE(term.simplify, cases.map(_.simplify)) // TODO: simplify when term is a DisjunctE
+}
+
+// Inject a value into the i-th part of the disjunction of type tExpr.
 final case class DisjunctE[T](index: Int, total: Int, term: TermExpr[T], tExpr: TypeExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = DisjunctE(index, total, term map f, tExpr map f)
 

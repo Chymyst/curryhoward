@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import io.chymyst.ch.TermExpr.ProofTerm
 
 // Premises are straight ordered, so (A, B, C) |- D is Sequent(List(A, B, C), D, _)
+// New bound variables are always introduced fresh, so the generated code never has any need for alpha-conversion.
 final case class Sequent[T](premises: List[TypeExpr[T]], goal: TypeExpr[T], freshVar: FreshIdents) {
   lazy val premiseVars: List[PropE[T]] = premises.map(PropE(freshVar(), _))
 
