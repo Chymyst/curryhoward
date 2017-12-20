@@ -96,3 +96,7 @@ def flatMap[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S))
 
 Note that there are several inequivalent implementations for the State monad's `map` and `flatMap`,
 but only one of them loses no information (and thus has a chance of satisfying the correct laws).
+
+# What does not work yet
+
+Disjunction types (`Option`, `Either`, sealed trait / case classes) are not yet handled for code generation.

@@ -4,7 +4,7 @@ sealed trait TypeExpr[+T] {
   override lazy val toString: String = prettyPrint(0)
 
   private def prettyPrint(level: Int): String = this match {
-    case DisjunctT(terms) ⇒ terms.map(_.prettyPrint(0)).mkString(" + ")
+    case DisjunctT(terms) ⇒ terms.map(_.prettyPrint(1)).mkString(" + ")
     case ConjunctT(terms) ⇒ "(" + terms.map(_.prettyPrint(0)).mkString(", ") + ")"
     case head #-> body ⇒
       val r = s"${head.prettyPrint(1)} → ${body.prettyPrint(0)}"

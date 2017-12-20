@@ -13,7 +13,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     var r = result
 
     r._2 shouldEqual "(<c>String, <c>String)"
-    r._1 shouldEqual "(A) → ((A, B)) → A"
+    r._1 shouldEqual "A → (A, B) → A"
   }
 
   it should "get type with nested argument tuples" in {
@@ -22,7 +22,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     var r = result
 
     r._2 shouldEqual "(<c>String, <c>String)"
-    r._1 shouldEqual "(((A, B)) → A) → A"
+    r._1 shouldEqual "((A, B) → A) → A"
   }
 
   it should "get a complicated type with argument tuples" in {
@@ -31,7 +31,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     var r = result
 
     r._2 shouldEqual "(<c>String, <c>String)"
-    r._1 shouldEqual "((S) → (A, S)) → (((A, S)) → (B, S)) → (S) → (B, S)"
+    r._1 shouldEqual "(S → (A, S)) → ((A, S) → (B, S)) → S → (B, S)"
   }
 
   behavior of "other syntax"
@@ -40,7 +40,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     def result[A, B, C](x: A, y: B)(z: (C, C))(implicit t: Int): (String, String) = testType[A ⇒ C]
 
     val r = result(0, 0)((0, 0))(0)
-    r._1 shouldEqual "(A) → C"
+    r._1 shouldEqual "A → C"
     r._2 shouldEqual "<tc>[A, B, C](x: A, y: B)(z: (C, C))(implicit t: Int)(String, String)"
   }
 }

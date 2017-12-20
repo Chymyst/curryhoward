@@ -114,8 +114,11 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   it should "generate code for reader monad's pure, map, flatMap" in {
     def f[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
+
     def pure[E, A]: A ⇒ (E ⇒ A) = implement
+
     def map[E, A, B]: (E ⇒ A) ⇒ (A ⇒ B) ⇒ (E ⇒ B) = implement
+
     def flatMap[E, A, B]: (E ⇒ A) ⇒ (A ⇒ E ⇒ B) ⇒ (E ⇒ B) = implement
   }
 
@@ -143,12 +146,26 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   it should "generate code for state monad's pure, map, flatMap" in {
     def pure[S, A]: A ⇒ (S ⇒ (A, S)) = implement
+
     def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
+
     def flatMap[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
   }
 
-//  it should "generate code using various disjunction rules" in {
-//    def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
-//  }
+  /*
+        it should "generate code using various disjunction rules" in {
+          def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
+        }
+
+      behavior of "named types"
+
+      it should "generate code by reflection on named type" in {
+        type MyType[T] = (Int, T, T)
+
+        def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement
+
+        f(1)("abc") shouldEqual ((1, "abc", "abc"))
+      }
+  */
 
 }
