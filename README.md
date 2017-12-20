@@ -78,7 +78,7 @@ f("abc")(123) // returns the tuple ("abc", 123)
 
 ```
 
-If the theorem prover finds several alternative implementations of a function, it attempts to find which implementations have the smallest "information loss".
+If the theorem prover finds several alternative implementations of a function, it attempts to find the implementation with the smallest "information loss".
 
 The "information loss" of a function is defined as an integer number computed as the sum of:
 
@@ -96,6 +96,19 @@ def flatMap[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S))
 
 Note that there are several inequivalent implementations for the State monad's `map` and `flatMap`,
 but only one of them loses no information (and thus has a chance of satisfying the correct laws).
+
+The theorem prover will generate a (compile-time) error when there are two or more implementations with the smallest level of information loss.
+
+If there are several possible implementations but only one implementation with the smallest level of information loss,
+the theorem prover will choose that implementation but print a warning message such as
+
+```
+Warning:scalac: type (S → (A, S)) → (A → B) → S → (B, S) has 2 implementations (laws need checking?)
+
+```
+
+This message means that the resulting implementation is _probably_ the right one, but there was a choice to be made.
+If there exist some equational laws that apply to this function, the laws need to be checked.
 
 # What does not work yet
 

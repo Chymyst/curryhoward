@@ -112,14 +112,9 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   behavior of "other examples"
 
-  it should "generate code for reader monad's pure, map, flatMap" in {
+  it should "generate code for reader monad's fmap" in {
     def f[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
 
-    def pure[E, A]: A ⇒ (E ⇒ A) = implement
-
-    def map[E, A, B]: (E ⇒ A) ⇒ (A ⇒ B) ⇒ (E ⇒ B) = implement
-
-    def flatMap[E, A, B]: (E ⇒ A) ⇒ (A ⇒ E ⇒ B) ⇒ (E ⇒ B) = implement
   }
 
   it should "generate code using rule ->L2" in {
@@ -142,14 +137,6 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   it should "generate code for state monad update-mapping function using rule ->L2" in {
     def f[S, A, B]: (S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
-  }
-
-  it should "generate code for state monad's pure, map, flatMap" in {
-    def pure[S, A]: A ⇒ (S ⇒ (A, S)) = implement
-
-    def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
-
-    def flatMap[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
   }
 
   /*

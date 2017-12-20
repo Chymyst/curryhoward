@@ -104,12 +104,13 @@ sealed trait TermExpr[+T] {
     letter ← ('a' to 'z').toIterator
   } yield s"$letter$number"
 
-  def prettyPrint: String = {
+  def prettyRename: TermExpr[T] = {
     val oldVars = usedVars.toSeq.sorted.reverse // Let's see if reversing helps achieve a more natural style, a -> b -> c -> .... rather than c -> b -> a -> ...
     val newVars = prettyVars.take(oldVars.length).toSeq
-    val renamed = this.renameAllVars(oldVars, newVars)
-    renamed.prettyPrintParens(0)
+    this.renameAllVars(oldVars, newVars)
   }
+
+  def prettyPrint: String = prettyRename.prettyPrintParens(0)
 
   def map[U](f: T ⇒ U): TermExpr[U]
 

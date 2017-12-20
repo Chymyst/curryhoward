@@ -29,7 +29,7 @@ object TheoremProver {
         .sortBy { case (pString, s1, s2, unusedArgs, usedTupleParts) ⇒ s1 + s2 }
       println(s"debug: got proof terms:\n ${prettyPP.mkString(";\n ")}")
     } else if (pp.size > 1) {
-      println(s"type $typeStructure has ${pp.size} implementations")
+      println(s"type $typeStructure has ${pp.size} implementations (laws need checking?)")
     }
     // Return the group of proofs that leave the smallest number of arguments unused.
     pp.map(proofTerm ⇒ (proofTerm, proofTerm.unusedArgs.size + proofTerm.unusedTupleParts))
@@ -39,6 +39,7 @@ object TheoremProver {
       .headOption // Option[(Int, Seq[ProofTerm[T]])]
       .map(_._2.toList) // Option[List[ProofTerm[T]]]
       .getOrElse(List())
+      .map(_.prettyRename)
   }
 
   // Main recursive function that computes the list of available proofs for a sequent.
