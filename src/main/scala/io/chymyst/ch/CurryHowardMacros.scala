@@ -22,11 +22,12 @@ note: to re­run compile after a successful compile you need either to clean or 
 // TODO:
 /*  Priority is given in parentheses.
 + finish the implicational fragment (0)
-- add documentation using the `tut` plugin
+- add documentation using the `tut` plugin (3)
 - support natural syntax def f[T](x: T): T = implement (3)
 - implement all rules of the LJT calculus (1)
 - implement Option and Either in inhabited terms (2)
 + make sure Unit works (2)
++ better output of parentheses for type expressions
 - support named conjunctions (case classes) explicitly (3) and support disjunctions on that basis
 + check unused arguments and sort results accordingly (3)
 + only output the results with smallest number of unused arguments, if that is unique (3)

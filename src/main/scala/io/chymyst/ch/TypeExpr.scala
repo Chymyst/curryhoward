@@ -1,10 +1,14 @@
 package io.chymyst.ch
 
 sealed trait TypeExpr[+T] {
-  override lazy val toString: String = this match {
-    case DisjunctT(terms) ⇒ terms.map(_.toString).mkString(" + ")
-    case ConjunctT(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
-    case head #-> body ⇒ s"($head) → $body"
+  override lazy val toString: String = prettyPrint(0)
+
+  private def prettyPrint(level: Int): String = this match {
+    case DisjunctT(terms) ⇒ terms.map(_.prettyPrint(0)).mkString(" + ")
+    case ConjunctT(terms) ⇒ "(" + terms.map(_.prettyPrint(0)).mkString(", ") + ")"
+    case head #-> body ⇒
+      val r = s"${head.prettyPrint(1)} → ${body.prettyPrint(0)}"
+      if (level == 1) s"($r)" else r
     case BasicT(name) ⇒ s"<c>$name" // well-known constant type such as Int
     case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"

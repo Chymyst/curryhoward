@@ -28,6 +28,8 @@ object TheoremProver {
       val prettyPP = pp.map(p ⇒ (p.prettyPrint, p.unusedArgs.size, p.unusedTupleParts, p.unusedArgs, p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }))
         .sortBy { case (pString, s1, s2, unusedArgs, usedTupleParts) ⇒ s1 + s2 }
       println(s"debug: got proof terms:\n ${prettyPP.mkString(";\n ")}")
+    } else if (pp.size > 1) {
+      println(s"type $typeStructure has ${pp.size} implementations")
     }
     // Return the group of proofs that leave the smallest number of arguments unused.
     pp.map(proofTerm ⇒ (proofTerm, proofTerm.unusedArgs.size + proofTerm.unusedTupleParts))

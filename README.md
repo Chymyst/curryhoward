@@ -59,6 +59,15 @@ def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
 
 ```
 
+Automatic implementations of `pure`, `map`, and `flatMap` for the `Reader` monad:
+
+```scala
+def pure[E, A]: A ⇒ (E ⇒ A) = implement
+def map[E, A, B]: (E ⇒ A) ⇒ (A ⇒ B) ⇒ (E ⇒ B) = implement
+def flatMap[E, A, B]: (E ⇒ A) ⇒ (A ⇒ E ⇒ B) ⇒ (E ⇒ B) = implement
+
+```
+
 Unit types, tuples, and constant types are supported.
 
 ```scala
@@ -68,3 +77,22 @@ def f[A, B]: A ⇒ Int ⇒ (A, Int) = implement
 f("abc")(123) // returns the tuple ("abc", 123)
 
 ```
+
+If the theorem prover finds several alternative implementations of a function, it attempts to find which implementations have the smallest "information loss".
+
+The "information loss" of a function is defined as an integer number computed as the sum of:
+
+- the number of (curried) arguments that are ignored by the function,
+- the number of tuple parts that are computed but subsequently not used by the function.
+
+Choosing the smallest "information loss" is a heuristic that enables automatic implementations of `pure`, `map`, and `flatMap` for the `State` monad:
+
+```scala
+def pure[S, A]: A ⇒ (S ⇒ (A, S)) = implement
+def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
+def flatMap[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
+
+```
+
+Note that there are several inequivalent implementations for the State monad's `map` and `flatMap`,
+but only one of them loses no information (and thus has a chance of satisfying the correct laws).
