@@ -36,9 +36,26 @@ Non-invertible rules:
 
 object LJT {
 
+  def invertibleRules[T]: Seq[ForwardRule[T]] = Seq(
+    ruleImplicationAtRight,
+    ruleConjunctionAtLeft,
+    ruleImplicationAtLeft2,
+    ruleConjunctionAtRight // Put this later in the sequence because it duplicates the context G*.
+  )
+
+  def invertibleAmbiguousRules[T]: Seq[ForwardRule[T]] = Seq(ruleImplicationAtLeft1)
+
+  def nonInvertibleRulesForSequent[T](sequent: Sequent[T]): Seq[ForwardRule[T]] = {
+    // Generate all +Rn rules if the sequent has a disjunction goal.
+    (sequent.goal match {
+      case DisjunctT(terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
+      case _ ⇒ Seq[ForwardRule[T]]()
+    }) ++ Seq(ruleImplicationAtLeft4[T])
+  }
+
   private def omitPremise[C](indexedPremises: Seq[(C, Int)], index: Int): List[C] = indexedPremises.filterNot(_._2 == index).map(_._1).toList
 
-  def followsFromAxioms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
+  private[ch] def followsFromAxioms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
     // The LJT calculus has three axioms. We use the Id axiom and the T axiom only, because the F axiom is not useful for code generation.
 
     val fromIdAxiom: Seq[TermExpr[T]] = sequent.premiseVars
@@ -89,7 +106,6 @@ object LJT {
       ???
     }
     )
-
     )
   }
   )
@@ -105,11 +121,13 @@ object LJT {
         Seq(RuleResult("->L2", List(sequent.copy(premises = newPremises)), { proofTerms ⇒
           // This rule expects one proof term.
           val proofTerm = proofTerms.head
-          val thePremiseVarAB = sequent.premiseVars(i)
-          ???
-          val valuesAB: List[TermExpr[T]] = heads.indices.map(ProjectE(_, thePremiseVarAB)).toList
+          val thePremiseVarAB = sequent.premiseVars(i) // of type A*B ⇒ C
+
+          val freshVarsAB = heads.map(PropE(sequent.freshVar(), _)).toList
+          val func_A_B_to_C = CurriedE(freshVarsAB, AppE(thePremiseVarAB, ConjunctE(freshVarsAB)))
+
           val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
-          val result = TermExpr.applyToVars(proofTerm, valuesAB ++ oldPremisesWithoutI)
+          val result = TermExpr.applyToVars(proofTerm, func_A_B_to_C :: oldPremisesWithoutI)
           sequent.constructResultTerm(result)
         }
         )
@@ -129,7 +147,6 @@ object LJT {
       ???
     }
     )
-
     )
   }
   )
@@ -150,6 +167,7 @@ object LJT {
               // Note that sequent.premises.length is the number of implications in x ⇒ ... before ⇒ a.
               val newHeads = args.tail.take(sequent.premises.length) ++ Seq(args.head) ++ args.drop(sequent.premises.length + 1)
               CurriedE(newHeads, f)
+            case _ ⇒ throw new Exception(s"Internal error: proof term $proofTerms must be a function")
           }
         }))
       case _ ⇒ Seq()
@@ -192,14 +210,6 @@ object LJT {
     }
   }
   )
-
-  def invertibleRules[T]: Seq[ForwardRule[T]] = Seq(
-    ruleImplicationAtRight,
-    ruleConjunctionAtLeft,
-    ruleConjunctionAtRight // Put this later in the sequence because it duplicates the context G*.
-  )
-
-  def invertibleAmbiguousRules[T]: Seq[ForwardRule[T]] = Seq(ruleImplicationAtLeft1)
 
   // G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
   private def ruleConjunctionAtRight[T] = ForwardRule[T](name = "&R", sequent ⇒
@@ -268,13 +278,5 @@ object LJT {
     }
   }
   )
-
-  def nonInvertibleRulesForSequent[T](sequent: Sequent[T]): Seq[ForwardRule[T]] = {
-    // Generate all +Rn rules if the sequent has a disjunction goal.
-    (sequent.goal match {
-      case DisjunctT(terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
-      case _ ⇒ Seq[ForwardRule[T]]()
-    }) ++ Seq(ruleImplicationAtLeft4[T])
-  }
 
 }

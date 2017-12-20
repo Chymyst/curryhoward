@@ -110,4 +110,26 @@ class LJTSpec2 extends FlatSpec with Matchers {
     g("abc")(_ + 1)._2(100) shouldEqual 101
   }
 
+  behavior of "other examples"
+
+  it should "generate code for reader monad's fmap" in {
+    def f[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
+  }
+
+  it should "generate code for using rule ->L2" in {
+    def f[S, A, B]: ((A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (B, S) = implement
+  }
+  /*
+    it should "generate code for state monad update-mapping function using rule ->L2" in {
+      def f[S, A, B]: (S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
+    }
+
+    it should "generate code for state monad's fmap" in {
+      def f[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
+    }
+
+      it should "generate code for various disjunctions" in {
+        def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
+      }
+  */
 }

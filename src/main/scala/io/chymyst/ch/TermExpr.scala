@@ -79,6 +79,36 @@ sealed trait TermExpr[+T] {
       "(" + leftZeros.mkString(" + ") + leftZerosString + term.toString + rightZerosString + rightZeros.mkString(" + ") + ")"
   }
 
+  private[ch] def prettyPrintParens(level: Int): String = this match {
+    case PropE(name, tExpr) ⇒ s"$name"
+    case AppE(head, arg) ⇒
+      val r = s"${head.prettyPrintParens(0)} ${arg.prettyPrintParens(1)}"
+      if (level == 1) s"($r)" else
+        r
+    case CurriedE(heads, body) ⇒ s"(${heads.map(_.prettyPrintParens(0)).mkString(" -> ")} -> ${body.prettyPrintParens(0)})"
+    case UnitE(tExpr) ⇒ "1"
+    case ConjunctE(terms) ⇒ "(" + terms.map(_.prettyPrintParens(0)).mkString(", ") + ")"
+    case ProjectE(index, term) ⇒ term.prettyPrintParens(1) + "._" + (index + 1).toString
+    case DisjunctE(index, total, term, _) ⇒
+      val leftZeros = Seq.fill(index)("0")
+      val leftZerosString = if (leftZeros.isEmpty) "" else " + "
+      val rightZeros = Seq.fill(total - index - 1)("0")
+      val rightZerosString = if (rightZeros.isEmpty) "" else " + "
+      "(" + leftZeros.mkString(" + ") + leftZerosString + term.prettyPrintParens(0) + rightZerosString + rightZeros.mkString(" + ") + ")"
+  }
+
+  private val prettyVars: Iterator[String] = for {
+    number ← Iterator.single("") ++ Iterator.from(1).map(_.toString)
+    letter ← ('a' to 'z').toIterator
+  } yield s"$letter$number"
+
+  def prettyPrint: String = {
+    val oldVars = usedVars.toSeq.sorted.reverse // Let's see if reversing helps achieve a more natural style, a -> b -> c -> .... rather than c -> b -> a -> ...
+    val newVars = prettyVars.take(oldVars.length).toSeq
+    val renamed = this.renameAllVars(oldVars, newVars)
+    renamed.prettyPrintParens(0)
+  }
+
   def map[U](f: T ⇒ U): TermExpr[U]
 
   def simplify: TermExpr[T] = this
@@ -93,6 +123,16 @@ sealed trait TermExpr[+T] {
     case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars).toSet
     case p: ProjectE[T] ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
     case d: DisjunctE[T] ⇒ d.term.freeVars
+  }
+
+  lazy val usedVars: Set[VarName] = this match {
+    case PropE(name, tExpr) ⇒ Set(name)
+    case AppE(head, arg) ⇒ head.usedVars ++ arg.usedVars
+    case CurriedE(heads, body) ⇒ body.usedVars ++ heads.map(_.name).toSet
+    case UnitE(tExpr) ⇒ Set()
+    case ConjunctE(terms) ⇒ terms.flatMap(_.usedVars).toSet
+    case p: ProjectE[T] ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
+    case d: DisjunctE[T] ⇒ d.term.usedVars
   }
 
   // Rename a variable *everywhere* in the expression.

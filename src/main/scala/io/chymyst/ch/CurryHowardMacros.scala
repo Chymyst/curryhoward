@@ -185,7 +185,7 @@ object CurryHowardMacros {
         result
 
       case list ⇒
-        c.error(c.enclosingPosition, s"type $typeStructure can be implemented in ${list.length} different ways: ${list.mkString("; ")}")
+        c.error(c.enclosingPosition, s"type $typeStructure can be implemented in ${list.length} different ways: ${list.map(_.prettyPrint).mkString("; ")}")
         q"null"
     }
 
