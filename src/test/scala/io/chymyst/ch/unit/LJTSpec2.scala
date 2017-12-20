@@ -116,9 +116,14 @@ class LJTSpec2 extends FlatSpec with Matchers {
     def f[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
   }
 
-  it should "generate code for using rule ->L2" in {
+  it should "generate code using rule ->L2" in {
     def f[S, T, A, B]: ((A, S)) ⇒ (((A, S)) ⇒ (B, T)) ⇒ (B, T) = implement
   }
+
+  it should "compute information loss penalty for tuples" in {
+    def f[S, A, B]: ((A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (B, S) = implement
+  }
+
   /*
     it should "generate code for state monad update-mapping function using rule ->L2" in {
       def f[S, A, B]: (S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement

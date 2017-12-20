@@ -25,15 +25,13 @@ object TheoremProver {
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
     findProofTerms(mainSequent)
       // Return the group of proofs that leave the smallest number of arguments unused.
-      .map(proofTerm ⇒ (proofTerm, proofTerm.unusedArgs.size))
+      .map(proofTerm ⇒ (proofTerm, proofTerm.unusedArgs.size - proofTerm.usedTupleParts.size))
       .groupBy(_._2) // Map[Int, Seq[(ProofTerm[T], Int)]]
       .mapValues(_.map(_._1)) // Map[Int, Seq[ProofTerm[T]]]
       .toSeq.sortBy(_._1) // Seq[(Int, Seq[ProofTerm[T]])]
-      .headOption match {
-      case Some((_, proofTerms)) ⇒ proofTerms.toList
-      case None ⇒ List()
-    }
-
+      .headOption // Option[(Int, Seq[ProofTerm[T]])]
+      .map(_._2.toList) // Option[List[ProofTerm[T]]]
+      .getOrElse(List())
   }
 
   // Main recursive function that computes the list of available proofs for a sequent.

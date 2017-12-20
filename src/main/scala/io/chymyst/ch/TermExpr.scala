@@ -115,6 +115,18 @@ sealed trait TermExpr[+T] {
 
   def unusedArgs: Set[VarName] = Set()
 
+  lazy val usedTupleParts: Seq[(TermExpr[T], Int)] = usedTuplePartsSeq.distinct
+
+  private lazy val usedTuplePartsSeq: Seq[(TermExpr[T], Int)] = this match {
+    case PropE(name, tExpr) ⇒ Seq()
+    case AppE(head, arg) ⇒ head.usedTupleParts ++ arg.usedTupleParts
+    case CurriedE(heads, body) ⇒ body.usedTupleParts
+    case UnitE(tExpr) ⇒ Seq()
+    case ConjunctE(terms) ⇒ terms.flatMap(_.usedTupleParts)
+    case ProjectE(index, term) ⇒ Seq((term, index))
+    case DisjunctE(index, total, term, tExpr) ⇒ term.usedTupleParts
+  }
+
   lazy val freeVars: Set[VarName] = this match {
     case PropE(name, tExpr) ⇒ Set(name)
     case AppE(head, arg) ⇒ head.freeVars ++ arg.freeVars
