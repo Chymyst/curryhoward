@@ -1,16 +1,18 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
-import org.scalatest.{FlatSpec, Matchers}
 import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary.arbitrary
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, TableDrivenPropertyChecks}
+import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{Assertion, FlatSpec, Matchers}
 
 class LawsSpec extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks {
 
-  def checkFunctionEquality[A: Arbitrary, B](f1: A ⇒ B, f2: A ⇒ B): Unit = {
+  def checkFunctionEquality[A: Arbitrary, B](f1: A ⇒ B, f2: A ⇒ B): Assertion = {
     forAll { (x: A) ⇒ f1(x) shouldEqual f2(x) }
+  }
+
+  def checkFunctionEquality[A: Arbitrary, B](resultsEqual: (B, B) ⇒ Assertion)(f1: A ⇒ B, f2: A ⇒ B): Assertion = {
+    forAll { (x: A) ⇒ resultsEqual(f1(x), f2(x)) }
   }
 
   behavior of "generated type class methods"
@@ -26,6 +28,9 @@ class LawsSpec extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
       // fmap id = id
       checkFunctionEquality(map(reader)(identity[String]), reader)
     }
+
+    // Same check, using the helper methods.
+    checkFunctionEquality((x: Int ⇒ String, y: Int ⇒ String) ⇒ checkFunctionEquality(x, y))((reader: Int ⇒ String) ⇒ map(reader)(identity[String]), identity[Int ⇒ String])
 
     forAll { (reader: String ⇒ Int, f: Int ⇒ Int, g: Int ⇒ Int) ⇒
       // fmap f . fmap g = fmap (f . g)
