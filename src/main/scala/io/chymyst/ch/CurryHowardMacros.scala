@@ -39,7 +39,8 @@ Done:
 - support sealed traits / case classes (5)
 - add documentation using the `tut` plugin (3)
 - support natural syntax def f[T](x: T): T = implement (3)
-- use c.Type instead of String for correct code generation (3)
+- use c.Type instead of String for correct code generation (3)?? Probably impossible since we can't reify types directly from reflection results, - need to use names.
+- probably can simplify data structures by eliminating [T]
 - use blackbox macros instead of whitebox if possible (5)
 - implement uncurried functions and multiple argument lists (6)
 - use a special subclass of Function1 that also carries symbolic information about the lambda-term (6)

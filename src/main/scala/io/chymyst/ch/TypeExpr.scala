@@ -75,6 +75,8 @@ final case class BasicT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T] {
   override def map[U](f: T ⇒ U): TypeExpr[U] = BasicT(f(name))
 }
 
+// Since we do not know how to work with arbitrary type constructors, we treat them as atomic types.
+// The only derivation rule for atomic types is the identity axiom.
 final case class ConstructorT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T] {
   override def map[U](f: T ⇒ U): TypeExpr[U] = ConstructorT(f(name))
 }

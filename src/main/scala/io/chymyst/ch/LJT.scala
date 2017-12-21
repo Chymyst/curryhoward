@@ -19,11 +19,11 @@ Invertible rules:
 
 + (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
 + G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
-(G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
++ (G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
 + G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
 + (G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1 -- here X is atomic, although the same rule would be valid for non-atomic X.
-(G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
-(G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
++ (G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
++ (G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
 
 Non-invertible rules:
 ---------------------
