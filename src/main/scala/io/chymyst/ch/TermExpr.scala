@@ -13,6 +13,8 @@ object TermExpr {
       l.heads.toSet ++ propositions(l.body)
     case ConjunctE(terms) ⇒ terms.flatMap(propositions).toSet
     case ProjectE(index, term) ⇒ propositions(term)
+    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(propositions).toSet
+    case MatchE(term, cases) ⇒ propositions(term) ++ cases.flatMap(propositions).toSet
     case _ ⇒ Set()
   }
 
@@ -54,7 +56,9 @@ object TermExpr {
     case AppE(head, arg) ⇒ AppE(subst(replaceVar, expr, head), subst(replaceVar, expr, arg))
     case CurriedE(heads, body) ⇒ CurriedE(heads.asInstanceOf[List[PropE[T]]], TermExpr.subst(replaceVar, expr, body))
     case ConjunctE(terms) ⇒ ConjunctE(terms.map(t ⇒ TermExpr.subst(replaceVar, expr, t)))
+    case NamedConjunctE(terms, tExpr: NamedConjunctT[_]) ⇒ NamedConjunctE(terms.map(t ⇒ TermExpr.subst(replaceVar, expr, t)), tExpr)
     case ProjectE(index, term) ⇒ ProjectE(index, TermExpr.subst(replaceVar, expr, term))
+    case MatchE(term, cases) ⇒ MatchE(TermExpr.subst(replaceVar, expr, term), cases.map(t ⇒ TermExpr.subst(replaceVar, expr, t)))
     case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, TermExpr.subst(replaceVar, expr, term), tExpr)
     case _ ⇒ inExpr
   }
@@ -64,12 +68,15 @@ object TermExpr {
 sealed trait TermExpr[+T] {
   def tExpr: TypeExpr[T]
 
+  def prettyPrint: String = prettyRename.prettyPrintParens(0)
+
   override lazy val toString: String = this match {
     case PropE(name, tExpr) ⇒ s"($name:$tExpr)"
     case AppE(head, arg) ⇒ s"($head)($arg)"
     case CurriedE(heads, body) ⇒ s"\\(${heads.mkString(" -> ")} -> $body)"
     case UnitE(tExpr) ⇒ "()"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
+    case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.toString).mkString(", ")})"
     case ProjectE(index, term) ⇒ term.toString + "._" + (index + 1).toString
     case MatchE(term, cases) ⇒ "(" + term.toString + " match " + cases.map(_.toString).mkString(" + ") + ")"
     case DisjunctE(index, total, term, _) ⇒
@@ -89,6 +96,7 @@ sealed trait TermExpr[+T] {
     case CurriedE(heads, body) ⇒ s"(${heads.map(_.prettyPrintParens(0)).mkString(" -> ")} -> ${body.prettyPrintParens(0)})"
     case UnitE(tExpr) ⇒ "1"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.prettyPrintParens(0)).mkString(", ") + ")"
+    case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.prettyPrintParens(0)).mkString(", ")})"
     case ProjectE(index, term) ⇒ term.prettyPrintParens(1) + "._" + (index + 1).toString
     case MatchE(term, cases) ⇒ "(" + term.prettyPrintParens(1) + " match " + cases.map(_.prettyPrintParens(0)).mkString(" + ") + ")"
     case DisjunctE(index, total, term, _) ⇒
@@ -109,8 +117,6 @@ sealed trait TermExpr[+T] {
     val newVars = prettyVars.take(oldVars.length).toSeq
     this.renameAllVars(oldVars, newVars)
   }
-
-  def prettyPrint: String = prettyRename.prettyPrintParens(0)
 
   def map[U](f: T ⇒ U): TermExpr[U]
 
@@ -134,6 +140,7 @@ sealed trait TermExpr[+T] {
     case CurriedE(heads, body) ⇒ body.usedTuplePartsSeq
     case UnitE(tExpr) ⇒ Seq()
     case ConjunctE(terms) ⇒ terms.flatMap(_.usedTuplePartsSeq)
+    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.usedTuplePartsSeq)
     case ProjectE(index, term) ⇒ Seq((term, index + 1)) ++ term.usedTuplePartsSeq
     case MatchE(term, cases) ⇒ term.usedTuplePartsSeq ++ cases.flatMap(_.usedTuplePartsSeq)
     case DisjunctE(index, total, term, tExpr) ⇒ term.usedTuplePartsSeq
@@ -145,6 +152,7 @@ sealed trait TermExpr[+T] {
     case CurriedE(heads, body) ⇒ body.freeVars -- heads.map(_.name).toSet
     case UnitE(tExpr) ⇒ Set()
     case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars).toSet
+    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.freeVars).toSet
     case p: ProjectE[T] ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
     case MatchE(term, cases) ⇒ term.freeVars ++ cases.flatMap(_.freeVars).toSet
     case d: DisjunctE[T] ⇒ d.term.freeVars
@@ -156,6 +164,7 @@ sealed trait TermExpr[+T] {
     case CurriedE(heads, body) ⇒ body.usedVars ++ heads.map(_.name).toSet
     case UnitE(tExpr) ⇒ Set()
     case ConjunctE(terms) ⇒ terms.flatMap(_.usedVars).toSet
+    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.usedVars).toSet
     case p: ProjectE[T] ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
     case MatchE(term, cases) ⇒ term.usedVars ++ cases.flatMap(_.usedVars).toSet
     case d: DisjunctE[T] ⇒ d.term.usedVars
@@ -173,8 +182,9 @@ sealed trait TermExpr[+T] {
       case CurriedE(heads, body) ⇒ CurriedE(heads.map(h ⇒ rename(h).asInstanceOf[PropE[T]]), rename(body))
       case UnitE(tExpr) ⇒ this
       case ConjunctE(terms) ⇒ ConjunctE(terms.map(rename))
+      case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms map rename, tExpr)
       case ProjectE(index, term) ⇒ ProjectE(index, rename(term))
-      case MatchE(term, cases) ⇒ ???
+      case MatchE(term, cases) ⇒ MatchE(rename(term), cases.map(rename))
       case d: DisjunctE[T] ⇒ d.copy(term = rename(d.term))
     }
   }
@@ -232,6 +242,12 @@ final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = UnitE(tExpr map f)
 }
 
+final case class NamedConjunctE[T](terms: Seq[TermExpr[T]], tExpr: NamedConjunctT[T]) extends TermExpr[T] {
+  override def map[U](f: T ⇒ U): TermExpr[U] = NamedConjunctE(terms map (_ map f), tExpr map f)
+
+  override def simplify: TermExpr[T] = this.copy(terms = terms.map(_.simplify))
+}
+
 final case class ConjunctE[T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = ConjunctE(terms.map(_.map(f)))
 
@@ -270,7 +286,8 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
     case _ ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
   }
 
-  override def simplify: TermExpr[T] = MatchE(term.simplify, cases.map(_.simplify)) // TODO: simplify when term is a DisjunctE
+  // TODO: simplify when term is a DisjunctE
+  override def simplify: TermExpr[T] = MatchE(term.simplify, cases.map(_.simplify))
 }
 
 // Inject a value into the i-th part of the disjunction of type tExpr.

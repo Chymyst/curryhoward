@@ -71,14 +71,22 @@ object CurryHowardMacros {
     // `finalResultType` seems to help here.
     val args = t.finalResultType.typeArgs
 
-//    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
-//    val valParamLists = t.paramLists
+    //    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
+    //    val valParamLists = t.paramLists
     // use something like t.paramLists(0)(0).typeSignature and also .isImplicit to extract types of function parameters
     t.typeSymbol.fullName match {
       case name if name matches "scala.Tuple[0-9]+" ⇒ ConjunctT(args.map(matchType(c))) //s"(${args.map(matchType(c)).mkString(", ")})"
       case "scala.Function1" ⇒ matchType(c)(args.head) ->: matchType(c)(args(1)) // s"${matchType(c)(args(0))} → ${matchType(c)(args(1))}"
-      case "scala.Option" ⇒ DisjunctT(Seq(UnitT("None"), matchType(c)(args.head))) //s"(1 + ${matchType(c)(args.head)})"
-      case "scala.util.Either" ⇒ DisjunctT(Seq(matchType(c)(args.head), matchType(c)(args(1)))) //s"(${matchType(c)(args(0))} + ${matchType(c)(args(1))})"
+      case "scala.Option" ⇒
+        DisjunctT(Seq(
+          NamedConjunctT("None", List(NothingT("Nothing")), List(), UnitT("None")),
+          NamedConjunctT("Some", List(matchType(c)(args.head)), List("value"), matchType(c)(args.head))
+        )) //s"(1 + ${matchType(c)(args.head)})"
+      case "scala.util.Either" ⇒
+        DisjunctT(Seq(
+          NamedConjunctT("Left", List(matchType(c)(args.head)), List("value"), matchType(c)(args.head)),
+          NamedConjunctT("Right", List(matchType(c)(args(1))), List("value"), matchType(c)(args(1)))
+        )) //s"(${matchType(c)(args(0))} + ${matchType(c)(args(1))})"
       case "scala.Any" ⇒ OtherT("_")
       case "scala.Nothing" ⇒ NothingT("Nothing")
       case "scala.Unit" ⇒ UnitT("Unit")
@@ -89,6 +97,7 @@ object CurryHowardMacros {
     }
   }
 
+  // This is used to put types on all function arguments within reifyParam().
   private def reifyType(c: whitebox.Context)(typeExpr: TypeExpr[String]): c.Tree = {
     import c.universe._
 
@@ -103,6 +112,12 @@ object CurryHowardMacros {
       // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case TP(nameT) ⇒ makeTypeName(nameT)
       case BasicT(nameT) ⇒ makeTypeName(nameT)
+      case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+        val constructorT = makeTypeName(constructor)
+        if (tParams.isEmpty) constructorT else {
+          val tParamsTrees = tParams.map(tp ⇒ reifyType(c)(tp))
+          tq"$constructorT[..$tParamsTrees]"
+        }
       case NothingT(nameT) ⇒ makeTypeName(nameT)
       case UnitT(nameT) ⇒ makeTypeName(nameT)
       case ConjunctT(terms) ⇒ // Assuming this is a tuple type.
@@ -140,12 +155,18 @@ object CurryHowardMacros {
         q"($param ⇒ $prevTree)"
       }
       case UnitE(_) => q"()"
-      case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
+      case ConjunctE(terms) ⇒ q""
+      case NamedConjunctE(terms, tExpr) ⇒
+        val constructorE = q"${TermName(tExpr.constructor)}"
+        q"$constructorE(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
       case ProjectE(index, term) ⇒
         val accessor = TermName(s"_${index + 1}")
         q"${reifyTerms(c)(term, paramTerms)}.$accessor"
-      case DisjunctE(index, total, term, tExpr) ⇒ ???
-      case MatchE(term, cases) ⇒ ???
+      case DisjunctE(index, total, term, tExpr) ⇒ q"${reifyTerms(c)(term, paramTerms)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
+      case MatchE(term, cases) ⇒
+        val disjunctTypesAndCases = term.tExpr.asInstanceOf[DisjunctT[String]].terms.zip(cases)
+        val casesTrees: Seq[c.Tree] = disjunctTypesAndCases.map { case (disjunctT, disjunctCase) ⇒ ??? } // cq"$pat => $expr" where pat = pq"Constructor(..$varNames)"
+        q"${reifyTerms(c)(term, paramTerms)} match { case ..$casesTrees }"
     }
   }
 

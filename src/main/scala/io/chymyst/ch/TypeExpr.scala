@@ -12,6 +12,9 @@ sealed trait TypeExpr[+T] {
     case BasicT(name) ⇒ s"<c>$name" // well-known constant type such as Int
     case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"
+    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+      val tparamString = if (tParams.isEmpty) "" else s"[${tParams.map(_.prettyPrint(0)).mkString(",")}]"
+      s"$constructor$tparamString"
     case OtherT(name) ⇒ s"<oc>$name" // other constant type
     case NothingT(_) ⇒ "0"
     case UnitT(name) ⇒ name.toString
@@ -73,6 +76,10 @@ case class OtherT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T] {
 
 final case class BasicT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T] {
   override def map[U](f: T ⇒ U): TypeExpr[U] = BasicT(f(name))
+}
+
+final case class NamedConjunctT[+T](constructor: T, tParams: List[TypeExpr[T]], accessors: List[T], wrapped: TypeExpr[T]) extends TypeExpr[T] with NonAtomicTypeExpr {
+  override def map[U](f: T ⇒ U): NamedConjunctT[U] = NamedConjunctT(f(constructor), tParams map (_ map f), accessors map f, wrapped map f)
 }
 
 // Since we do not know how to work with arbitrary type constructors, we treat them as atomic types.
