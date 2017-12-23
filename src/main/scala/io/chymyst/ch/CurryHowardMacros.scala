@@ -164,7 +164,7 @@ object CurryHowardMacros {
         val constructorE = q"${TermName(tExpr.constructor)}"
         q"$constructorE(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
       case ProjectE(index, term) ⇒
-        val accessor = TermName(s"_${index + 1}")
+        val accessor = TermName(term.accessor(index))
         q"${reifyTerms(c)(term, paramTerms)}.$accessor"
       case DisjunctE(index, total, term, tExpr) ⇒ q"${reifyTerms(c)(term, paramTerms)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
       case MatchE(term, cases) ⇒

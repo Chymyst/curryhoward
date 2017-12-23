@@ -96,13 +96,7 @@ sealed trait TermExpr[+T] {
     case UnitE(tExpr) ⇒ "1"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.prettyPrintWithParentheses(0)).mkString(", ") + ")"
     case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.prettyPrintWithParentheses(0)).mkString(", ")})"
-    case ProjectE(index, term) ⇒
-      val accessor: String = term.tExpr match {
-        case NamedConjunctT(_, _, accessors, _) ⇒ accessors(index).toString
-        case ConjunctT(terms) ⇒ (index + 1).toString
-        case _ ⇒ throw new Exception(s"Invalid projection for term $term : ${term.tExpr}")
-      }
-      term.prettyPrintWithParentheses(1) + "." + accessor
+    case ProjectE(index, term) ⇒ term.prettyPrintWithParentheses(1) + "." + term.accessor(index)
     case MatchE(term, cases) ⇒ "(" + term.prettyPrintWithParentheses(1) + " match " + cases.map(_.prettyPrintWithParentheses(0)).mkString(" + ") + ")"
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
@@ -121,6 +115,12 @@ sealed trait TermExpr[+T] {
     val oldVars = usedVars.toSeq.sorted.reverse // Let's see if reversing helps achieve a more natural style, a -> b -> c -> .... rather than c -> b -> a -> ...
     val newVars = prettyVars.take(oldVars.length).toSeq
     this.renameAllVars(oldVars, newVars)
+  }
+
+  def accessor(index: Int): String = tExpr match {
+    case NamedConjunctT(_, _, accessors, _) ⇒ accessors(index).toString
+    case ConjunctT(terms) ⇒ s"_${index + 1}"
+    case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : $tExpr because its type is not a conjunction")
   }
 
   def map[U](f: T ⇒ U): TermExpr[U]
