@@ -51,7 +51,7 @@ object LJT {
   def nonInvertibleRulesForSequent[T](sequent: Sequent[T]): Seq[ForwardRule[T]] = {
     // Generate all +Rn rules if the sequent has a disjunction goal.
     (sequent.goal match {
-      case DisjunctT(terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
+      case DisjunctT(_, _, terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
       case _ ⇒ Seq[ForwardRule[T]]()
     }) ++ Seq(ruleImplicationAtLeft4[T]) // This rule is for all sequents.
   }
@@ -103,7 +103,7 @@ object LJT {
   // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
   private def ruleDisjunctionAtLeft[T] = ForwardRule[T](name = "+L", { sequent ⇒
     val indexedPremises = sequent.premises.zipWithIndex
-    indexedPremises.collectFirst { case (DisjunctT(heads), index) ⇒ (heads, index) } match {
+    indexedPremises.collectFirst { case (DisjunctT(_, _, heads), index) ⇒ (heads, index) } match {
       case Some((heads, i)) ⇒
         val premisesWithoutAB = omitPremise(indexedPremises, i)
         val newSequents = heads.map { h ⇒ sequent.copy(premises = h :: premisesWithoutAB) }
@@ -155,7 +155,7 @@ object LJT {
   // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
   private def ruleImplicationAtLeft3[T] = ForwardRule[T](name = "->L3", { sequent ⇒
     val indexedPremises = sequent.premises.zipWithIndex
-    indexedPremises.collectFirst { case ((t@DisjunctT(heads)) #-> argC, index) ⇒ (t, heads, argC, index) } match {
+    indexedPremises.collectFirst { case ((t@DisjunctT(_, _, heads)) #-> argC, index) ⇒ (t, heads, argC, index) } match {
       case Some((disjunctT, heads, argC, i)) ⇒
 
         val newPremisesABC = heads.map(_ ->: argC).toList ++ omitPremise(indexedPremises, i)
