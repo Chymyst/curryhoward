@@ -116,6 +116,17 @@ class LJTSpec2 extends FlatSpec with Matchers {
     g("abc")(_ + 1)._2(100) shouldEqual 101
   }
 
+  behavior of "misc. proof terms"
+
+  it should "select implementation by argument usage counts" in {
+    def f[A]: A ⇒ (A ⇒ A) ⇒ A = implement // Implement as b ⇒ a ⇒ a b rather than b ⇒ _ ⇒ b.
+
+    f(123)(_ + 1) shouldEqual 124
+
+    // Triple negation is equivalent to single negation. The single "correct" implementation is b ⇒ a ⇒ b (c ⇒ c a).
+    def g[A, B]: (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B = implement
+  }
+
   behavior of "other examples"
 
   it should "generate code for reader monad's fmap" in {

@@ -68,7 +68,7 @@ object TermExpr {
 sealed trait TermExpr[+T] {
   def tExpr: TypeExpr[T]
 
-  def prettyPrint: String = prettyRename.prettyPrintParens(0)
+  def prettyPrint: String = prettyRename.prettyPrintWithParentheses(0)
 
   override lazy val toString: String = this match {
     case PropE(name, tExpr) ⇒ s"($name:$tExpr)"
@@ -87,24 +87,29 @@ sealed trait TermExpr[+T] {
       "(" + leftZeros.mkString(" + ") + leftZerosString + term.toString + rightZerosString + rightZeros.mkString(" + ") + ")"
   }
 
-  private[ch] def prettyPrintParens(level: Int): String = this match {
+  private[ch] def prettyPrintWithParentheses(level: Int): String = this match {
     case PropE(name, tExpr) ⇒ s"$name"
     case AppE(head, arg) ⇒
-      val r = s"${head.prettyPrintParens(0)} ${arg.prettyPrintParens(1)}"
-      if (level == 1) s"($r)" else
-        r
-    case CurriedE(heads, body) ⇒ s"(${heads.map(_.prettyPrintParens(0)).mkString(" ⇒ ")} ⇒ ${body.prettyPrintParens(0)})"
+      val r = s"${head.prettyPrintWithParentheses(0)} ${arg.prettyPrintWithParentheses(1)}"
+      if (level == 1) s"($r)" else r
+    case CurriedE(heads, body) ⇒ s"(${heads.map(_.prettyPrintWithParentheses(0)).mkString(" ⇒ ")} ⇒ ${body.prettyPrintWithParentheses(0)})"
     case UnitE(tExpr) ⇒ "1"
-    case ConjunctE(terms) ⇒ "(" + terms.map(_.prettyPrintParens(0)).mkString(", ") + ")"
-    case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.prettyPrintParens(0)).mkString(", ")})"
-    case ProjectE(index, term) ⇒ term.prettyPrintParens(1) + "._" + (index + 1).toString
-    case MatchE(term, cases) ⇒ "(" + term.prettyPrintParens(1) + " match " + cases.map(_.prettyPrintParens(0)).mkString(" + ") + ")"
+    case ConjunctE(terms) ⇒ "(" + terms.map(_.prettyPrintWithParentheses(0)).mkString(", ") + ")"
+    case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.prettyPrintWithParentheses(0)).mkString(", ")})"
+    case ProjectE(index, term) ⇒
+      val accessor: String = term.tExpr match {
+        case NamedConjunctT(_, _, accessors, _) ⇒ accessors(index).toString
+        case ConjunctT(terms) ⇒ (index + 1).toString
+        case _ ⇒ throw new Exception(s"Invalid projection for term $term : ${term.tExpr}")
+      }
+      term.prettyPrintWithParentheses(1) + "." + accessor
+    case MatchE(term, cases) ⇒ "(" + term.prettyPrintWithParentheses(1) + " match " + cases.map(_.prettyPrintWithParentheses(0)).mkString(" + ") + ")"
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
       val leftZerosString = if (leftZeros.isEmpty) "" else " + "
       val rightZeros = Seq.fill(total - index - 1)("0")
       val rightZerosString = if (rightZeros.isEmpty) "" else " + "
-      "(" + leftZeros.mkString(" + ") + leftZerosString + term.prettyPrintParens(0) + rightZerosString + rightZeros.mkString(" + ") + ")"
+      "(" + leftZeros.mkString(" + ") + leftZerosString + term.prettyPrintWithParentheses(0) + rightZerosString + rightZeros.mkString(" + ") + ")"
   }
 
   private def prettyVars: Iterator[String] = for {
