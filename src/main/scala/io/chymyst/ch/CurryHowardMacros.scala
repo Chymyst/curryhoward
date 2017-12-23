@@ -78,14 +78,17 @@ object CurryHowardMacros {
       case name if name matches "scala.Tuple[0-9]+" ⇒ ConjunctT(args.map(matchType(c))) //s"(${args.map(matchType(c)).mkString(", ")})"
       case "scala.Function1" ⇒ matchType(c)(args.head) ->: matchType(c)(args(1)) // s"${matchType(c)(args(0))} → ${matchType(c)(args(1))}"
       case "scala.Option" ⇒
-        DisjunctT(Seq(
+        val argType = matchType(c)(args.head)
+        DisjunctT("Option", List(argType), Seq(
           NamedConjunctT("None", List(NothingT("Nothing")), List(), UnitT("None")),
-          NamedConjunctT("Some", List(matchType(c)(args.head)), List("value"), matchType(c)(args.head))
+          NamedConjunctT("Some", List(argType), List("value"), matchType(c)(args.head))
         )) //s"(1 + ${matchType(c)(args.head)})"
       case "scala.util.Either" ⇒
-        DisjunctT(Seq(
-          NamedConjunctT("Left", List(matchType(c)(args.head)), List("value"), matchType(c)(args.head)),
-          NamedConjunctT("Right", List(matchType(c)(args(1))), List("value"), matchType(c)(args(1)))
+        val leftType = matchType(c)(args.head)
+        val rightType = matchType(c)(args(1))
+        DisjunctT("Either", List(leftType, rightType), Seq(
+          NamedConjunctT("Left", List(leftType), List("value"), matchType(c)(args.head)),
+          NamedConjunctT("Right", List(rightType), List("value"), matchType(c)(args(1)))
         )) //s"(${matchType(c)(args(0))} + ${matchType(c)(args(1))})"
       case "scala.Any" ⇒ OtherT("_")
       case "scala.Nothing" ⇒ NothingT("Nothing")

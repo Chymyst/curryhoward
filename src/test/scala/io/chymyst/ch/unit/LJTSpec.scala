@@ -165,17 +165,19 @@ class LJTSpec extends FlatSpec with Matchers {
   behavior of "proof search - high-level API, rule +Rn"
 
   it should "find proof term for simple instance of +Rn" in {
-    val typeExpr = TP(1) ->: DisjunctT(Seq(TP(1), TP(2)))
+    val disjunctT = DisjunctT(12, Seq(), Seq(TP(1), TP(2)))
+    val typeExpr = TP(1) ->: disjunctT
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(1))), DisjunctE(0, 2, PropE("x", TP(1)), DisjunctT(Seq(TP(1), TP(2)))))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(1))), DisjunctE(0, 2, PropE("x", TP(1)), disjunctT))) shouldEqual true
   }
 
   it should "find proof term for simple instance of +Rn with several disjuncts" in {
-    val typeExpr = TP(2) ->: DisjunctT(Seq(TP(1), TP(2), TP(3)))
+    val disjunctT = DisjunctT(123, Seq(), Seq(TP(1), TP(2), TP(3)))
+    val typeExpr = TP(2) ->: disjunctT
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(2))), DisjunctE(1, 3, PropE("x", TP(2)), DisjunctT(Seq(TP(1), TP(2), TP(3)))))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP(2))), DisjunctE(1, 3, PropE("x", TP(2)), disjunctT))) shouldEqual true
   }
 
   it should "inhabit type using +Rn" in {

@@ -4,20 +4,18 @@ sealed trait TypeExpr[+T] {
   override lazy val toString: String = prettyPrint(0)
 
   private def prettyPrint(level: Int): String = this match {
-    case DisjunctT(terms) ⇒ terms.map(_.prettyPrint(1)).mkString(" + ")
-    case ConjunctT(terms) ⇒ "(" + terms.map(_.prettyPrint(0)).mkString(", ") + ")"
+    case DisjunctT(constructor, tParams, terms) ⇒ s"$constructor${TypeExpr.tParamString(tParams)}{${terms.map(_.prettyPrint(1)).mkString(" + ")}}"
+    case ConjunctT(terms) ⇒ s"(${terms.map(_.prettyPrint(0)).mkString(", ")})"
     case head #-> body ⇒
       val r = s"${head.prettyPrint(1)} ⇒ ${body.prettyPrint(0)}"
       if (level == 1) s"($r)" else r
     case BasicT(name) ⇒ s"<c>$name" // well-known constant type such as Int
     case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"
-    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
-      val tparamString = if (tParams.isEmpty) "" else s"[${tParams.map(_.prettyPrint(0)).mkString(",")}]"
-      s"$constructor$tparamString"
+    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ s"$constructor${TypeExpr.tParamString(tParams)}"
     case OtherT(name) ⇒ s"<oc>$name" // other constant type
     case NothingT(_) ⇒ "0"
-    case UnitT(name) ⇒ name.toString
+    case UnitT(name) ⇒ s"$name"
   }
 
   def isAtomic: Boolean
@@ -36,6 +34,11 @@ sealed trait AtomicTypeExpr[T] {
 }
 
 object TypeExpr {
+  private[ch] def tParamString[T](tParams: Seq[TypeExpr[T]]): String =
+    if (tParams.isEmpty)
+      ""
+    else
+      s"[${tParams.map(_.prettyPrint(0)).mkString(",")}]"
 
   private def makeImplication[T](tpe1: TypeExpr[T], tpe2: TypeExpr[T]): TypeExpr[T] = #->(tpe1, tpe2)
 
@@ -45,8 +48,8 @@ object TypeExpr {
 
 }
 
-final case class DisjunctT[T](terms: Seq[TypeExpr[T]]) extends TypeExpr[T] with NonAtomicTypeExpr {
-  override def map[U](f: T ⇒ U): TypeExpr[U] = DisjunctT(terms.map(_.map(f)))
+final case class DisjunctT[T](constructor: T, tParams: Seq[TypeExpr[T]], terms: Seq[TypeExpr[T]]) extends TypeExpr[T] with NonAtomicTypeExpr {
+  override def map[U](f: T ⇒ U): TypeExpr[U] = DisjunctT(f(constructor), tParams map (_ map f), terms map (_ map f))
 }
 
 final case class ConjunctT[T](terms: Seq[TypeExpr[T]]) extends TypeExpr[T] with NonAtomicTypeExpr {

@@ -7,7 +7,9 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
   behavior of "misc. proof terms"
 
-  it should "correctly use eta-expansion in simplify()" in {
+  it should "select implementation by argument usage counts" in {
+    def f[A]: A ⇒ (A ⇒ A) ⇒ A = implement // return b ⇒ a ⇒ a b rather than b ⇒ _ ⇒ b
+
     // Triple negation is equivalent to single negation.
     def g[A, B]: (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B = implement
   }
