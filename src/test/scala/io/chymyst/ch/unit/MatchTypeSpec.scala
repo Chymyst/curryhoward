@@ -11,7 +11,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
     def result[A, B, C]: (String, String) = testType[_ ⇒ B]
 
     val res = result._1
-    res shouldEqual "<oc>_ → B"
+    res shouldEqual "<oc>_ ⇒ B"
   }
 
   it should "get printable representation of enclosing owner's type" in {
@@ -41,32 +41,32 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of function types" in {
     def result[A, B, C]: (String, String) = testType[A ⇒ B]
 
-    result._1 shouldEqual "A → B"
+    result._1 shouldEqual "A ⇒ B"
   }
 
   it should "get printable representation of fixed types with type constructors" in {
     def result[A, B, C]: (String, String) = testType[Option[Seq[Int]] ⇒ Option[List[Set[A]]] ⇒ B]
 
-    result._1 shouldEqual "None + <tc>Seq[Int] → None + <tc>List[Set[A]] → B"
+    result._1 shouldEqual "None[0] + Some[<tc>Seq[Int]] ⇒ None[0] + Some[<tc>List[Set[A]]] ⇒ B"
   }
 
   it should "get printable representation of fixed types with type constructors with [_]" in {
     def result[A, B, C]: (String, String) = testType[Option[_] ⇒ B]
 
     val res = result._1
-    res shouldEqual "None + <oc>_ → B"
+    res shouldEqual "None[0] + Some[<oc>_] ⇒ B"
   }
 
   it should "get printable representation of Option types" in {
     def result[A, B, C]: (String, String) = testType[Option[A] ⇒ Either[A, B]]
 
-    result._1 shouldEqual "None + A → A + B"
+    result._1 shouldEqual "None[0] + Some[A] ⇒ Left[A] + Right[B]"
   }
 
   it should "get printable representation of Any, Unit, and Nothing types" in {
     def result[A, B, C]: (String, String) = testType[Any ⇒ Nothing ⇒ Unit]
 
-    result._1 shouldEqual "<oc>_ → 0 → Unit"
+    result._1 shouldEqual "<oc>_ ⇒ 0 ⇒ Unit"
   }
 
   it should "not confuse a type parameter with a type inheriting from Any" in {
@@ -74,7 +74,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
 
     def result[A, B, C]: (String, String) = testType[A ⇒ Q]
 
-    result._1 shouldEqual "A → <oc>Q"
+    result._1 shouldEqual "A ⇒ <oc>Q"
   }
 
   it should "get printable representation of tuple types" in {
@@ -86,7 +86,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of tuple as function argument" in {
     def result[A, B, C]: (String, String) = testType[((A, B)) ⇒ C]
 
-    result._1 shouldEqual "(A, B) → C"
+    result._1 shouldEqual "(A, B) ⇒ C"
   }
 
   it should "get printable representation of tuple of basic types" in {
@@ -106,6 +106,6 @@ class MatchTypeSpec extends FlatSpec with Matchers {
 
     def result[T]: (String, String) = testType[Test1[T] ⇒ Test2]
 
-    result._1 shouldEqual "<tc>Test1[T] → <oc>Test2"
+    result._1 shouldEqual "<tc>Test1[T] ⇒ <oc>Test2"
   }
 }

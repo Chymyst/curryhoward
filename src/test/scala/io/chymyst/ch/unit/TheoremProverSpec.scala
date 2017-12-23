@@ -3,7 +3,7 @@ package io.chymyst.ch.unit
 import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
 
-class TheoremProverSpec  extends FlatSpec with Matchers {
+class TheoremProverSpec extends FlatSpec with Matchers {
 
   private val freshVar = new FreshIdents(prefix = "x")
 

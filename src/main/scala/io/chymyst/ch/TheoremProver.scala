@@ -17,22 +17,20 @@ object TheoremProver {
     }
   }
 
-  def apply[T](typeStructure: TypeExpr[T]): List[TermExpr[T]] = findProofs(typeStructure)
+  def apply[T](typeStructure: TypeExpr[T]): (List[TermExpr[T]], Int) = findProofs(typeStructure)
 
   private[ch] val freshVar = new FreshIdents(prefix = "x")
 
-  def findProofs[T](typeStructure: TypeExpr[T]): List[TermExpr[T]] = {
+  def findProofs[T](typeStructure: TypeExpr[T]): (List[TermExpr[T]], Int) = {
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
-    val pp = findProofTerms(mainSequent)
+    val proofTerms = findProofTerms(mainSequent)
     if (debug) {
-      val prettyPP = pp.map(p ⇒ (p.prettyPrint, p.unusedArgs.size, p.unusedTupleParts, p.unusedArgs, p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }))
+      val prettyPT = proofTerms.map(p ⇒ (p.prettyPrint, p.unusedArgs.size, p.unusedTupleParts, p.unusedArgs, p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }))
         .sortBy { case (pString, s1, s2, unusedArgs, usedTupleParts) ⇒ s1 + s2 }
-      println(s"debug: got proof terms:\n ${prettyPP.mkString(";\n ")}")
-    } else if (pp.size > 1) {
-      println(s"type $typeStructure has ${pp.size} implementations (laws need checking?)")
+      println(s"debug: got proof terms:\n ${prettyPT.mkString(";\n ")}")
     }
-    // Return the group of proofs that leave the smallest number of arguments unused.
-    pp.map(proofTerm ⇒ (proofTerm, proofTerm.unusedArgs.size + proofTerm.unusedTupleParts))
+    // Return the group of proofs that leave the smallest number of values unused, but has the smallest use count of those that are used.
+    val chosenTerms = proofTerms.map(proofTerm ⇒ (proofTerm, (proofTerm.unusedArgs.size + proofTerm.unusedTupleParts, proofTerm.argsMultiUseCount)))
       .groupBy(_._2) // Map[Int, Seq[(ProofTerm[T], Int)]]
       .mapValues(_.map(_._1)) // Map[Int, Seq[ProofTerm[T]]]
       .toSeq.sortBy(_._1) // Seq[(Int, Seq[ProofTerm[T]])]
@@ -40,6 +38,7 @@ object TheoremProver {
       .map(_._2.toList) // Option[List[ProofTerm[T]]]
       .getOrElse(List())
       .map(_.prettyRename)
+    (chosenTerms, proofTerms.size)
   }
 
   // Main recursive function that computes the list of available proofs for a sequent.

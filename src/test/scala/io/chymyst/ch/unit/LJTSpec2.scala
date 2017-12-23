@@ -9,7 +9,7 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   it should "inhabit type using ->L1" in {
     val typeExpr = TP(1) ->: ((TP(1) ->: TP(2)) ->: TP(2))
-    val proofs = TheoremProver.findProofs(typeExpr)
+    val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
   }
 
@@ -57,11 +57,6 @@ class LJTSpec2 extends FlatSpec with Matchers {
   it should "generate the weak Peirce's law and related laws" in {
     // Weak Peirce's law.
     def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
-
-    // Triple negation is equivalent to single negation.
-    // TODO: fix this
-    // This has two problems: 1) incorrect renaming for pretty-print leads to name clashes in bound variables. 2) eta-conversion not performed, thus spurious second implementation found.
-    def g[A, B]: (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B = implement
 
     // This cannot be implemented (weak double negation reduction).
     "def h[A,B]: ((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B = implement" shouldNot compile
@@ -148,26 +143,5 @@ class LJTSpec2 extends FlatSpec with Matchers {
   it should "generate code for state monad update-mapping function using rule ->L2" in {
     def f[S, A, B]: (S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
   }
-
-  // TODO: make this work
-  /*
-      it should "generate code for the weak law of excluded middle" in {
-      def f[A, B]: (Either[A, A ⇒ B] ⇒ B) ⇒ B = implement
-    }
-
-        it should "generate code using various disjunction rules" in {
-            def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
-          }
-
-        behavior of "named types"
-
-        it should "generate code by reflection on named type" in {
-          type MyType[T] = (Int, T, T)
-
-          def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement
-
-          f(1)("abc") shouldEqual ((1, "abc", "abc"))
-        }
-  */
 
 }

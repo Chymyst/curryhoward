@@ -112,6 +112,7 @@ object CurryHowardMacros {
       // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case TP(nameT) ⇒ makeTypeName(nameT)
       case BasicT(nameT) ⇒ makeTypeName(nameT)
+      case OtherT(nameT) ⇒ makeTypeName(nameT)
       case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
         val constructorT = makeTypeName(constructor)
         if (tParams.isEmpty) constructorT else {
@@ -155,7 +156,7 @@ object CurryHowardMacros {
         q"($param ⇒ $prevTree)"
       }
       case UnitE(_) => q"()"
-      case ConjunctE(terms) ⇒ q""
+      case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
       case NamedConjunctE(terms, tExpr) ⇒
         val constructorE = q"${TermName(tExpr.constructor)}"
         q"$constructorE(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
@@ -198,22 +199,26 @@ object CurryHowardMacros {
     import c.universe._
     type TExprType = String // (String, c.Type)
     val typeStructure: TypeExpr[TExprType] = matchType(c)(typeT)
+    // TODO Check that there aren't repeated types among the curried arguments, print warning.
     TheoremProver(typeStructure) match {
-      case Nil ⇒
+      case (Nil, _) ⇒
         c.error(c.enclosingPosition, s"type $typeStructure cannot be implemented")
         q"null" // Avoid other spurious errors, return a valid tree here.
-      case List(termFound) ⇒
+      case (List(termFound), count) ⇒
+        if (count > 1) c.warning(c.enclosingPosition, s"type $typeStructure has $count implementations (laws need checking?)")
         //        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
+        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
         val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(c)(p)).toMap
         val result = reifyTerms(c)(termFound, paramTerms)
+
         //        val resultType = tq"${typeT.finalResultType}"
-        //        val resultWithType = q"$result: $resultType"
+        //        val resultWithType = q"$result: $resultType" // this does not work
         if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
 
         // use resultWithType? Doesn't seem tow work.
         result
 
-      case list ⇒
+      case (list, _) ⇒
         c.error(c.enclosingPosition, s"type $typeStructure can be implemented in ${list.length} different ways: ${list.map(_.prettyPrint).mkString("; ")}")
         q"null"
     }

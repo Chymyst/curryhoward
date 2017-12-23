@@ -73,7 +73,7 @@ sealed trait TermExpr[+T] {
   override lazy val toString: String = this match {
     case PropE(name, tExpr) ⇒ s"($name:$tExpr)"
     case AppE(head, arg) ⇒ s"($head)($arg)"
-    case CurriedE(heads, body) ⇒ s"\\(${heads.mkString(" -> ")} -> $body)"
+    case CurriedE(heads, body) ⇒ s"\\(${heads.mkString(" ⇒ ")} ⇒ $body)"
     case UnitE(tExpr) ⇒ "()"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
     case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.toString).mkString(", ")})"
@@ -93,7 +93,7 @@ sealed trait TermExpr[+T] {
       val r = s"${head.prettyPrintParens(0)} ${arg.prettyPrintParens(1)}"
       if (level == 1) s"($r)" else
         r
-    case CurriedE(heads, body) ⇒ s"(${heads.map(_.prettyPrintParens(0)).mkString(" -> ")} -> ${body.prettyPrintParens(0)})"
+    case CurriedE(heads, body) ⇒ s"(${heads.map(_.prettyPrintParens(0)).mkString(" ⇒ ")} ⇒ ${body.prettyPrintParens(0)})"
     case UnitE(tExpr) ⇒ "1"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.prettyPrintParens(0)).mkString(", ") + ")"
     case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.prettyPrintParens(0)).mkString(", ")})"
@@ -170,13 +170,31 @@ sealed trait TermExpr[+T] {
     case d: DisjunctE[T] ⇒ d.term.usedVars
   }
 
-  // Rename a variable *everywhere* in the expression.
-  def renameVar(oldName: VarName, newName: VarName): TermExpr[T] = {
-    def rename(t: TermExpr[T]): TermExpr[T] = t.renameVar(oldName, newName)
+  def varCount(varName: VarName): Int = this match {
+    case PropE(name, tExpr) ⇒ if (name == varName) 1 else 0
+    case AppE(head, arg) ⇒ head.varCount(varName) + arg.varCount(varName)
+    case CurriedE(heads, body) ⇒ body.varCount(varName)
+    case UnitE(tExpr) ⇒ 0
+    case NamedConjunctE(terms, tExpr) ⇒ terms.map(_.varCount(varName)).sum
+    case ConjunctE(terms) ⇒ terms.map(_.varCount(varName)).sum
+    case ProjectE(index, term) ⇒ term.varCount(varName)
+    case MatchE(term, cases) ⇒ term.varCount(varName) + cases.map(_.varCount(varName)).sum
+    case DisjunctE(index, total, term, tExpr) ⇒ term.varCount(varName)
+  }
+
+  lazy val argsMultiUseCount: Int = 0
+
+  // Rename all variable at once *everywhere* in the expression. (This is not the alpha-conversion!)
+  def renameAllVars(oldNames: Seq[VarName], newNames: Seq[VarName]): TermExpr[T] = {
+    renameAllVars(oldNames.zip(newNames).toMap)
+  }
+
+  def renameAllVars(oldAndNewNames: Map[VarName, VarName]): TermExpr[T] = {
+    def rename(t: TermExpr[T]): TermExpr[T] = t.renameAllVars(oldAndNewNames)
 
     this match {
-      case PropE(name, tExpr) ⇒
-        val replacedName = if (name == oldName) newName else name
+      case PropE(oldName, tExpr) ⇒
+        val replacedName = oldAndNewNames.getOrElse(oldName, oldName)
         PropE(replacedName, tExpr)
       case AppE(head, arg) ⇒ AppE(rename(head), rename(arg))
       case CurriedE(heads, body) ⇒ CurriedE(heads.map(h ⇒ rename(h).asInstanceOf[PropE[T]]), rename(body))
@@ -187,11 +205,6 @@ sealed trait TermExpr[+T] {
       case MatchE(term, cases) ⇒ MatchE(rename(term), cases.map(rename))
       case d: DisjunctE[T] ⇒ d.copy(term = rename(d.term))
     }
-  }
-
-  def renameAllVars(oldNames: Seq[VarName], newNames: Seq[VarName]): TermExpr[T] = {
-    oldNames.zip(newNames)
-      .foldLeft(this) { case (prev, (oldName, newName)) ⇒ prev.renameVar(oldName, newName) }
   }
 }
 
@@ -233,9 +246,16 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
   // The type is t1 -> t2 -> t3 -> b; here `heads` = List(t1, t2, t3).
   def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr ->: prev }
 
-  override def simplify: TermExpr[T] = this.copy(body = body.simplify)
+  override def simplify: TermExpr[T] = (heads, body.simplify) match {
+    // Check for inverse eta-conversion: simplify x ⇒ y ⇒ ... ⇒ z ⇒ a ⇒ f a into x ⇒ y ⇒ ... ⇒ z ⇒ f.
+    // TODO figure out why this does not work
+    //    case (_ :: _, AppE(fHead, fBody)) if heads.last == fBody ⇒ CurriedE(heads.slice(0, heads.length - 1), fHead)
+    case (_, simplifiedBody) ⇒ this.copy(body = simplifiedBody)
+  }
 
   override def unusedArgs: Set[VarName] = heads.map(_.name).toSet -- body.freeVars
+
+  override lazy val argsMultiUseCount: Int = heads.map(head ⇒ body.varCount(head.name)).sum
 }
 
 final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T] {
