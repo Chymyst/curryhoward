@@ -18,6 +18,12 @@ sealed trait TypeExpr[+T] {
     case UnitT(name) ⇒ s"$name"
   }
 
+  def conjunctSize: Int = this match {
+    case ConjunctT(terms) ⇒ terms.length
+    case NamedConjunctT(_, _, _, wrapped) ⇒ wrapped.conjunctSize
+    case _ ⇒ 1
+  }
+
   def isAtomic: Boolean
 
   def map[U](f: T ⇒ U): TypeExpr[U]
@@ -81,6 +87,7 @@ final case class BasicT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T] {
   override def map[U](f: T ⇒ U): TypeExpr[U] = BasicT(f(name))
 }
 
+// The `wrapped` is a type expression for the entire contents of the named conjunct. This can be a Unit, a single type, or a ConjunctT.
 final case class NamedConjunctT[+T](constructor: T, tParams: List[TypeExpr[T]], accessors: List[T], wrapped: TypeExpr[T]) extends TypeExpr[T] with NonAtomicTypeExpr {
   override def map[U](f: T ⇒ U): NamedConjunctT[U] = NamedConjunctT(f(constructor), tParams map (_ map f), accessors map f, wrapped map f)
 }

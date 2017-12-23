@@ -129,7 +129,7 @@ sealed trait TermExpr[+T] {
       .groupBy(_._1) // Map[TermExpr[T], Seq[(TermExpr[Int], Int)]]
       .mapValues(_.map(_._2).distinct) // Map[TermExpr[T], Seq[Int]]
       .map { case (term, parts) ⇒
-      val totalParts = term.tExpr.asInstanceOf[ConjunctT[T]].terms.length
+      val totalParts = term.tExpr.conjunctSize
       totalParts - parts.length
     }.count(_ > 0)
 
@@ -276,6 +276,7 @@ final case class ConjunctE[T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
   override def simplify: TermExpr[T] = this.copy(terms = terms.map(_.simplify))
 }
 
+// The `term` should be a ConjunctT or a NamedConjunctT
 final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = ProjectE(index, term map f)
 
@@ -284,7 +285,16 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
     case _ ⇒ None
   }
 
-  override def tExpr: TypeExpr[T] = term.tExpr.asInstanceOf[ConjunctT[T]].terms(index)
+  override def tExpr: TypeExpr[T] = term.tExpr match {
+    case ConjunctT(terms) ⇒ terms(index)
+    case NamedConjunctT(_, _, _, wrapped) ⇒ wrapped match {
+      case ConjunctT(terms) ⇒ terms(index)
+      case _ if index == 0 ⇒ wrapped
+      // Otherwise it is an error!
+      case _ ⇒ throw new Exception(s"Internal error: Invalid projection to index $index for a named conjunct $term : ${term.tExpr} with multiplicity 1")
+    }
+    case _ ⇒ throw new Exception(s"Internal error: Invalid projection term $term whose type ${term.tExpr} is not a conjunction")
+  }
 
   override def simplify: TermExpr[T] = term.simplify match {
     case ConjunctE(terms) ⇒ terms(index).simplify
