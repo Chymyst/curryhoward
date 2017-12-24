@@ -1,5 +1,6 @@
 package io.chymyst.ch
 
+import scala.collection.immutable
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 import scala.reflect.macros.whitebox
@@ -65,37 +66,48 @@ object CurryHowardMacros {
 
   private val basicRegex = s"(?:scala.|java.lang.)*(${basicTypes.mkString("|")})".r
 
-  // TODO: use c.Type instead of String
+  // TODO: use c.Type instead of String -- ??? Not sure this is ever going to work.
   private def matchType(c: whitebox.Context)(t: c.Type): TypeExpr[String] = {
-    // Could be the weird type [X, Y] => (type expression), or it could be an actual tuple type.
+    // Could be the weird type [X, Y] => (type expression).
     // `finalResultType` seems to help here.
     val args = t.finalResultType.typeArgs
+
+    import c.universe._
 
     //    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
     //    val valParamLists = t.paramLists
     // use something like t.paramLists(0)(0).typeSignature and also .isImplicit to extract types of function parameters
-    t.typeSymbol.fullName match {
-      case name if name matches "scala.Tuple[0-9]+" ⇒ ConjunctT(args.map(matchType(c))) //s"(${args.map(matchType(c)).mkString(", ")})"
-      case "scala.Function1" ⇒ matchType(c)(args.head) ->: matchType(c)(args(1)) // s"${matchType(c)(args(0))} → ${matchType(c)(args(1))}"
-      case "scala.Option" ⇒
+    t.typeSymbol.name.decodedName.toString match {
+      case name if name matches "(scala\\.)?Tuple[0-9]+" ⇒ ConjunctT(args.map(matchType(c))) //s"(${args.map(matchType(c)).mkString(", ")})"
+      case "scala.Function1" | "Function1" ⇒ matchType(c)(args.head) ->: matchType(c)(args(1)) // s"${matchType(c)(args(0))} → ${matchType(c)(args(1))}"
+      case "scala.Option" | "Option" ⇒
         val argType = matchType(c)(args.head)
         DisjunctT("Option", List(argType), Seq(
           NamedConjunctT("None", List(NothingT("Nothing")), List(), UnitT("None")),
           NamedConjunctT("Some", List(argType), List("value"), matchType(c)(args.head))
         )) //s"(1 + ${matchType(c)(args.head)})"
-      case "scala.util.Either" ⇒
+      case "scala.util.Either" | "Either" ⇒
         val leftType = matchType(c)(args.head)
         val rightType = matchType(c)(args(1))
         DisjunctT("Either", List(leftType, rightType), Seq(
           NamedConjunctT("Left", List(leftType), List("value"), matchType(c)(args.head)),
           NamedConjunctT("Right", List(rightType), List("value"), matchType(c)(args(1)))
         )) //s"(${matchType(c)(args(0))} + ${matchType(c)(args(1))})"
-      case "scala.Any" ⇒ OtherT("_")
-      case "scala.Nothing" ⇒ NothingT("Nothing")
-      case "scala.Unit" ⇒ UnitT("Unit")
+      case "scala.Any" | "Any" ⇒ OtherT("_")
+      case "scala.Nothing" | "Nothing" ⇒ NothingT("Nothing")
+      case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
       case basicRegex(name) ⇒ BasicT(name)
       case _ if args.isEmpty && t.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(t.toString)
       case _ if args.isEmpty ⇒ OtherT(t.toString)
+      case fullName if t.typeSymbol.isClass && t.typeSymbol.asClass.isCaseClass ⇒ // Detect case classes.
+        // Detect all parts of the case class.
+        val parts: List[(String, TypeExpr[String])] = t.decls
+          .collect { case s: MethodSymbol if s.isCaseAccessor ⇒ (s.name.decodedName.toString, matchType(c)(s.typeSignature.resultType)) }
+          .toList
+        NamedConjunctT(fullName, args.map(matchType(c)), parts.map(_._1), ConjunctT(parts.map(_._2)))
+      case fullName if t.typeSymbol.isClass && t.typeSymbol.asClass.isTrait && t.typeSymbol.asClass.knownDirectSubclasses.forall(_.asClass.isCaseClass) ⇒ // Detect traits with case classes.
+        val parts = t.typeSymbol.asClass.knownDirectSubclasses.toList.map(s ⇒ matchType(c)(s.typeSignature))
+        DisjunctT(fullName, args.map(matchType(c)), parts)
       case _ ⇒ ConstructorT(t.toString)
     }
   }
@@ -162,7 +174,7 @@ object CurryHowardMacros {
       case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
       case NamedConjunctE(terms, tExpr) ⇒
         val constructorE = q"${TermName(tExpr.constructor)}"
-        q"$constructorE(..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
+        q"$constructorE[..${tExpr.tParams.map(t ⇒ reifyType(c)(t))}](..${terms.map(t ⇒ reifyTerms(c)(t, paramTerms))})"
       case ProjectE(index, term) ⇒
         val accessor = TermName(term.accessor(index))
         q"${reifyTerms(c)(term, paramTerms)}.$accessor"
@@ -218,7 +230,7 @@ object CurryHowardMacros {
         //        val resultWithType = q"$result: $resultType" // this does not work
         if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
 
-        // use resultWithType? Doesn't seem tow work.
+        // use resultWithType? Doesn't seem to work.
         result
 
       case (list, _) ⇒

@@ -5,7 +5,21 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class LJTSpec3 extends FlatSpec with Matchers {
 
-  behavior of "terms with disjunctions"
+  case class Wrap1[A, B](x: Int, a: A, b: B)
+
+  sealed trait Choice[A]
+
+  case class Choice1[A, B](x: Int, a: A, b: B) extends Choice[A]
+
+  case class Choice2[B](name: String, bb: B) extends Choice[Boolean]
+
+  behavior of "terms with case classes"
+
+  it should "generate code for case class" in {
+    def f[A, B]: Wrap1[A, B] ⇒ B = implement
+
+    f(Wrap1(123, "abc", true)) shouldEqual true
+  }
 
   // TODO: make this work
   /*
