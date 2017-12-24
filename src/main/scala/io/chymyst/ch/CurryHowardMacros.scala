@@ -102,10 +102,13 @@ object CurryHowardMacros {
       case fullName if t.typeSymbol.isClass && t.typeSymbol.asClass.isCaseClass ⇒ // Detect case classes.
         // Detect all parts of the case class.
         val parts: List[(String, TypeExpr[String])] = t.decls
-          .collect { case s: MethodSymbol if s.isCaseAccessor ⇒ (s.name.decodedName.toString, matchType(c)(s.typeSignature.resultType)) }
+          .collect { case s: MethodSymbol if s.isCaseAccessor && s.isGetter ⇒ (s.name.decodedName.toString, matchType(c)(s.typeSignature.resultType)) }
           .toList
         NamedConjunctT(fullName, args.map(matchType(c)), parts.map(_._1), ConjunctT(parts.map(_._2)))
-      case fullName if t.typeSymbol.isClass && t.typeSymbol.asClass.isTrait && t.typeSymbol.asClass.knownDirectSubclasses.forall(_.asClass.isCaseClass) ⇒ // Detect traits with case classes.
+      case fullName if t.typeSymbol.isClass && t.typeSymbol.asClass.isTrait && {
+        val subclasses = t.typeSymbol.asClass.knownDirectSubclasses
+        subclasses.nonEmpty && subclasses.forall(_.asClass.isCaseClass)
+      } ⇒ // Detect traits with case classes.
         val parts = t.typeSymbol.asClass.knownDirectSubclasses.toList.map(s ⇒ matchType(c)(s.typeSignature))
         DisjunctT(fullName, args.map(matchType(c)), parts)
       case _ ⇒ ConstructorT(t.toString)

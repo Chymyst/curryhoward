@@ -94,7 +94,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
 
     result._1 shouldEqual "(" + CurryHowardMacros.basicTypes.map("<c>" + _).mkString(", ") + ")"
   }
-
+/*
   it should "get printable representation of case class" in {
     sealed trait Test1[T]
     case class A[T](x: Int, y: T) extends Test1[T]
@@ -107,5 +107,5 @@ class MatchTypeSpec extends FlatSpec with Matchers {
     def result[T]: (String, String) = testType[Test1[T] ⇒ Test2]
 
     result._1 shouldEqual "<tc>Test1[T] ⇒ <oc>Test2"
-  }
+  }*/
 }

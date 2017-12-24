@@ -21,6 +21,31 @@ class LJTSpec3 extends FlatSpec with Matchers {
     f(Wrap1(123, "abc", true)) shouldEqual true
   }
 
+  it should "generate code for case class that is part of a sealed trait" in {
+    def f[A, B]: Choice1[A, B] ⇒ B = implement
+
+    f(Choice1(123, "abc", true)) shouldEqual true
+  }
+
+  it should "generate code for GADT case class that is part of a sealed trait" in {
+    def f[B]: Choice2[B] ⇒ B = implement
+
+    f(Choice2("abc", true)) shouldEqual true
+  }
+
+  /*
+    it should "generate code for sealed trait" in {
+      def f[A, B]: Choice[A] ⇒ B = implement
+
+      val r1 = f[String, Boolean](Choice1(123, "abc", true))
+
+      r1 shouldEqual true
+
+      val r2 = f[Boolean, Int](Choice2("abc", 123))
+
+      r2 shouldEqual 123
+    }
+  */
   // TODO: make this work
   /*
       it should "generate code for the weak law of excluded middle" in {
