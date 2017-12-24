@@ -3,15 +3,33 @@ package io.chymyst.ch.unit
 import io.chymyst.ch.implement
 import org.scalatest.{FlatSpec, Matchers}
 
+case class Wrap1[A, B](x: Int, a: A, b: B)
+
+sealed trait SimpleChoice[A]
+
+case class SimpleChoice1[A](x: A) extends SimpleChoice[A]
+
+case class SimpleChoice2[A](x: A, y: A) extends SimpleChoice[A]
+
+sealed trait GadtChoice[A]
+
+case class GadtChoice1[A, B](x: Int, a: A, b: B) extends GadtChoice[A]
+
+case class GadtChoice2[B](name: String, bb: B) extends GadtChoice[Boolean]
+
+sealed trait Wrap2
+
+case class Wrap2a(x: Int, y: String) extends Wrap2
+
+case class Wrap2b() extends Wrap2
+
+case object Wrap2c extends Wrap2
+
+case class Wrap2d[A]() extends Wrap2
+
+case class Wrap2e[A](a: A) extends Wrap2
+
 class LJTSpec3 extends FlatSpec with Matchers {
-
-  case class Wrap1[A, B](x: Int, a: A, b: B)
-
-  sealed trait Choice[A]
-
-  case class Choice1[A, B](x: Int, a: A, b: B) extends Choice[A]
-
-  case class Choice2[B](name: String, bb: B) extends Choice[Boolean]
 
   behavior of "terms with case classes"
 
@@ -22,30 +40,31 @@ class LJTSpec3 extends FlatSpec with Matchers {
   }
 
   it should "generate code for case class that is part of a sealed trait" in {
-    def f[A, B]: Choice1[A, B] ⇒ B = implement
+    def f[A, B]: GadtChoice1[A, B] ⇒ B = implement
 
-    f(Choice1(123, "abc", true)) shouldEqual true
+    f(GadtChoice1(123, "abc", true)) shouldEqual true
   }
 
   it should "generate code for GADT case class that is part of a sealed trait" in {
-    def f[B]: Choice2[B] ⇒ B = implement
+    def f[B]: GadtChoice2[B] ⇒ B = implement
 
-    f(Choice2("abc", true)) shouldEqual true
+    f(GadtChoice2("abc", true)) shouldEqual true
+  }
+/*
+  it should "generate code for sealed trait" in {
+    def f[A, B]: GadtChoice[A] ⇒ B = implement
+
+    val r1 = f[String, Boolean](GadtChoice1(123, "abc", true))
+
+    r1 shouldEqual true
+
+    val r2 = f[Boolean, Int](GadtChoice2("abc", 123))
+
+    r2 shouldEqual 123
   }
 
-  /*
-    it should "generate code for sealed trait" in {
-      def f[A, B]: Choice[A] ⇒ B = implement
-
-      val r1 = f[String, Boolean](Choice1(123, "abc", true))
-
-      r1 shouldEqual true
-
-      val r2 = f[Boolean, Int](Choice2("abc", 123))
-
-      r2 shouldEqual 123
-    }
-  */
+    def f: Wrap2 ⇒ Wrap2c.type = implement
+*/
   // TODO: make this work
   /*
       it should "generate code for the weak law of excluded middle" in {

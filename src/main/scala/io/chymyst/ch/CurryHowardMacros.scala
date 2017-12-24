@@ -98,20 +98,27 @@ object CurryHowardMacros {
       case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
       case basicRegex(name) ⇒ BasicT(name)
       case _ if args.isEmpty && t.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(t.toString)
-      case _ if args.isEmpty ⇒ OtherT(t.toString)
-      case fullName if t.typeSymbol.isClass && t.typeSymbol.asClass.isCaseClass ⇒ // Detect case classes.
-        // Detect all parts of the case class.
-        val parts: List[(String, TypeExpr[String])] = t.decls
-          .collect { case s: MethodSymbol if s.isCaseAccessor && s.isGetter ⇒ (s.name.decodedName.toString, matchType(c)(s.typeSignature.resultType)) }
-          .toList
-        NamedConjunctT(fullName, args.map(matchType(c)), parts.map(_._1), ConjunctT(parts.map(_._2)))
-      case fullName if t.typeSymbol.isClass && t.typeSymbol.asClass.isTrait && {
-        val subclasses = t.typeSymbol.asClass.knownDirectSubclasses
-        subclasses.nonEmpty && subclasses.forall(_.asClass.isCaseClass)
-      } ⇒ // Detect traits with case classes.
-        val parts = t.typeSymbol.asClass.knownDirectSubclasses.toList.map(s ⇒ matchType(c)(s.typeSignature))
-        DisjunctT(fullName, args.map(matchType(c)), parts)
-      case _ ⇒ ConstructorT(t.toString)
+      case fullName if t.typeSymbol.isClass ⇒
+        if (t.typeSymbol.asClass.isCaseClass) {
+          // Detect case classes.
+          // Detect all parts of the case class.
+          val parts: List[(String, TypeExpr[String])] = t.decls
+            .collect { case s: MethodSymbol if s.isCaseAccessor ⇒ (s.name.decodedName.toString, matchType(c)(s.typeSignature.resultType)) }
+            .toList
+          NamedConjunctT(fullName, args.map(matchType(c)), parts.map(_._1), ConjunctT(parts.map(_._2)))
+        } else {
+          val subclasses = t.typeSymbol.asClass.knownDirectSubclasses.toList.sortBy(_.name.decodedName.toString) // Otherwise the set is randomly ordered.
+          if ((t.typeSymbol.asClass.isTrait || t.typeSymbol.asClass.isAbstract) &&
+            subclasses.nonEmpty &&
+            subclasses.forall(s ⇒ s.asClass.isCaseClass || s.asClass.isModuleClass) // `case object` is a "module class".
+          ) {
+            // Detect traits with case classes.
+            val parts = subclasses.map(s ⇒ matchType(c)(s.asType.toType)) // Note: s.typeSignature does not work correctly here!
+            DisjunctT(fullName, args.map(matchType(c)), parts)
+          } else if (args.isEmpty) OtherT(fullName)
+          else ConstructorT(t.toString)
+        }
+      case _ ⇒ ConstructorT(t.toString) // Sometimes we get <none> as the type symbol's name... Not sure what to do in that case.
     }
   }
 

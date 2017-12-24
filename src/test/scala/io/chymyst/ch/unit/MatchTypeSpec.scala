@@ -94,7 +94,26 @@ class MatchTypeSpec extends FlatSpec with Matchers {
 
     result._1 shouldEqual "(" + CurryHowardMacros.basicTypes.map("<c>" + _).mkString(", ") + ")"
   }
-/*
+
+  it should "get printable representation of single case class" in {
+
+    def result[T, U]: (String, String) = testType[Wrap1[T, U]]
+
+    result._1 shouldEqual "Wrap1[T,U]"
+  }
+
+  it should "get printable representation of sealed trait with type parameters" in {
+    def result[T, U]: (String, String) = testType[SimpleChoice[T]]
+
+    result._1 shouldEqual "SimpleChoice[T]{SimpleChoice1[A] + SimpleChoice2[A]}"
+  }
+
+  it should "get printable representation of sealed trait without type parameters" in {
+    def result[T, U]: (String, String) = testType[Wrap2]
+
+    result._1 shouldEqual "Wrap2{Wrap2a + Wrap2b + Wrap2c + Wrap2d[A] + Wrap2e[A]}"
+  }
+
   it should "get printable representation of case class" in {
     sealed trait Test1[T]
     case class A[T](x: Int, y: T) extends Test1[T]
@@ -106,6 +125,6 @@ class MatchTypeSpec extends FlatSpec with Matchers {
 
     def result[T]: (String, String) = testType[Test1[T] ⇒ Test2]
 
-    result._1 shouldEqual "<tc>Test1[T] ⇒ <oc>Test2"
-  }*/
+    result._1 shouldEqual "Test1[T]{A[T] + B} ⇒ Test2{C + D}"
+  }
 }
