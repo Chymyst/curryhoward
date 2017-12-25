@@ -87,8 +87,26 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
   it should "produce correct type expressions for Either" in {
     val t = testReifyType[Either[Int, Int ⇒ Double]]
-    t shouldEqual DisjunctT("Either", List(BasicT("Int"), #->(BasicT("Int"), BasicT("Double"))), List(NamedConjunctT("Left", List(BasicT("Int")), List("value"), BasicT("Int")),
-      NamedConjunctT("Right", List(BasicT("Int") ->: BasicT("Double")), List("value"), BasicT("Int") ->: BasicT("Double"))))
+    // TODO: this should be specific types rather than TP("A") and TP("B")
+    t shouldEqual DisjunctT("Either", List(BasicT("Int"), #->(BasicT("Int"), BasicT("Double"))), List(NamedConjunctT("Left", List(TP("A"), TP("B")), List("value"), TP("A")),
+      NamedConjunctT("Right", List(TP("A"), TP("B")), List("value"), TP("B"))))
+  }
+
+  it should "produce correct type expressions for Either as result type" in {
+    def t[P, Q] = testReifyType[Option[P] ⇒ Either[P,Q]]
+    // TODO: this should be specific types rather than TP("A") and TP("B")
+    t[Int, String] shouldEqual DisjunctT("Option", List(TP("P")), List(NamedConjunctT("None", Nil, Nil, NothingT("Nothing")), NamedConjunctT("Some", List(TP("A")), List("value"), TP("A")))) ->: DisjunctT("Either", List(TP("P"), TP("Q")), List(NamedConjunctT("Left", List(TP("A"), TP("B")), List("value"), TP("A")),
+      NamedConjunctT("Right", List(TP("A"), TP("B")), List("value"), TP("B"))))
+  }
+
+  it should "produce correct type expression for unknown type constructors" in {
+    val t = testReifyType[IndexedSeq[Int]]
+    t shouldEqual ConstructorT("IndexedSeq[Int]")
+  }
+
+  it should "produce correct type expression for unknown type constructors under Option" in {
+    val t = testReifyType[Option[IndexedSeq[Int]]]
+    t shouldEqual DisjunctT("Option", List(ConstructorT("IndexedSeq[Int]")), List(NamedConjunctT("None", List(), List(), NothingT("Nothing")), NamedConjunctT("Some", List(TP("A")), List("value"), TP("A"))))
   }
 
   behavior of "syntax of `implement` and `typeOf`"

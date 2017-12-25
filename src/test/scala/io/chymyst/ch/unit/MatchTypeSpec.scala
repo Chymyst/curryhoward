@@ -45,22 +45,22 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   }
 
   it should "get printable representation of fixed types with type constructors" in {
-    def result[A, B, C]: (String, String) = testType[Option[Seq[Int]] ⇒ Option[List[Set[A]]] ⇒ B]
+    def result[P, Q, R]: (String, String) = testType[Option[Seq[Int]] ⇒ Option[IndexedSeq[Set[P]]] ⇒ Q]
 
-    result._1 shouldEqual "Option[<tc>Seq[Int]]{None[0] + Some[<tc>Seq[Int]]} ⇒ Option[<tc>List[Set[A]]]{None[0] + Some[<tc>List[Set[A]]]} ⇒ B"
+    result._1 shouldEqual "Option[<tc>Seq[Int]]{None.type + Some[A]} ⇒ Option[<tc>IndexedSeq[Set[P]]]{None.type + Some[A]} ⇒ Q"
   }
 
   it should "get printable representation of fixed types with type constructors with [_]" in {
-    def result[A, B, C]: (String, String) = testType[Option[_] ⇒ B]
+    def result[P, Q, R]: (String, String) = testType[Option[_] ⇒ Q]
 
     val res = result._1
-    res shouldEqual "Option[<oc>_]{None[0] + Some[<oc>_]} ⇒ B"
+    res shouldEqual "Option[<oc>_]{None.type + Some[A]} ⇒ Q"
   }
 
   it should "get printable representation of Option types" in {
-    def result[A, B, C]: (String, String) = testType[Option[A] ⇒ Either[A, B]]
+    def result[P, Q, R]: (String, String) = testType[Option[P] ⇒ Either[P, Q]]
 
-    result._1 shouldEqual "Option[A]{None[0] + Some[A]} ⇒ Either[A,B]{Left[A] + Right[B]}"
+    result._1 shouldEqual "Option[P]{None.type + Some[A]} ⇒ Either[P,Q]{Left[A,B] + Right[A,B]}"
   }
 
   it should "get printable representation of Any, Unit, and Nothing types" in {

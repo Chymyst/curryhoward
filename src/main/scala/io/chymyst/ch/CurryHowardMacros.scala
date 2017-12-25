@@ -57,7 +57,7 @@ val a: Int = f[Int, X, Y, Z](x, y, z)
 
 object CurryHowardMacros {
 
-  private val debug = true
+  private val debug = false
 
   private[ch] def testType[T]: (String, String) = macro testTypeImpl[T]
 
@@ -83,26 +83,13 @@ object CurryHowardMacros {
     t.typeSymbol.name.decodedName.toString match {
       case name if name matches "(scala\\.)?Tuple[0-9]+" ⇒ ConjunctT(args.map(matchType(c))) //s"(${args.map(matchType(c)).mkString(", ")})"
       case "scala.Function1" | "Function1" ⇒ matchType(c)(args.head) ->: matchType(c)(args(1)) // s"${matchType(c)(args(0))} → ${matchType(c)(args(1))}"
-      case "scala.Option" | "Option" ⇒
-        val argType = matchType(c)(args.head)
-        DisjunctT("Option", List(argType), Seq(
-          NamedConjunctT("None", List(NothingT("Nothing")), List(), UnitT("None")),
-          NamedConjunctT("Some", List(argType), List("value"), matchType(c)(args.head))
-        )) //s"(1 + ${matchType(c)(args.head)})"
-      case "scala.util.Either" | "Either" ⇒
-        val leftType = matchType(c)(args.head)
-        val rightType = matchType(c)(args(1))
-        DisjunctT("Either", List(leftType, rightType), Seq(
-          NamedConjunctT("Left", List(leftType), List("value"), matchType(c)(args.head)),
-          NamedConjunctT("Right", List(rightType), List("value"), matchType(c)(args(1)))
-        )) //s"(${matchType(c)(args(0))} + ${matchType(c)(args(1))})"
       case "scala.Any" | "Any" ⇒ OtherT("_")
       case "scala.Nothing" | "Nothing" ⇒ NothingT("Nothing")
       case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
       case basicRegex(name) ⇒ BasicT(name)
       case _ if args.isEmpty && t.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(t.toString)
       case fullName if t.typeSymbol.isType && t.typeSymbol.asType.isAliasType ⇒ ???
-      case fullName if t.typeSymbol.isClass ⇒
+      case fullName if t.typeSymbol.isClass ⇒ // asType.toType.typeSymbol.asClass.knownDirectSubclasses
         if (t.typeSymbol.asClass.isModuleClass) { // `case object` is a "module class", but also a "case class".
           NamedConjunctT(fullName, Nil, Nil, NothingT("Nothing"))
         } else if (t.typeSymbol.asClass.isCaseClass) {
@@ -117,10 +104,19 @@ object CurryHowardMacros {
           }
           NamedConjunctT(fullName, args.map(matchType(c)), accessors, wrapped)
         } else {
-          val subclasses = t.typeSymbol.asClass.knownDirectSubclasses.toList.sortBy(_.name.decodedName.toString) // Otherwise the set is randomly ordered.
-          if ((t.typeSymbol.asClass.isTrait || t.typeSymbol.asClass.isAbstract) &&
+          // Note: Either is a "type" rather than a class, even though isClass() returns true.
+          // Sealed traits / case classes are classes.
+          // Prepare a type symbol that works for both cases.
+          val typeSymbol = if (t.typeSymbol.isType) t.typeSymbol.asType.toType.typeSymbol else t.typeSymbol
+          val subclasses = typeSymbol
+            .asClass.knownDirectSubclasses
+            .toList.sortBy(_.name.decodedName.toString) // Otherwise the set is randomly ordered.
+          if ((typeSymbol.asClass.isTrait || typeSymbol.asClass.isAbstract) &&
             subclasses.nonEmpty &&
-            subclasses.forall(s ⇒ s.asClass.isCaseClass || s.asClass.isModuleClass) // `case object` is a "module class".
+            subclasses.forall{s ⇒
+              val resultClass = s.typeSignature.resultType.typeSymbol.asClass
+              resultClass.isCaseClass || resultClass.isModuleClass
+            } // `case object` is a "module class".
           ) {
             // Detect traits with case classes.
             val parts = subclasses.map(s ⇒ matchType(c)(s.asType.toType)) // Note: s.typeSignature does not work correctly here!
@@ -336,10 +332,10 @@ object CurryHowardMacros {
     // TODO Check that there aren't repeated types among the curried arguments, print warning.
     TheoremProver(typeStructure) match {
       case (Nil, _) ⇒
-        c.error(c.enclosingPosition, s"type $typeStructure cannot be implemented")
+        c.error(c.enclosingPosition, s"type ${typeStructure.prettyPrint} cannot be implemented")
         q"null" // Avoid other spurious errors, return a valid tree here.
       case (List(termFound), count) ⇒
-        if (count > 1) c.warning(c.enclosingPosition, s"type $typeStructure has $count implementations (laws need checking?)")
+        if (count > 1) c.warning(c.enclosingPosition, s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?)")
         //        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
         c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
         val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(c)(p)).toMap
@@ -353,7 +349,7 @@ object CurryHowardMacros {
         result
 
       case (list, _) ⇒
-        c.error(c.enclosingPosition, s"type $typeStructure can be implemented in ${list.length} different ways: ${list.map(_.prettyPrint).mkString("; ")}")
+        c.error(c.enclosingPosition, s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} different ways: ${list.map(_.prettyPrint).mkString("; ")}")
         q"null"
     }
 
