@@ -57,15 +57,73 @@ The `curryhoward` library can generate the code of functions of this sort:
 scala> case class User[N, I](name: N, id: I)
 defined class User
 
-scala> def makeUser[N, I]: N ⇒ (N ⇒ I) ⇒ User[N, I] = implement
-<console>:17: Returning term: (b ⇒ a ⇒ User(b, a b))
-       def makeUser[N, I]: N ⇒ (N ⇒ I) ⇒ User[N, I] = implement
-                                                      ^
-makeUser: [N, I]=> N => ((N => I) => User[N,I])
+scala> def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
+<console>:17: Returning term: User(userName, userIdGenerator userName)
+       def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
+                                                                             ^
+makeUser: [N, I](userName: N, userIdGenerator: N => I)User[N,I]
 
-scala> makeUser[Int, String](123)(n => "id:" + (n * 100).toString)
+scala> makeUser(123, (n: Int) => "id:" + (n * 100).toString)
 res0: User[Int,String] = User(123,id:12300)
 ```
 
-The library prints the lambda-calculus term notation for the generated code.
-In this example, the term is `b ⇒ a ⇒ User(b, a b)`.
+The library always prints the lambda-calculus term corresponding to the generated code.
+In this example, the term is `User(userName, userIdGenerator userName)`.
+
+The chosen notation for lambda-calculus terms supports tuples and named case classes.
+Below we will see more examples of the generated terms.
+
+# Curried functions
+
+The `curryhoward` library, of course, works with _curried_ functions as well:
+
+```scala
+scala> def const[A, B]: A ⇒ B ⇒ A = implement
+<console>:15: Returning term: (a ⇒ b ⇒ a)
+       def const[A, B]: A ⇒ B ⇒ A = implement
+                                    ^
+const: [A, B]=> A => (B => A)
+
+scala> val f: String => Int = const(10)
+f: String => Int = $$Lambda$14895/1080678045@4f16e215
+
+scala> f("abc")
+res1: Int = 10
+```
+
+The returned lambda-calculus term is `(a ⇒ b ⇒ a)`.
+
+Here is a more complicated example that automatically implements the `fmap` function for the Reader monad:
+
+```scala
+scala> def fmap[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
+<console>:15: Returning term: (a ⇒ b ⇒ c ⇒ a (b c))
+       def fmap[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
+                                                        ^
+fmap: [E, A, B]=> (A => B) => ((E => A) => (E => B))
+
+scala> val f: Int => Int = _ + 10
+f: Int => Int = $$Lambda$14968/1569286823@72ee663b
+
+scala> def eaeb[E]: (E ⇒ Int) ⇒ (E ⇒ Int) = fmap(f)
+eaeb: [E]=> (E => Int) => (E => Int)
+
+scala> val ea: Double => Int = x => (x + 0.5).toInt
+ea: Double => Int = $$Lambda$14969/322444383@471606f
+
+scala> eaeb(ea)(1.9)
+res2: Int = 12
+```
+
+In this example, the returned lambda-calculus term is `(a ⇒ b ⇒ c ⇒ a (b c))`.
+
+One can freely mix the curried and the conventional Scala function syntax.
+Here is the applicative `map2` function for the Reader monad:
+
+```scala
+scala> def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
+<console>:15: Returning term: (c ⇒ f (readerA c) (readerB c))
+       def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
+                                                                                   ^
+map2: [E, A, B, C](readerA: E => A, readerB: E => B, f: A => (B => C))E => C
+```

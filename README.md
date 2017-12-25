@@ -38,7 +38,7 @@ object MyApp extends App {
 
   def f[X, Y]: X => Y => X = implement
 
-  // The code `(x: X) => (y: Y) => x` is generated for the function `f`.
+  // The code `(x: X) ⇒ (y: Y) ⇒ x` is generated for the function `f`.
   
   f(123)("abc") // returns 123
 }
@@ -53,7 +53,20 @@ See also the [tutorial](docs/Tutorial.md).
 
 # Status
 
-The implicational fragment of the IPL is working.
+- The theorem prover for the full IPL is working
+- When a type cannot be inhabited, signal a compile-time error
+- Unit type, constant types, tuples, sealed traits / case classes / case objects are supported
+- Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T` can be used
+- When a type can be implemented in more than one way, heuristics ("least information loss") are used to prefer implementations that are more likely to satisfy algebraic laws 
+- Signal error when a type can be implemented in more than one way despite using heuristics
+- Tests and tutorial examples
+
+# Bugs and to-do
+
+- Recursive case classes (including `List`!) cause stack overflow
+- Type aliases `type MyType[T] = (Int, T)` generate incorrect code
+
+# Examples
 
 ```scala
 // "Weak" Peirce's law:
@@ -139,5 +152,4 @@ optionId(None) == None
 
 There are two possible implementations of the given type; the "trivial" implementation always returns `None`, and is rejected by the algorithm because it ignores the information given in the original data.
 
-Generally, the algorithm prefers functions that use more parts of the disjunction.
- 
+Generally, the algorithm prefers implementations that use more parts of the disjunction.

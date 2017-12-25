@@ -32,12 +32,13 @@ Done:
 + support named conjunctions (case classes) explicitly (3) and support disjunctions on that basis
 + support sealed traits / case classes (5)
 + implement Option and Either in inhabited terms (2)
+
++ add documentation using the `tut` plugin (3)
++ support natural syntax def f[T](x: T): T = implement (3)
  */
 
 // TODO:
 /*  Priority is given in parentheses.
-- add documentation using the `tut` plugin (3)
-- support natural syntax def f[T](x: T): T = implement (3)
 - use c.Type instead of String for correct code generation (3)?? Probably impossible since we can't reify types directly from reflection results, - need to use names.
 - probably can simplify data structures by eliminating [T]
 - use blackbox macros instead of whitebox if possible (5) ?? Seems to prevent the " = implement" and "= ofType[]" syntax from working.
@@ -344,7 +345,7 @@ class CurryHowardMacros(val c: whitebox.Context) {
         inhabitInternal(typeStructure) match {
           case Right(term) ⇒
             val termFound = givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify
-            c.info(c.enclosingPosition, s"Returning term: $termFound", force = true)
+            c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = true)
             val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
             val result = reifyTerm(termFound, paramTerms)
             if (debug) println(s"DEBUG: returning code: ${showCode(result)}")

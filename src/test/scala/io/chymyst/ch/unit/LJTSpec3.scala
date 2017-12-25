@@ -118,9 +118,9 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
   it should "generate the example in the tutorial" in {
     case class User[N, I](name: N, id: I)
-    def makeUser[N, I]: N ⇒ (N ⇒ I) ⇒ User[N, I] = implement
+    def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
 
-    makeUser[Int, String](123)(_.toString) shouldEqual User(123, "123")
+    makeUser(123, (x: Int) ⇒ x.toString) shouldEqual User(123, "123")
   }
 
   behavior of "named types"
