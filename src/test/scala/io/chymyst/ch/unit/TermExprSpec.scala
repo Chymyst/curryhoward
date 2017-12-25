@@ -22,6 +22,12 @@ class TermExprSpec extends FlatSpec with Matchers {
     termExpr1.renameAllVars(Seq("x2", "x3", "x4"), Seq("y2", "y3", "y4")) shouldEqual CurriedE(List(PropE("y2", TP(3)), PropE("y3", TP(2)), PropE("y4", TP(1))), PropE("y3", TP(2)))
   }
 
+  behavior of "TermExpr#propositions"
+
+  it should "get the list of propositions" in {
+    TermExpr.propositions(CurriedE(List(PropE("A", TP("A"))), AppE(PropE("B", TP("B") ->: TP("A")), PropE("B", TP("B"))))) shouldEqual Set(PropE("A", TP("A")), PropE("B", TP("B")), PropE("B", TP("B") ->: TP("A")))
+  }
+
   behavior of "TermExpr#prettyPrint"
 
   it should "rename variables without name clash" in {

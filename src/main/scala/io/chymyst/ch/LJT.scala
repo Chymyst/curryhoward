@@ -192,7 +192,7 @@ object LJT {
             case CurriedE(args, f) ⇒
               // We need to construct x ⇒ ... ⇒ a ⇒ y ⇒ ... ⇒ z ⇒ f instead.
               // Note that sequent.premises.length is the number of implications in x ⇒ ... before ⇒ a.
-              val newHeads = args.tail.take(sequent.premises.length) ++ Seq(args.head) ++ args.drop(sequent.premises.length + 1)
+              val newHeads = args.drop(1).take(sequent.premises.length) ++ Seq(args.head) ++ args.drop(sequent.premises.length + 1)
               CurriedE(newHeads, f)
             case _ ⇒ throw new Exception(s"Internal error: proof term $proofTerms must be a function")
           }
@@ -243,7 +243,7 @@ object LJT {
     sequent.goal match {
       case conjunctType: ConjunctT[T] ⇒ Seq(RuleResult("&R", conjunctType.terms.map(t ⇒ sequent.copy(goal = t)), { proofTerms ⇒
         // This rule takes any number of proof terms.
-        sequent.constructResultTerm(ConjunctE(proofTerms.map(sequent.substitute)))
+        sequent.constructResultTerm(ConjunctE(proofTerms.map(sequent.substituteInto)))
       })
       )
       case _ ⇒ Seq()
@@ -262,12 +262,14 @@ object LJT {
         Seq(RuleResult("_&R", Seq(sequent.copy(goal = unwrapped)), { proofTerms ⇒
           // This rule takes one proof term.
           val proofTerm = proofTerms.head
-          val result = sequent.substitute(proofTerm) match {
+          val result = sequent.substituteInto(proofTerm) match {
             // Wrapped conjunction having more than one part.
             case ConjunctE(terms) ⇒ NamedConjunctE(terms, nct)
             // Wrapped Unit or wrapped single term.
             case other if nct.caseObjectName.isDefined ⇒ NamedConjunctE(Nil, nct)
-            case other ⇒ NamedConjunctE(Seq(other), nct)
+            case other ⇒
+//              println(s"debug: wrapping $other into type $nct")
+              NamedConjunctE(Seq(other), nct)
           }
           sequent.constructResultTerm(result)
         })
