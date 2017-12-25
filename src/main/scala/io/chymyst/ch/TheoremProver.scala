@@ -54,7 +54,7 @@ object TheoremProver {
       val result = transformedProofs.map(_.simplify).distinct
       if (debug) {
         println(s"debug: transformed ${transformedProofs.length} proof terms:\n ${transformedProofs.map(_.prettyPrint).mkString(";\n ")},\nafter simplify:\n ${result.map(_.prettyPrint).mkString(";\n ")}")
-        println(s"debug: types of transformed proofs:\n ${transformedProofs.map(_.tExpr).mkString(";\n ")},\nafter simplify:\n ${result.map(_.tExpr).mkString(";\n ")}")
+        println(s"debug: types of transformed proofs:\n ${transformedProofs.map(_.tExpr.prettyPrint).mkString(";\n ")},\nafter simplify:\n ${result.map(_.tExpr.prettyPrint).mkString(";\n ")}")
       }
       result
     }

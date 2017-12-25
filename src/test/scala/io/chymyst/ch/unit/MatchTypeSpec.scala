@@ -111,7 +111,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of sealed trait without type parameters" in {
     def result[T, U]: (String, String) = testType[Wrap2]
 
-    result._1 shouldEqual "Wrap2{Wrap2a + Wrap2b + Wrap2c + Wrap2d[A] + Wrap2e[A]}"
+    result._1 shouldEqual "Wrap2{Wrap2a + Wrap2b + Wrap2c.type + Wrap2d[A] + Wrap2e[A]}"
   }
 
   it should "get printable representation of case class" in {

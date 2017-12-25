@@ -47,7 +47,7 @@ Additional rules for named conjunctions:
 
 + G* |- Named(A, B) when G* |- (A & B)  -- rule _&R
 + G*, Named(A, B) |- C when G*, (A & B) |- C  -- rule _&L
-
++ G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L
  */
 
 object LJT {
@@ -59,6 +59,7 @@ object LJT {
     ruleImplicationAtLeft3,
     ruleNamedConjunctionAtLeft,
     ruleNamedConjunctionAtRight,
+    ruleImplicationWithNamedConjunctionAtLeft,
     // The following rules are tried later because they duplicate the context G*.
     ruleDisjunctionAtLeft,
     ruleConjunctionAtRight
@@ -108,7 +109,8 @@ object LJT {
 
           val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
           val freshVarsAB = heads.map(PropE(sequent.freshVar(), _)).toList
-          val subTerms = proofTerms.zip(freshVarsAB).map { case (pt, fv) ⇒ TermExpr.applyToVars(pt, fv :: oldPremisesWithoutI) }
+          // Each part of the disjunction is matched with a function of the form fv ⇒ proofTerm(fv, other_premises).
+          val subTerms = proofTerms.zip(freshVarsAB).map { case (pt, fv) ⇒ CurriedE(List(fv), TermExpr.applyToVars(pt, fv :: oldPremisesWithoutI)) }
           val result = MatchE(thePremiseVarAB, subTerms.toList)
           sequent.constructResultTerm(result)
         }
@@ -255,9 +257,9 @@ object LJT {
         // This rule takes one proof term.
         val proofTerm = proofTerms.head
         val result = sequent.substitute(proofTerm) match {
-            // Wrapped conjunction having more than one part.
+          // Wrapped conjunction having more than one part.
           case ConjunctE(terms) ⇒ NamedConjunctE(terms, nct)
-            // Wrapped Unit or wrapped single term.
+          // Wrapped Unit or wrapped single term.
           case other ⇒ NamedConjunctE(Seq(other), nct)
         }
         sequent.constructResultTerm(result)
@@ -268,15 +270,32 @@ object LJT {
   )
 
   // G*, Named(A, B) |- C when G*, (A & B) |- C  -- rule _&L
- private def ruleNamedConjunctionAtLeft[T] = uniformRule[T]("_&L") {
-   case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ UniRuleLogic(Seq(wrapped), { (sequent, premiseVar) ⇒
-     val termAB = wrapped match {
-       case ConjunctT(terms) ⇒ ConjunctE(accessors.indices.map(ProjectE(_, premiseVar)))
-       case _ ⇒ ProjectE(0, premiseVar)
-     }
-     List(termAB)
-   })
- }
+  private def ruleNamedConjunctionAtLeft[T] = uniformRule[T]("_&L") {
+    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ UniRuleLogic(Seq(wrapped), { (sequent, premiseVar) ⇒
+      val termAB = wrapped match {
+        case ConjunctT(terms) ⇒ ConjunctE(accessors.indices.map(ProjectE(_, premiseVar)))
+        case _ ⇒ ProjectE(0, premiseVar)
+      }
+      List(termAB)
+    })
+  }
+
+  // G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L
+  private def ruleImplicationWithNamedConjunctionAtLeft[T] = uniformRule[T]("_->L") {
+    case (nct@NamedConjunctT(constructor, tParams, accessors, wrapped)) #-> argC ⇒ UniRuleLogic(Seq(wrapped ->: argC), { (sequent, premiseVar) ⇒
+      val fv = PropE(sequent.freshVar(), wrapped)
+      // Need to produce a term termAB_C : (A & B) ⇒ C, given premiseVar : Named(A, B) ⇒ C.
+      // Use fv: A & B
+      val termAB_C = CurriedE(List(fv), AppE(premiseVar,
+        wrapped match {
+          case ConjunctT(terms) ⇒ NamedConjunctE(accessors.indices.map(ProjectE(_, fv)), nct)
+          case _ ⇒ NamedConjunctE(Seq(fv), nct)
+        }
+      )
+      )
+      List(termAB_C)
+    })
+  }
 
   // G* |- A + B when G* |- A  -- rule +R1
   // Generate all such rules for any disjunct.

@@ -9,13 +9,14 @@ object TermExpr {
   def propositions[T](termExpr: TermExpr[T]): Set[PropE[T]] = termExpr match {
     case p: PropE[T] ⇒ Set(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
     case AppE(head, arg) ⇒ propositions(head) ++ propositions(arg)
-    case l: CurriedE[T] ⇒ // Can't pattern-match directly for some reason! Some trouble with the type parameter T.
-      l.heads.toSet ++ propositions(l.body)
+    case CurriedE(heads, body) ⇒ // Can't pattern-match directly for some reason! Some trouble with the type parameter T.
+      heads.asInstanceOf[List[PropE[T]]].toSet ++ propositions(body)
     case ConjunctE(terms) ⇒ terms.flatMap(propositions).toSet
     case ProjectE(index, term) ⇒ propositions(term)
     case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(propositions).toSet
     case MatchE(term, cases) ⇒ propositions(term) ++ cases.flatMap(propositions).toSet
-    case _ ⇒ Set()
+    case DisjunctE(_, _, term, _) ⇒ propositions(term)
+    case UnitE(_) ⇒ Set()
   }
 
   private val freshIdents = new FreshIdents("z")
@@ -71,10 +72,10 @@ sealed trait TermExpr[+T] {
   def prettyPrint: String = prettyRename.prettyPrintWithParentheses(0)
 
   override lazy val toString: String = this match {
-    case PropE(name, tExpr) ⇒ s"($name:$tExpr)"
+    case PropE(name, tExpr) ⇒ s"($name:${tExpr.prettyPrint})"
     case AppE(head, arg) ⇒ s"($head)($arg)"
     case CurriedE(heads, body) ⇒ s"\\(${heads.mkString(" ⇒ ")} ⇒ $body)"
-    case UnitE(tExpr) ⇒ "()"
+    case UnitE(_) ⇒ "()"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
     case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.toString).mkString(", ")})"
     case ProjectE(index, term) ⇒ term.toString + "._" + (index + 1).toString
@@ -120,7 +121,7 @@ sealed trait TermExpr[+T] {
   def accessor(index: Int): String = tExpr match {
     case NamedConjunctT(_, _, accessors, _) ⇒ accessors(index).toString
     case ConjunctT(terms) ⇒ s"_${index + 1}"
-    case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : $tExpr because its type is not a conjunction")
+    case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : ${tExpr.prettyPrint} because its type is not a conjunction")
   }
 
   def map[U](f: T ⇒ U): TermExpr[U]
@@ -224,7 +225,7 @@ final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T
   // Make this a `val` to catch bugs early.
   val tExpr: TypeExpr[T] = head.tExpr match {
     case hd #-> body if hd == arg.tExpr ⇒ body
-    case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application $this: `${head.tExpr}` must be a function with argument type `${arg.tExpr}`")
+    case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application $this: `${head.tExpr.prettyPrint}` must be a function with argument type `${arg.tExpr}`")
   }
 
   override def simplify: TermExpr[T] = {
@@ -296,9 +297,9 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
       case ConjunctT(terms) ⇒ terms(index)
       case _ if index == 0 ⇒ wrapped
       // Otherwise it is an error!
-      case _ ⇒ throw new Exception(s"Internal error: Invalid projection to index $index for a named conjunct $term : ${term.tExpr} with multiplicity 1")
+      case _ ⇒ throw new Exception(s"Internal error: Invalid projection to index $index for a named conjunct $term : ${term.tExpr.prettyPrint} with multiplicity 1")
     }
-    case _ ⇒ throw new Exception(s"Internal error: Invalid projection term $term whose type ${term.tExpr} is not a conjunction")
+    case _ ⇒ throw new Exception(s"Internal error: Invalid projection term $term whose type ${term.tExpr.prettyPrint} is not a conjunction")
   }
 
   override def simplify: TermExpr[T] = term.simplify match {
@@ -313,12 +314,17 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
 
   override def tExpr: TypeExpr[T] = cases match {
     case te :: tail ⇒
-      val tpe = te.tExpr
-      if (tail.exists(_.tExpr != tpe))
-        throw new Exception(s"Internal error: unequal expression types in cases for $this")
-      else
-        tpe
-    case _ ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
+      te match {
+        case CurriedE(List(_), body) ⇒
+          val tpe = body.tExpr
+          if (tail.exists(_.asInstanceOf[CurriedE[T]].body.tExpr != tpe))
+            throw new Exception(s"Internal error: unequal expression types in cases for $this")
+          else
+            tpe
+
+        case _ ⇒ throw new Exception(s"Internal error: `case` expression for $this must contain functions of one argument")
+      }
+    case Nil ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
   }
 
   // TODO: simplify when term is a DisjunctE
