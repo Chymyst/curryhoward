@@ -39,8 +39,6 @@ lazy val curryhoward: Project = (project in file("."))
       "-language:existentials",
       "-language:higherKinds",
       "-language:implicitConversions",
-      "-opt:l:inline",
-      "-Yvirtpatmat",
       "-Ydelambdafy:inline",
       // "-Xfatal-warnings",
       "-Xlint",
@@ -54,7 +52,12 @@ lazy val curryhoward: Project = (project in file("."))
       "-target:jvm-1.8"
     ),
     scalacOptions ++= (
-      if (scalaBinaryVersion.value == "2.12") Seq("-target:jvm-1.8", "-Ypartial-unification")
+      if (scalaBinaryVersion.value == "2.12") Seq(
+        "-target:jvm-1.8",
+        "-opt:l:inline",
+        "-Ypartial-unification",
+        "-Yvirtpatmat"
+      )
       else Nil
       ), // (SI-2712 pertains to partial-unification),
 
