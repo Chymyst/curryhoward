@@ -29,7 +29,7 @@ class TheoremProverSpec extends FlatSpec with Matchers {
   it should "implement trivial unwrapping" in {
     val aT = TP(1)
     val a = PropE("a", aT)
-    val wrappedT = NamedConjunctT("MyWrapper", List(), List("name"), aT)
+    val wrappedT = NamedConjunctT("MyWrapper", List(), List("name"), List(aT))
 
     val sequent1 = Sequent(List(wrappedT), aT, freshVar)
     val terms1 = TheoremProver.findProofTerms(sequent1)
@@ -40,22 +40,23 @@ class TheoremProverSpec extends FlatSpec with Matchers {
   it should "implement trivial wrapping" in {
     val aT = TP(1)
     val a = PropE("a", aT)
-    val wrappedT = NamedConjunctT("MyWrapper", List(), List("name"), aT)
+    val wrappedT = NamedConjunctT("MyWrapper", List(), List("name"), List(aT))
 
     val sequent2 = Sequent(List(aT), wrappedT, freshVar)
     val terms2 = TheoremProver.findProofTerms(sequent2)
     terms2.length shouldEqual 1
-    terms2.head.prettyPrint shouldEqual "(a ⇒ MyWrapper(a))"
+    terms2.head.prettyPrint shouldEqual "(a ⇒ MyWrapper((a)))"
+    terms2.head.toString shouldEqual "\\((x7:1) ⇒ MyWrapper(((x7:1))))"
   }
 
   it should "implement wrapping and unwrapping for higher multiplicity and nested usage" in {
     val aT = TP(1)
     val bT = TP(2)
     val cT = TP(3)
-    val wrapped12T = NamedConjunctT("MyWrapper12", List(), List("a1", "b1"), ConjunctT(List(aT, bT)))
-    val wrapped23T = NamedConjunctT("MyWrapper23", List(), List("b2", "c3"), ConjunctT(List(bT, cT)))
-    val wrapped123abT = NamedConjunctT("MyWrapper123ab", List(), List("ab3", "c3"), ConjunctT(List(wrapped12T, cT)))
-    val wrapped123bcT = NamedConjunctT("MyWrapper123bc", List(), List("a4", "bc4"), ConjunctT(List(aT, wrapped23T)))
+    val wrapped12T = NamedConjunctT("MyWrapper12", List(), List("a1", "b1"), List(aT, bT))
+    val wrapped23T = NamedConjunctT("MyWrapper23", List(), List("b2", "c3"), List(bT, cT))
+    val wrapped123abT = NamedConjunctT("MyWrapper123ab", List(), List("ab3", "c3"), List(wrapped12T, cT))
+    val wrapped123bcT = NamedConjunctT("MyWrapper123bc", List(), List("a4", "bc4"), List(aT, wrapped23T))
 
     val sequent = Sequent(List(wrapped123abT), wrapped123bcT, freshVar)
     val terms = TheoremProver.findProofTerms(sequent)

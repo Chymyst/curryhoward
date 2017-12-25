@@ -13,7 +13,7 @@ sealed trait TypeExpr[+T] {
     case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"
     case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
-      val typeSuffix = if (tParams.isEmpty && accessors.isEmpty && wrapped.isInstanceOf[NothingT[T]]) ".type" else ""
+      val typeSuffix = if (caseObjectName.isDefined) ".type" else ""
       s"$constructor${TypeExpr.tParamString(tParams)}$typeSuffix"
     case OtherT(name) ⇒ s"<oc>$name" // other constant type
     case NothingT(_) ⇒ "0"
@@ -22,9 +22,11 @@ sealed trait TypeExpr[+T] {
 
   def conjunctSize: Int = this match {
     case ConjunctT(terms) ⇒ terms.length
-    case NamedConjunctT(_, _, _, wrapped) ⇒ wrapped.conjunctSize
+    case NamedConjunctT(_, _, _, wrapped) ⇒ wrapped.size
     case _ ⇒ 1
   }
+
+  def caseObjectName: Option[T] = None
 
   def isAtomic: Boolean
 
@@ -91,11 +93,13 @@ final case class BasicT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T] {
 
 /** This type expression represents a case class, treated as a named conjunction.
   * The `wrapped` is a type expression for the entire contents of the named conjunction. This can be a Unit, a single type, or a ConjunctT.
-  * If `accessors` is empty and `wrapped` is NothingT, this is a case object. If `accessors` is empty and `wrapped` is UnitT, this is a case class with zero arguments.
+  * If `accessors` is empty and `wrapped` is Seq(), this is a case object. If `accessors` is empty and `wrapped` is Seq(UnitT), this is a case class with zero arguments.
   * If `accessors` in not empty, `wrapped` could be a ConjunctT with more than one part, or another type (e.g. Int or another NamedConjunctT or whatever else).
   */
-final case class NamedConjunctT[+T](constructor: T, tParams: List[TypeExpr[T]], accessors: List[T], wrapped: TypeExpr[T]) extends TypeExpr[T] with NonAtomicTypeExpr {
-  override def map[U](f: T ⇒ U): NamedConjunctT[U] = NamedConjunctT(f(constructor), tParams map (_ map f), accessors map f, wrapped map f)
+final case class NamedConjunctT[+T](constructor: T, tParams: List[TypeExpr[T]], accessors: List[T], wrapped: List[TypeExpr[T]]) extends TypeExpr[T] with NonAtomicTypeExpr {
+  override def map[U](f: T ⇒ U): NamedConjunctT[U] = NamedConjunctT(f(constructor), tParams map (_ map f), accessors map f, wrapped map (_ map f))
+
+  override def caseObjectName: Option[T] = if (tParams.isEmpty && accessors.isEmpty && wrapped.isEmpty) Some(constructor) else None
 }
 
 // Since we do not know how to work with arbitrary type constructors, we treat them as atomic types.

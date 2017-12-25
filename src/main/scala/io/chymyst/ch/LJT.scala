@@ -253,48 +253,69 @@ object LJT {
   // G* |- Named(A, B) when G* |- (A & B)  -- rule _&R
   private def ruleNamedConjunctionAtRight[T] = ForwardRule[T](name = "_&R", sequent ⇒
     sequent.goal match {
-      case nct@NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ Seq(RuleResult("_&R", Seq(sequent.copy(goal = wrapped)), { proofTerms ⇒
-        // This rule takes one proof term.
-        val proofTerm = proofTerms.head
-        val result = sequent.substitute(proofTerm) match {
-          // Wrapped conjunction having more than one part.
-          case ConjunctE(terms) ⇒ NamedConjunctE(terms, nct)
-          // Wrapped Unit or wrapped single term.
-          case other ⇒ NamedConjunctE(Seq(other), nct)
+      case nct@NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+        val unwrapped = wrapped match {
+          case Nil ⇒ // empty wrapper means a named Unit as a case object
+            UnitT(constructor)
+          case _ ⇒ ConjunctT(wrapped)
         }
-        sequent.constructResultTerm(result)
-      })
-      )
+        Seq(RuleResult("_&R", Seq(sequent.copy(goal = unwrapped)), { proofTerms ⇒
+          // This rule takes one proof term.
+          val proofTerm = proofTerms.head
+          val result = sequent.substitute(proofTerm) match {
+            // Wrapped conjunction having more than one part.
+            case ConjunctE(terms) ⇒ NamedConjunctE(terms, nct)
+            // Wrapped Unit or wrapped single term.
+            case other if nct.caseObjectName.isDefined ⇒ NamedConjunctE(Nil, nct)
+            case other ⇒ NamedConjunctE(Seq(other), nct)
+          }
+          sequent.constructResultTerm(result)
+        })
+        )
       case _ ⇒ Seq()
     }
   )
 
-  // G*, Named(A, B) |- C when G*, (A & B) |- C  -- rule _&L
+  // G*, Named(A, B) |- C when G*, A, B |- C  -- rule _&L
   private def ruleNamedConjunctionAtLeft[T] = uniformRule[T]("_&L") {
-    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ UniRuleLogic(Seq(wrapped), { (sequent, premiseVar) ⇒
-      val termAB = wrapped match {
-        case ConjunctT(terms) ⇒ ConjunctE(accessors.indices.map(ProjectE(_, premiseVar)))
-        case _ ⇒ ProjectE(0, premiseVar)
+    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+      val unwrapped = wrapped match {
+        case Nil ⇒ // empty wrapper means a named Unit as a case object
+          List(UnitT(constructor))
+        case _ ⇒ wrapped
       }
-      List(termAB)
-    })
+      UniRuleLogic(unwrapped, { (sequent, premiseVar) ⇒
+        // Need to produce the terms termsAB : A, B, ..., given premiseVar : Named(A, B).
+        val termsAB: List[TermExpr[T]] = wrapped match {
+          case Nil ⇒ // empty wrapper means a named Unit as a case object
+            List(UnitE(UnitT(constructor)))
+          case terms ⇒ // wrapper is not empty, so some terms are present
+            accessors.indices.map(ProjectE(_, premiseVar)).toList
+        }
+        termsAB
+      })
   }
 
   // G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L
   private def ruleImplicationWithNamedConjunctionAtLeft[T] = uniformRule[T]("_->L") {
-    case (nct@NamedConjunctT(constructor, tParams, accessors, wrapped)) #-> argC ⇒ UniRuleLogic(Seq(wrapped ->: argC), { (sequent, premiseVar) ⇒
-      val fv = PropE(sequent.freshVar(), wrapped)
-      // Need to produce a term termAB_C : (A & B) ⇒ C, given premiseVar : Named(A, B) ⇒ C.
-      // Use fv: A & B
-      val termAB_C = CurriedE(List(fv), AppE(premiseVar,
-        wrapped match {
-          case ConjunctT(terms) ⇒ NamedConjunctE(accessors.indices.map(ProjectE(_, fv)), nct)
-          case _ ⇒ NamedConjunctE(Seq(fv), nct)
+    case (nct@NamedConjunctT(constructor, tParams, accessors, wrapped)) #-> argC ⇒
+      val unwrapped = ConjunctT(wrapped match {
+        case Nil ⇒ // empty wrapper means a named Unit as a case object
+          List(UnitT(constructor))
+        case _ ⇒ wrapped
+      })
+      UniRuleLogic(Seq(unwrapped ->: argC), { (sequent, premiseVar) ⇒
+        val fv = PropE(sequent.freshVar(), unwrapped)
+        // Need to produce a term termAB_C : (A & B) ⇒ C, given premiseVar : Named(A, B) ⇒ C.
+        // Use the free variable fv : A & B. We first construct namedAB : Named(A, B) using fv, and then apply premiseVar to it.
+        // The resulting term is fv ⇒ premiseVar namedAB
+        val namedAB: TermExpr[T] = wrapped match {
+          case Nil ⇒ NamedConjunctE(Seq(fv), nct)
+          case _ ⇒ NamedConjunctE(accessors.indices.map(ProjectE(_, fv)), nct)
         }
-      )
-      )
-      List(termAB_C)
-    })
+        val termAB_C = CurriedE(List(fv), AppE(premiseVar, namedAB))
+        List(termAB_C)
+      })
   }
 
   // G* |- A + B when G* |- A  -- rule +R1

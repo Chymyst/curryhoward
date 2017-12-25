@@ -49,9 +49,9 @@ class CurryHowardSpec extends FlatSpec with Matchers {
         constructor shouldEqual "AA"
         tParams shouldEqual List(BasicT("Double"))
         accessors shouldEqual List("x", "t")
-        wrapped shouldEqual ConjunctT(List(BasicT("Int"), BasicT("Double")))
+        wrapped shouldEqual List(BasicT("Int"), BasicT("Double"))
     }
-    t shouldEqual BasicT("Int") ->: BasicT("Double") ->: NamedConjunctT("AA", List(BasicT("Double")), List("x", "t"), ConjunctT(List(BasicT("Int"), BasicT("Double"))))
+    t shouldEqual BasicT("Int") ->: BasicT("Double") ->: NamedConjunctT("AA", List(BasicT("Double")), List("x", "t"), List(BasicT("Int"), BasicT("Double")))
   }
 
   it should "produce correct type expressions for sealed traits with generic types" in {
@@ -60,11 +60,11 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     case class AA2[U](y: U, b: Boolean) extends AA[U]
     def t[T] = testReifyType[T ⇒ Double ⇒ AA[T]]
     t[String] shouldEqual TP("T") ->: BasicT("Double") ->: DisjunctT("AA", List(TP("T")), Seq(
-      NamedConjunctT("AA1", List(TP("T")), List("x", "d"), ConjunctT(List(TP("T"), BasicT("Double")))),
-      NamedConjunctT("AA2", List(TP("T")), List("y", "b"), ConjunctT(List(TP("T"), BasicT("Boolean"))))
+      NamedConjunctT("AA1", List(TP("T")), List("x", "d"), List(TP("T"), BasicT("Double"))),
+      NamedConjunctT("AA2", List(TP("T")), List("y", "b"), List(TP("T"), BasicT("Boolean")))
     ))
   }
-/*
+/* // TODO: make this work by introspecting the remapping of type variables between the trait and its child classes
   it should "produce correct type expressions for sealed traits with generic types and nonstandard type variable names" in {
     sealed trait AA[U]
     case class AA1[V](x: V, d: Double) extends AA[V]
@@ -84,8 +84,8 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     val tl = List(BasicT("Int"))
     val t = testReifyType[Int ⇒ Double ⇒ AA[Int]]
     t shouldEqual BasicT("Int") ->: BasicT("Double") ->: DisjunctT("AA", tl, Seq(
-      NamedConjunctT("AA1", tl, List("x", "d"), ConjunctT(List(tl.head, BasicT("Double")))),
-      NamedConjunctT("AA2", tl, List("y", "b"), ConjunctT(List(tl.head, BasicT("Boolean"))))
+      NamedConjunctT("AA1", tl, List("x", "d"), List(tl.head, BasicT("Double"))),
+      NamedConjunctT("AA2", tl, List("y", "b"), List(tl.head, BasicT("Boolean")))
     ))
   }
 
@@ -98,36 +98,36 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     val t = testReifyType[Int ⇒ Double ⇒ BB[Int]]
     t match {
       case BasicT("Int") #-> (BasicT("Double") #-> DisjunctT("BB", List(BasicT("Int")), Seq(c1, c2))) ⇒
-        c1 shouldEqual NamedConjunctT("BB1", List(), List(), UnitT(""))
-        c2 shouldEqual NamedConjunctT("BB2", List(), List(), NothingT("Nothing"))
+        c1 shouldEqual NamedConjunctT("BB1", Nil, Nil, List(UnitT("BB1")))
+        c2 shouldEqual NamedConjunctT("BB2", Nil, Nil, Nil)
     }
   }
 
   it should "produce correct type expressions for Left" in {
     val b = testReifyType[Left[Int, Double]]
-    b shouldEqual NamedConjunctT("Left", List(BasicT("Int"), BasicT("Double")), List("value"), BasicT("Int"))
+    b shouldEqual NamedConjunctT("Left", List(BasicT("Int"), BasicT("Double")), List("value"), List(BasicT("Int")))
   }
 
   it should "produce correct type expressions for Either with concrete types" in {
     val t = testReifyType[Either[Int, Double]]
     val typeList = List(BasicT("Int"), BasicT("Double"))
-    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", typeList, List("value"), typeList(0)),
-      NamedConjunctT("Right", typeList, List("value"), typeList(1))))
+    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", typeList, List("value"), List(typeList(0))),
+      NamedConjunctT("Right", typeList, List("value"), List(typeList(1)))))
   }
 
   it should "produce correct type expressions for Either with function type" in {
     val t = testReifyType[Either[Int, Int ⇒ Double]]
     val typeList = List(BasicT("Int"), #->(BasicT("Int"), BasicT("Double")))
-    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", typeList, List("value"), typeList(0)),
-      NamedConjunctT("Right", typeList, List("value"), typeList(1))))
+    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", typeList, List("value"), List(typeList(0))),
+      NamedConjunctT("Right", typeList, List("value"), List(typeList(1)))))
   }
 
   it should "produce correct type expressions for Either as result type" in {
     def t[P, Q] = testReifyType[Option[P] ⇒ Either[P, Q]]
     val tl2 = List(TP("P"), TP("Q"))
     val tl1 = List(TP("P"))
-    t[Int, String] shouldEqual DisjunctT("Option", tl1, List(NamedConjunctT("None", Nil, Nil, NothingT("Nothing")), NamedConjunctT("Some", tl1, List("value"), TP("P")))) ->: DisjunctT("Either", tl2, List(NamedConjunctT("Left", tl2, List("value"), TP("P")),
-      NamedConjunctT("Right", tl2, List("value"), TP("Q"))))
+    t[Int, String] shouldEqual DisjunctT("Option", tl1, List(NamedConjunctT("None", Nil, Nil, Nil), NamedConjunctT("Some", tl1, List("value"), tl1))) ->: DisjunctT("Either", tl2, List(NamedConjunctT("Left", tl2, List("value"), tl1),
+      NamedConjunctT("Right", tl2, List("value"), List(TP("Q")))))
   }
 
   it should "produce correct type expression for unknown type constructors" in {
@@ -139,7 +139,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     val t = testReifyType[Option[IndexedSeq[Int]]]
     val t1 = ConstructorT("IndexedSeq[Int]")
     val t1l = List(t1)
-    t shouldEqual DisjunctT("Option", t1l, List(NamedConjunctT("None", List(), List(), NothingT("Nothing")), NamedConjunctT("Some", t1l, List("value"), t1)))
+    t shouldEqual DisjunctT("Option", t1l, List(NamedConjunctT("None", List(), List(), Nil), NamedConjunctT("Some", t1l, List("value"), t1l)))
   }
 
   behavior of "syntax of `implement` and `typeOf`"

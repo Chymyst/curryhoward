@@ -32,7 +32,6 @@ Done:
 + support named conjunctions (case classes) explicitly (3) and support disjunctions on that basis
 + support sealed traits / case classes (5)
 + implement Option and Either in inhabited terms (2)
-
  */
 
 // TODO:
@@ -41,9 +40,11 @@ Done:
 - support natural syntax def f[T](x: T): T = implement (3)
 - use c.Type instead of String for correct code generation (3)?? Probably impossible since we can't reify types directly from reflection results, - need to use names.
 - probably can simplify data structures by eliminating [T]
-- use blackbox macros instead of whitebox if possible (5)
+- use blackbox macros instead of whitebox if possible (5) ?? Seems to prevent the " = implement" and "= ofType[]" syntax from working.
 - implement uncurried functions and multiple argument lists (6)
 - use a special subclass of Function1 that also carries symbolic information about the lambda-term (6)
+- support recursive types such as List (right now this crashes with stack overflow)
+- support type aliases (right now they are broken)
 
 - implement a new API of the form `val a: Int = from(x, y, z)` or `val a = to[Int](x, y, z)`, equivalent to
 
@@ -89,7 +90,7 @@ class CurryHowardMacros(val c: whitebox.Context) {
         val typeMap: Map[c.Name, c.Type] = t.typeSymbol.asClass.typeParams.map(_.name.decodedName).zip(args).toMap
 
         if (t.typeSymbol.asClass.isModuleClass) { // `case object` is a "module class", but also a "case class".
-          NamedConjunctT(fullName, Nil, Nil, NothingT("Nothing"))
+          NamedConjunctT(fullName, Nil, Nil, Nil)
         } else if (t.typeSymbol.asClass.isCaseClass) {
           // Case class.
 
@@ -105,9 +106,8 @@ class CurryHowardMacros(val c: whitebox.Context) {
             }
             .toList.unzip
           val wrapped = typeExprs match {
-            case Nil ⇒ UnitT("")
-            case wrappedT :: Nil ⇒ wrappedT
-            case _ ⇒ ConjunctT(typeExprs)
+            case Nil ⇒ List(UnitT(fullName)) // Case class with no arguments is represented by a named Unit.
+            case _ ⇒ typeExprs // Case class with some arguments.
           }
           NamedConjunctT(fullName, matchedTypeArgs, accessors, wrapped)
         } else {
@@ -163,9 +163,8 @@ class CurryHowardMacros(val c: whitebox.Context) {
           val tParamsTrees = tParams.map(reifyType)
           tq"$constructorT[..$tParamsTrees]"
         }
-        if (tParams.isEmpty && accessors.isEmpty && wrapped.isInstanceOf[NothingT[String]]) {
-          // case object
-          tq"$constructorT.type"
+        if (typeExpr.caseObjectName.isDefined) {
+          tq"$constructorT.type" // case object
         } else constructorWithTypeParams
       case NothingT(nameT) ⇒ makeTypeName(nameT)
       case UnitT(nameT) ⇒ makeTypeName(nameT)
@@ -191,38 +190,44 @@ class CurryHowardMacros(val c: whitebox.Context) {
       param
   }
 
-  private def reifyTerms(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree]): c.Tree = {
+  private def reifyTerm(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree]): c.Tree = {
     termExpr match {
       case p@PropE(name, typeName) =>
         val tn = TermName(name.toString)
         q"$tn"
-      case AppE(head, arg) => q"${reifyTerms(head, paramTerms)}(${reifyTerms(arg, paramTerms)})"
+      case AppE(head, arg) => q"${reifyTerm(head, paramTerms)}(${reifyTerm(arg, paramTerms)})"
 
       // If `heads` = List(x, y, z) and `body` = b then the code must be x => y => z => b
-      case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyTerms(body, paramTerms)) { case (prevTree, paramE) ⇒
+      case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyTerm(body, paramTerms)) { case (prevTree, paramE) ⇒
         val param = paramTerms(paramE) // Look up the parameter in the precomputed table.
         q"($param ⇒ $prevTree)"
       }
       case UnitE(_) => q"()"
-      case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTerms(t, paramTerms))})"
+      case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTerm(t, paramTerms))})"
       case NamedConjunctE(terms, tExpr) ⇒
-        val constructorE = q"${TermName(tExpr.constructor)}"
-        q"$constructorE[..${tExpr.tParams.map(reifyType)}](..${terms.map(t ⇒ reifyTerms(t, paramTerms))})"
+        val constructorE = q"${TermName(tExpr.constructor)}[..${tExpr.tParams.map(reifyType)}]"
+        if (terms.isEmpty)
+          constructorE // avoid spurious parameter lists for case objects
+        else
+          q"$constructorE(..${terms.map(t ⇒ reifyTerm(t, paramTerms))})"
       case ProjectE(index, term) ⇒
         val accessor = TermName(term.accessor(index))
-        q"${reifyTerms(term, paramTerms)}.$accessor"
-      case DisjunctE(index, total, term, tExpr) ⇒ q"${reifyTerms(term, paramTerms)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
+        q"${reifyTerm(term, paramTerms)}.$accessor"
+      case DisjunctE(index, total, term, tExpr) ⇒ q"${reifyTerm(term, paramTerms)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
       case MatchE(term, cases) ⇒
         // Each term within `cases` is always a CurriedE because it is of the form fv ⇒ proofTerm(fv, other_premises).
         val casesTrees: Seq[c.Tree] = cases.map {
           case CurriedE(PropE(fvName, fvType) :: _, body) ⇒
             // cq"$pat => $expr" where pat = pq"Constructor(..$varNames)"
-            val pat = pq"${TermName(fvName)} : ${reifyType(fvType)}"
-            cq"$pat => ${reifyTerms(body, paramTerms)}"
+            val pat = fvType.caseObjectName match {
+              case Some(constructor) ⇒ pq"${TermName(constructor)}"
+              case None ⇒ pq"${TermName(fvName)} : ${reifyType(fvType)}"
+            }
+            cq"$pat => ${reifyTerm(body, paramTerms)}"
           case cc ⇒ throw new Exception(s"Internal error: `case` term ${cc.prettyPrint} must be a function")
         }
 
-        q"${reifyTerms(term, paramTerms)} match { case ..$casesTrees }"
+        q"${reifyTerm(term, paramTerms)} match { case ..$casesTrees }"
     }
   }
 
@@ -317,7 +322,7 @@ class CurryHowardMacros(val c: whitebox.Context) {
     c.Expr[(String, String)](q"($s1,$s2)")
   }
 
-  // TODO: can we replace this with blackbox? Probably, as long as `def f3[X, Y]: X ⇒ Y ⇒ X = ofType` does not work with whitebox anyway.
+  // TODO: can we replace this with blackbox? So far this only works with whitebox.
   def ofTypeImpl[U: c.WeakTypeTag]: c.Tree = {
     val typeU: c.Type = c.weakTypeOf[U]
     inhabitInternal(typeU)
@@ -328,20 +333,26 @@ class CurryHowardMacros(val c: whitebox.Context) {
     inhabitInternal(typeU)
   }
 
+  def allOfTypeImpl[U]: c.Tree = {
+    val typeU: c.Type = c.weakTypeOf[U]
+    inhabitAllInternal(typeU)
+  }
+
   private def inhabitInternal(typeT: c.Type): c.Tree = {
     type TExprType = String // (String, c.Type)
     val typeStructure: TypeExpr[TExprType] = matchType(typeT)
     // TODO Check that there aren't repeated types among the curried arguments, print warning.
-    TheoremProver(typeStructure) match {
+    TheoremProver.findProofs(typeStructure) match {
       case (Nil, _) ⇒
         c.error(c.enclosingPosition, s"type ${typeStructure.prettyPrint} cannot be implemented")
         q"null" // Avoid other spurious errors, return a valid tree here.
-      case (List(termFound), count) ⇒
-        if (count > 1) c.warning(c.enclosingPosition, s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?)")
+      case (List(termFound), allTerms) ⇒
+        val count = allTerms.length
+        if (count > 1) c.warning(c.enclosingPosition, s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(_.prettyPrint).mkString(";\n ")}.")
         //        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
-        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
+        c.info(c.enclosingPosition, s"Returning term: ${termFound}", force = true)
         val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
-        val result = reifyTerms(termFound, paramTerms)
+        val result = reifyTerm(termFound, paramTerms)
 
         //        val resultType = tq"${typeT.finalResultType}"
         //        val resultWithType = q"$result: $resultType" // this does not work
@@ -351,10 +362,23 @@ class CurryHowardMacros(val c: whitebox.Context) {
         result
 
       case (list, _) ⇒
-        c.error(c.enclosingPosition, s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} different ways: ${list.map(_.prettyPrint).mkString("; ")}")
+        c.error(c.enclosingPosition, s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} equivalent ways:\n ${list.map(_.prettyPrint).mkString(";\n ")}.")
         q"null"
     }
+  }
 
+  private def inhabitAllInternal(typeT: c.Type): c.Tree = {
+    type TExprType = String // (String, c.Type)
+    val typeStructure: TypeExpr[TExprType] = matchType(typeT)
+    val terms = TheoremProver.findProofs(typeStructure)._1.map { termFound ⇒
+      c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
+      val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
+      val result = reifyTerm(termFound, paramTerms)
+      if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
+      // use resultWithType? Doesn't seem to work.
+      result
+    }
+    q"Seq(..$terms)"
   }
 }
 

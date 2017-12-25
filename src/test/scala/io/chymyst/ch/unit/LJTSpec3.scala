@@ -1,6 +1,5 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.CurryHowardMacros.testReifyType
 import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -52,7 +51,8 @@ class LJTSpec3 extends FlatSpec with Matchers {
     f(GadtChoice2("abc", true)) shouldEqual true
   }
 
-  //  def f: Wrap2 ⇒ Wrap2c.type = implement
+  // TODO: make this work
+  //    def f: Wrap2 ⇒ Wrap2c.type = implement
 
   it should "generate code for sealed trait" in {
     def f[A, B]: GadtChoice[A] ⇒ B = implement
@@ -65,21 +65,67 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     r2 shouldEqual 123
   }
-
   it should "generate code for the weak law of _tertium non datur_" in {
-        def f[A, B]: (Either[A, A ⇒ B] ⇒ B) ⇒ B = implement
+    def f[A, B, C]: (Either[A, A ⇒ B] ⇒ B) ⇒ Either[B, C] = implement
   }
 
-    it should "generate code using various disjunction rules" in {
-//      def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
-    }
+  it should "generate identity for Option[X]" in {
+    def f[X] = ofType[Option[X] ⇒ Option[X]]
+
+    def f2[X] = ofType[Option[X]]
+
+    f2[Int] shouldEqual None
+    //
+    //    def f[X]: Option[X] ⇒ Option[X] = (c: Option[X]) => c match {
+    //      case (b: None.type) => None
+    //      case (a: Some[X]) => Some[X](a.value)
+    //    }
+
+    f(Some(123)) shouldEqual Some(123)
+    f(None) shouldEqual None
+  }
+
+  it should "generate code using various disjunction rules" in {
+    def f1[A, B] = ofType[A ⇒ (Either[A, B] ⇒ B) ⇒ B]
+
+    def f1a[A, B]: Either[A, B] ⇒ Either[B, A] = implement
+
+    def f1b[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = implement
+
+    def f2a[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ Either[C, D]]
+
+    def f2b[A, B, C, D, E]: Either[A, B] ⇒ (Either[A, B] ⇒ Either[C, D]) ⇒ Either[C, D] = implement
+
+    def f2c[A, B, C, D, E]: (((A, E), B)) ⇒ Either[A, B] = implement
+
+    def f2c1[A, B, C, D, E]: ((A, E)) ⇒ Either[A, B] = implement
+
+    def f2d[A, B, C, D, E]: Either[(A, E), B] ⇒ Either[A, B] = implement
+
+    def f2e[A, B, C, D, E]: Either[A, B] ⇒ Either[(A, A), B] = implement
+
+    def f2f[A, B, C, D, E]: Either[A, B] ⇒ Either[A, B] = implement
+
+    def f3[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E]]
+  }
 
   behavior of "named types"
+
+  // TODO: make this work
+  /*
+  it should "generate code by reflection on named type that has no type parameters" in {
+    type MyType = (Int, String)
+
+    def f: MyType ⇒ Int = implement
+
+    f((123, "abc")) shouldEqual 123
+  }
+
   // TODO: make this work
   // This does not work because we match Tuple3 but `args` show only one type parameter. So this
   // is incorrectly recognized as a tuple with a single element of type T.
-  /*
-  it should "generate code by reflection on named type" in {
+
+  it should "generate code by reflection on named type with type parameters" in {
     type MyType[T] = (Int, T, T)
 
     def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement
