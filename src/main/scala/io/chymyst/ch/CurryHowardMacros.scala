@@ -220,7 +220,7 @@ class CurryHowardMacros(val c: whitebox.Context) {
           case CurriedE(PropE(fvName, fvType) :: _, body) ⇒
             // cq"$pat => $expr" where pat = pq"Constructor(..$varNames)"
             val pat = fvType.caseObjectName match {
-              case Some(constructor) ⇒ pq"${TermName(constructor)}"
+              case Some(constructor) ⇒ pq"_ : ${TermName(constructor)}.type"
               case None ⇒ pq"${TermName(fvName)} : ${reifyType(fvType)}"
             }
             cq"$pat => ${reifyTerm(body, paramTerms)}"
@@ -333,7 +333,7 @@ class CurryHowardMacros(val c: whitebox.Context) {
     inhabitInternal(typeU)
   }
 
-  def allOfTypeImpl[U]: c.Tree = {
+  def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = {
     val typeU: c.Type = c.weakTypeOf[U]
     inhabitAllInternal(typeU)
   }
@@ -350,8 +350,8 @@ class CurryHowardMacros(val c: whitebox.Context) {
         val count = allTerms.length
         if (count > 1) c.warning(c.enclosingPosition, s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(_.prettyPrint).mkString(";\n ")}.")
         //        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
-        c.info(c.enclosingPosition, s"Returning term: ${termFound}", force = true)
-        val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
+        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
+        val paramTerms: Map[PropE[TExprType], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
         val result = reifyTerm(termFound, paramTerms)
 
         //        val resultType = tq"${typeT.finalResultType}"
@@ -372,7 +372,7 @@ class CurryHowardMacros(val c: whitebox.Context) {
     val typeStructure: TypeExpr[TExprType] = matchType(typeT)
     val terms = TheoremProver.findProofs(typeStructure)._1.map { termFound ⇒
       c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
-      val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
+      val paramTerms: Map[PropE[TExprType], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
       val result = reifyTerm(termFound, paramTerms)
       if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
       // use resultWithType? Doesn't seem to work.

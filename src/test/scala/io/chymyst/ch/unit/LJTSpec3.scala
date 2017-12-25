@@ -75,13 +75,16 @@ class LJTSpec3 extends FlatSpec with Matchers {
     def f2[X] = ofType[Option[X]]
 
     f2[Int] shouldEqual None
-    //
+
+    // This code is generated for f:
     //    def f[X]: Option[X] ⇒ Option[X] = (c: Option[X]) => c match {
-    //      case (b: None.type) => None
+    //      case None => None
     //      case (a: Some[X]) => Some[X](a.value)
     //    }
+    // Generating code such as `case (a : None.type) ⇒ None` does not work for some reason!
 
     f(Some(123)) shouldEqual Some(123)
+
     f(None) shouldEqual None
   }
 
@@ -93,6 +96,8 @@ class LJTSpec3 extends FlatSpec with Matchers {
     def f1b[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = implement
 
     def f2a[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ Either[C, D]]
+
+    f2a[Int, Int, Int, Int, Int].size shouldEqual 4
 
     def f2b[A, B, C, D, E]: Either[A, B] ⇒ (Either[A, B] ⇒ Either[C, D]) ⇒ Either[C, D] = implement
 
@@ -107,6 +112,8 @@ class LJTSpec3 extends FlatSpec with Matchers {
     def f2f[A, B, C, D, E]: Either[A, B] ⇒ Either[A, B] = implement
 
     def f3[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E]]
+
+    f3[Int, Int, Int, Int, Int].size shouldEqual 2
   }
 
   behavior of "named types"

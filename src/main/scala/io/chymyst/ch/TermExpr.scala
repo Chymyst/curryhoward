@@ -78,7 +78,7 @@ sealed trait TermExpr[+T] {
     case UnitE(_) ⇒ "()"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.toString).mkString(", ") + ")"
     case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.toString).mkString(", ")})"
-    case ProjectE(index, term) ⇒ term.toString + "._" + (index + 1).toString
+    case ProjectE(index, term) ⇒ term.toString + "." + term.accessor(index)
     case MatchE(term, cases) ⇒ "(" + term.toString + " match " + cases.map(_.toString).mkString("; ") + ")"
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
