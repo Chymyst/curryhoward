@@ -69,6 +69,7 @@ def flatMap[E, A, B]: (E ⇒ A) ⇒ (A ⇒ E ⇒ B) ⇒ (E ⇒ B) = implement
 ```
 
 Unit types, tuples, and constant types are supported.
+Constant types are treated as type parameters.
 
 ```scala
 
@@ -83,7 +84,8 @@ If the theorem prover finds several alternative implementations of a function, i
 The "information loss" of a function is defined as an integer number computed as the sum of:
 
 - the number of (curried) arguments that are ignored by the function,
-- the number of tuple parts that are computed but subsequently not used by the function.
+- the number of tuple parts that are computed but subsequently not used by the function,
+- the number of `case` clauses that do not use their arguments.
 
 Choosing the smallest "information loss" is a heuristic that enables automatic implementations of `pure`, `map`, and `flatMap` for the `State` monad:
 
@@ -110,6 +112,30 @@ Warning:scalac: type (S → (A, S)) → (A → B) → S → (B, S) has 2 impleme
 This message means that the resulting implementation is _probably_ the right one, but there was a choice to be made.
 If there exist some equational laws that apply to this function, the laws need to be checked.
 
-# What does not work yet
+## Case classes
 
-Disjunction types (`Option`, `Either`, sealed trait / case classes) are not yet handled for code generation.
+Sealed traits and case classes are supported:
+
+```scala
+def eitherCommut[A, B]: Either[A, B] ⇒ Either[B, A] = implement
+
+def eitherAssoc[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = implement
+
+```
+
+Case objects are treated as named `Unit` type.
+ 
+The "smallest information loss" heuristic allows us to select the "better" implementation in the following example:
+
+```scala
+def optionId[X]: Option[X] ⇒ Option[X] = implement
+
+optionId(Some(123)) == 123
+optionId(None) == None
+
+```
+
+There are two possible implementations of the given type; the "trivial" implementation always returns `None`, and is rejected by the algorithm because it ignores the information given in the original data.
+
+Generally, the algorithm prefers functions that use more parts of the disjunction.
+ 

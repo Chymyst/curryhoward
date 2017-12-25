@@ -15,6 +15,10 @@ class LawsSpec extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
     forAll { (x: A) ⇒ resultsEqual(f1(x), f2(x)) }
   }
 
+  // Check equality for higher-order functions of type A ⇒ B ⇒ C.
+  def checkHOFEquality[A: Arbitrary, B: Arbitrary, C: Arbitrary](f1: A ⇒ B ⇒ C, f2: A ⇒ B ⇒ C): Assertion =
+    checkFunctionEquality[A, B ⇒ C]((x: B ⇒ C, y: B ⇒ C) ⇒ checkFunctionEquality(x, y))(f1, f2)
+
   behavior of "generated type class methods"
 
   it should "check laws for Reader monad" in {
@@ -30,7 +34,7 @@ class LawsSpec extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks
     }
 
     // Same check, using the helper methods.
-    checkFunctionEquality((x: Int ⇒ String, y: Int ⇒ String) ⇒ checkFunctionEquality(x, y))((reader: Int ⇒ String) ⇒ map(reader)(identity[String]), identity[Int ⇒ String])
+    checkHOFEquality((reader: Int ⇒ String) ⇒ map(reader)(identity[String]), identity[Int ⇒ String])
 
     forAll { (reader: String ⇒ Int, f: Int ⇒ Int, g: Int ⇒ Int) ⇒
       // fmap f . fmap g = fmap (f . g)

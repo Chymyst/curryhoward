@@ -30,7 +30,7 @@ case class Wrap2d[A]() extends Wrap2
 case class Wrap2e[A](a: A) extends Wrap2
 
 class LJTSpec3 extends FlatSpec with Matchers {
-
+/*
   behavior of "terms with case classes"
 
   it should "generate code for case class" in {
@@ -114,6 +114,13 @@ class LJTSpec3 extends FlatSpec with Matchers {
     def f3[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E]]
 
     f3[Int, Int, Int, Int, Int].size shouldEqual 2
+  }
+*/
+  it should "generate the example in the tutorial" in {
+    case class User[N, I](name: N, id: I)
+    def makeUser[N, I]: N ⇒ (N ⇒ I) ⇒ User[N, I] = implement
+
+    makeUser[Int, String](123)(_.toString) shouldEqual User(123, "123")
   }
 
   behavior of "named types"
