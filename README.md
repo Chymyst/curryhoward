@@ -26,7 +26,7 @@ The current implementation uses the sequent calculus called LJT as presented in:
 
 The original presentation of the LJT rules are found in:
 
-R. Dyckhoff, _Contraction-Free Sequent Calculi for Intuitionistic Logic_, The Journal of Symbolic Logic, Vol. 57, No. 3, (Sep., 1992), pp. 795-807.
+[R. Dyckhoff, _Contraction-Free Sequent Calculi for Intuitionistic Logic_, The Journal of Symbolic Logic, Vol. 57, No. 3, (Sep., 1992), pp. 795-807](https://rd.host.cs.st-andrews.ac.uk/publications/jsl57.pdf).
 
 
 # Usage
