@@ -1,6 +1,7 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.implement
+import io.chymyst.ch.CurryHowardMacros.testReifyType
+import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
 
 case class Wrap1[A, B](x: Int, a: A, b: B)
@@ -65,23 +66,30 @@ class LJTSpec3 extends FlatSpec with Matchers {
     r2 shouldEqual 123
   }
 */
+  it should "produce correct type parameters for Left" in {
+    val b = testReifyType[Left[Int, Double]]
+    b shouldEqual NamedConjunctT("Left", List(BasicT("Int"), BasicT("Double")), List("value"), BasicT("Int"))
+  }
+
   it should "generate code for the weak law of _tertium non datur_" in {
-//    def f[A, B]: (Either[A, A ⇒ B] ⇒ B) ⇒ B = implement
+    //    def f[A, B]: (Either[A, A ⇒ B] ⇒ B) ⇒ B = implement
   }
-/*
-  it should "generate code using various disjunction rules" in {
-    def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
-  }
-*/
+
+    it should "generate code using various disjunction rules" in {
+  //    def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
+    }
+
   behavior of "named types"
   // TODO: make this work
+  // This does not work because we match Tuple3 but `args` show only one type parameter. So this
+  // is incorrectly recognized as a tuple with a single element of type T.
   /*
-          it should "generate code by reflection on named type" in {
-            type MyType[T] = (Int, T, T)
+  it should "generate code by reflection on named type" in {
+    type MyType[T] = (Int, T, T)
 
-            def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement
+    def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement
 
-            f(1)("abc") shouldEqual ((1, "abc", "abc"))
-          }
-  */
+    f(1)("abc") shouldEqual ((1, "abc", "abc"))
+  }
+*/
 }

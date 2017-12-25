@@ -49,9 +49,9 @@ class CurryHowardSpec extends FlatSpec with Matchers {
         constructor shouldEqual "AA"
         tParams shouldEqual List(BasicT("Double"))
         accessors shouldEqual List("x", "t")
-        wrapped shouldEqual ConjunctT(List(BasicT("Int"), TP("T")))
+        wrapped shouldEqual ConjunctT(List(BasicT("Int"), BasicT("Double")))
     }
-    t shouldEqual BasicT("Int") ->: BasicT("Double") ->: NamedConjunctT("AA", List(BasicT("Double")), List("x", "t"), ConjunctT(List(BasicT("Int"), TP("T"))))
+    t shouldEqual BasicT("Int") ->: BasicT("Double") ->: NamedConjunctT("AA", List(BasicT("Double")), List("x", "t"), ConjunctT(List(BasicT("Int"), BasicT("Double"))))
   }
 
   it should "produce correct type expressions for sealed traits" in {
@@ -81,11 +81,18 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
   it should "produce correct type expressions for Left" in {
     val b = testReifyType[Left[Int, Double]]
-    // TODO: this should be BasicT["Int"] and not TP("A")
-    b shouldEqual NamedConjunctT("Left", List(BasicT("Int"), BasicT("Double")), List("value"), TP("A"))
+    b shouldEqual NamedConjunctT("Left", List(BasicT("Int"), BasicT("Double")), List("value"), BasicT("Int"))
   }
 
-  it should "produce correct type expressions for Either" in {
+  it should "produce correct type expressions for Either with given type" in {
+    val t = testReifyType[Either[Int, Double]]
+    // TODO: this should be specific types rather than TP("A") and TP("B")
+    val typeList = List(BasicT("Int"), BasicT("Double"))
+    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", List(TP("A"), TP("B")), List("value"), TP("A")),
+      NamedConjunctT("Right", List(TP("A"), TP("B")), List("value"), TP("B"))))
+  }
+
+  it should "produce correct type expressions for Either with function type" in {
     val t = testReifyType[Either[Int, Int ⇒ Double]]
     // TODO: this should be specific types rather than TP("A") and TP("B")
     t shouldEqual DisjunctT("Either", List(BasicT("Int"), #->(BasicT("Int"), BasicT("Double"))), List(NamedConjunctT("Left", List(TP("A"), TP("B")), List("value"), TP("A")),
@@ -93,7 +100,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
   }
 
   it should "produce correct type expressions for Either as result type" in {
-    def t[P, Q] = testReifyType[Option[P] ⇒ Either[P,Q]]
+    def t[P, Q] = testReifyType[Option[P] ⇒ Either[P, Q]]
     // TODO: this should be specific types rather than TP("A") and TP("B")
     t[Int, String] shouldEqual DisjunctT("Option", List(TP("P")), List(NamedConjunctT("None", Nil, Nil, NothingT("Nothing")), NamedConjunctT("Some", List(TP("A")), List("value"), TP("A")))) ->: DisjunctT("Either", List(TP("P"), TP("Q")), List(NamedConjunctT("Left", List(TP("A"), TP("B")), List("value"), TP("A")),
       NamedConjunctT("Right", List(TP("A"), TP("B")), List("value"), TP("B"))))

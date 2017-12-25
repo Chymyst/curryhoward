@@ -81,21 +81,26 @@ object CurryHowardMacros {
     //    val valParamLists = t.paramLists
     // use something like t.paramLists(0)(0).typeSignature and also .isImplicit to extract types of function parameters
     t.typeSymbol.name.decodedName.toString match {
-      case name if name matches "(scala\\.)?Tuple[0-9]+" ⇒ ConjunctT(args.map(matchType(c))) //s"(${args.map(matchType(c)).mkString(", ")})"
-      case "scala.Function1" | "Function1" ⇒ matchType(c)(args.head) ->: matchType(c)(args(1)) // s"${matchType(c)(args(0))} → ${matchType(c)(args(1))}"
+      case name if name matches "(scala\\.)?Tuple[0-9]+" ⇒ ConjunctT(args.map(matchType(c)))
+      case "scala.Function1" | "Function1" ⇒ matchType(c)(args.head) ->: matchType(c)(args(1))
       case "scala.Any" | "Any" ⇒ OtherT("_")
       case "scala.Nothing" | "Nothing" ⇒ NothingT("Nothing")
       case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
       case basicRegex(name) ⇒ BasicT(name)
       case _ if args.isEmpty && t.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(t.toString)
       case fullName if t.typeSymbol.isType && t.typeSymbol.asType.isAliasType ⇒ ???
-      case fullName if t.typeSymbol.isClass ⇒ // asType.toType.typeSymbol.asClass.knownDirectSubclasses
+      case fullName if t.typeSymbol.isClass ⇒
         if (t.typeSymbol.asClass.isModuleClass) { // `case object` is a "module class", but also a "case class".
           NamedConjunctT(fullName, Nil, Nil, NothingT("Nothing"))
         } else if (t.typeSymbol.asClass.isCaseClass) {
-          // Detect all fields of the case class.
+          // Case class.
+
+          // Need to assign type parameters to the accessors.
+          val typeMap: Map[c.Name, c.Type] = t.typeSymbol.asClass.typeParams.map(_.name.decodedName).zip(args).toMap
+          //  t.decls.toList(0).asMethod.typeSignature.resultType gives A, t.typeSymbol.asClass.typeParams(0) ==  t.decls.toList(0).asMethod.typeSignature.resultType.typeSymbol
+          /* t.typeSymbol.asClass.typeParams gives List(A, B)*/
           val (accessors, typeExprs) = t.decls
-            .collect { case s: MethodSymbol if s.isCaseAccessor ⇒ (s.name.decodedName.toString, matchType(c)(s.typeSignature.resultType)) }
+            .collect { case s: MethodSymbol if s.isCaseAccessor ⇒ (s.name.decodedName.toString, matchType(c)(typeMap.getOrElse(s.typeSignature.resultType.typeSymbol.name.decodedName, s.typeSignature.resultType))) }
             .toList.unzip
           val wrapped = typeExprs match {
             case Nil ⇒ UnitT("")
@@ -103,9 +108,9 @@ object CurryHowardMacros {
             case _ ⇒ ConjunctT(typeExprs)
           }
           NamedConjunctT(fullName, args.map(matchType(c)), accessors, wrapped)
-        } else {
+        } else { // Possibly a disjunction type.
           // Note: Either is a "type" rather than a class, even though isClass() returns true.
-          // Sealed traits / case classes are classes.
+          // traits / case classes are classes, but knownDirectSubclasses does not work for both cases.
           // Prepare a type symbol that works for both cases.
           val typeSymbol = if (t.typeSymbol.isType) t.typeSymbol.asType.toType.typeSymbol else t.typeSymbol
           val subclasses = typeSymbol
@@ -113,14 +118,17 @@ object CurryHowardMacros {
             .toList.sortBy(_.name.decodedName.toString) // Otherwise the set is randomly ordered.
           if ((typeSymbol.asClass.isTrait || typeSymbol.asClass.isAbstract) &&
             subclasses.nonEmpty &&
-            subclasses.forall{s ⇒
+            subclasses.forall { s ⇒
               val resultClass = s.typeSignature.resultType.typeSymbol.asClass
-              resultClass.isCaseClass || resultClass.isModuleClass
-            } // `case object` is a "module class".
+              resultClass.isCaseClass || resultClass.isModuleClass // `case object` is a "module class".
+            }
           ) {
             // Detect traits with case classes.
-            val parts = subclasses.map(s ⇒ matchType(c)(s.asType.toType)) // Note: s.typeSignature does not work correctly here!
-            DisjunctT(fullName, args.map(matchType(c)), parts)
+            // Note: s.typeSignature does not work correctly here! Need s.asType.toType
+            subclasses.map(s ⇒ matchType(c)(s.asType.toType)) match {
+              case part :: Nil ⇒ part // A single case class implementing a trait.
+              case parts ⇒ DisjunctT(fullName, args.map(matchType(c)), parts) // Several case classes implementing a trait.
+            }
           } else if (args.isEmpty) OtherT(fullName)
           else ConstructorT(t.toString)
         }
