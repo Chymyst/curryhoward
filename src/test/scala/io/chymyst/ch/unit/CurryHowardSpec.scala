@@ -69,10 +69,12 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     sealed trait AA[T]
     case class AA1[T](x: T, d: Double) extends AA[T]
     case class AA2[T](y: T, b: Boolean) extends AA[T]
+
+    val tl = List(BasicT("Int"))
     val t = testReifyType[Int ⇒ Double ⇒ AA[Int]]
-    t shouldEqual BasicT("Int") ->: BasicT("Double") ->: DisjunctT("AA", List(BasicT("Int")), Seq(
-      NamedConjunctT("AA1", List(TP("T")), List("x", "d"), ConjunctT(List(TP("T"), BasicT("Double")))),
-      NamedConjunctT("AA2", List(TP("T")), List("y", "b"), ConjunctT(List(TP("T"), BasicT("Boolean"))))
+    t shouldEqual BasicT("Int") ->: BasicT("Double") ->: DisjunctT("AA", tl, Seq(
+      NamedConjunctT("AA1", tl, List("x", "d"), ConjunctT(List(tl.head, BasicT("Double")))),
+      NamedConjunctT("AA2", tl, List("y", "b"), ConjunctT(List(tl.head, BasicT("Boolean"))))
     ))
   }
 
@@ -97,24 +99,24 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
   it should "produce correct type expressions for Either with given type" in {
     val t = testReifyType[Either[Int, Double]]
-    // TODO: this should be specific types rather than TP("A") and TP("B")
     val typeList = List(BasicT("Int"), BasicT("Double"))
-    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", List(TP("A"), TP("B")), List("value"), TP("A")),
-      NamedConjunctT("Right", List(TP("A"), TP("B")), List("value"), TP("B"))))
+    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", typeList, List("value"), typeList(0)),
+      NamedConjunctT("Right", typeList, List("value"), typeList(1))))
   }
 
   it should "produce correct type expressions for Either with function type" in {
     val t = testReifyType[Either[Int, Int ⇒ Double]]
-    // TODO: this should be specific types rather than TP("A") and TP("B")
-    t shouldEqual DisjunctT("Either", List(BasicT("Int"), #->(BasicT("Int"), BasicT("Double"))), List(NamedConjunctT("Left", List(TP("A"), TP("B")), List("value"), TP("A")),
-      NamedConjunctT("Right", List(TP("A"), TP("B")), List("value"), TP("B"))))
+    val typeList = List(BasicT("Int"), #->(BasicT("Int"), BasicT("Double")))
+    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", typeList, List("value"), typeList(0)),
+      NamedConjunctT("Right", typeList, List("value"), typeList(1))))
   }
 
   it should "produce correct type expressions for Either as result type" in {
     def t[P, Q] = testReifyType[Option[P] ⇒ Either[P, Q]]
-    // TODO: this should be specific types rather than TP("A") and TP("B")
-    t[Int, String] shouldEqual DisjunctT("Option", List(TP("P")), List(NamedConjunctT("None", Nil, Nil, NothingT("Nothing")), NamedConjunctT("Some", List(TP("A")), List("value"), TP("A")))) ->: DisjunctT("Either", List(TP("P"), TP("Q")), List(NamedConjunctT("Left", List(TP("A"), TP("B")), List("value"), TP("A")),
-      NamedConjunctT("Right", List(TP("A"), TP("B")), List("value"), TP("B"))))
+    val tl2 = List(TP("P"), TP("Q"))
+    val tl1 = List(TP("P"))
+    t[Int, String] shouldEqual DisjunctT("Option", tl1, List(NamedConjunctT("None", Nil, Nil, NothingT("Nothing")), NamedConjunctT("Some", tl1, List("value"), TP("P")))) ->: DisjunctT("Either", tl2, List(NamedConjunctT("Left", tl2, List("value"), TP("P")),
+      NamedConjunctT("Right", tl2, List("value"), TP("Q"))))
   }
 
   it should "produce correct type expression for unknown type constructors" in {
@@ -124,7 +126,9 @@ class CurryHowardSpec extends FlatSpec with Matchers {
 
   it should "produce correct type expression for unknown type constructors under Option" in {
     val t = testReifyType[Option[IndexedSeq[Int]]]
-    t shouldEqual DisjunctT("Option", List(ConstructorT("IndexedSeq[Int]")), List(NamedConjunctT("None", List(), List(), NothingT("Nothing")), NamedConjunctT("Some", List(TP("A")), List("value"), TP("A"))))
+    val t1 = ConstructorT("IndexedSeq[Int]")
+    val t1l = List(t1)
+    t shouldEqual DisjunctT("Option", t1l, List(NamedConjunctT("None", List(), List(), NothingT("Nothing")), NamedConjunctT("Some", t1l, List("value"), t1)))
   }
 
   behavior of "syntax of `implement` and `typeOf`"

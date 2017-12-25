@@ -47,20 +47,20 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of fixed types with type constructors" in {
     def result[P, Q, R]: (String, String) = testType[Option[Seq[Int]] ⇒ Option[IndexedSeq[Set[P]]] ⇒ Q]
 
-    result._1 shouldEqual "Option[<tc>Seq[Int]]{None.type + Some[A]} ⇒ Option[<tc>IndexedSeq[Set[P]]]{None.type + Some[A]} ⇒ Q"
+    result._1 shouldEqual "Option[<tc>Seq[Int]]{None.type + Some[<tc>Seq[Int]]} ⇒ Option[<tc>IndexedSeq[Set[P]]]{None.type + Some[<tc>IndexedSeq[Set[P]]]} ⇒ Q"
   }
 
   it should "get printable representation of fixed types with type constructors with [_]" in {
     def result[P, Q, R]: (String, String) = testType[Option[_] ⇒ Q]
 
     val res = result._1
-    res shouldEqual "Option[<oc>_]{None.type + Some[A]} ⇒ Q"
+    res shouldEqual "Option[<oc>_]{None.type + Some[<oc>_]} ⇒ Q"
   }
 
   it should "get printable representation of Option types" in {
     def result[P, Q, R]: (String, String) = testType[Option[P] ⇒ Either[P, Q]]
 
-    result._1 shouldEqual "Option[P]{None.type + Some[A]} ⇒ Either[P,Q]{Left[A,B] + Right[A,B]}"
+    result._1 shouldEqual "Option[P]{None.type + Some[P]} ⇒ Either[P,Q]{Left[P,Q] + Right[P,Q]}"
   }
 
   it should "get printable representation of Any, Unit, and Nothing types" in {
@@ -105,7 +105,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of sealed trait with type parameters" in {
     def result[T, U]: (String, String) = testType[SimpleChoice[T]]
 
-    result._1 shouldEqual "SimpleChoice[T]{SimpleChoice1[A] + SimpleChoice2[A]}"
+    result._1 shouldEqual "SimpleChoice[T]{SimpleChoice1[T] + SimpleChoice2[T]}"
   }
 
   it should "get printable representation of sealed trait without type parameters" in {
