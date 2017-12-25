@@ -11,9 +11,9 @@ libraryDependencies += "io.chymyst" %% "curryhoward" % "latest.integration"
 
 The `curryhoward` functionality becomes available once you add this statement:
 
-```tut
+```scala
+scala> import io.chymyst.ch._
 import io.chymyst.ch._
-
 ```
 
 This imports all the necessary symbols such as `implement`, `ofType`, `allOfType` and so on.
@@ -53,14 +53,20 @@ We see that the type of the function `makeUser[N, I]` constrains its algorithm t
 
 The `curryhoward` library can generate the code of functions of this sort:
 
-```tut
-case class User[N, I](name: N, id: I)
+```scala
+scala> case class User[N, I](name: N, id: I)
+defined class User
 
-def makeUser[N, I]: N ⇒ (N ⇒ I) ⇒ User[N, I] = implement
+scala> def makeUser[N, I]: N ⇒ (N ⇒ I) ⇒ User[N, I] = implement
+<console>:17: Returning term: (b ⇒ a ⇒ User(b, a b))
+       def makeUser[N, I]: N ⇒ (N ⇒ I) ⇒ User[N, I] = implement
+                                                      ^
+makeUser: [N, I]=> N => ((N => I) => User[N,I])
 
-makeUser[Int, String](123)(n => "id:" + (n * 100).toString)
-
+scala> makeUser[Int, String](123)(n => "id:" + (n * 100).toString)
+res0: User[Int,String] = User(123,id:12300)
 ```
 
 The library prints the lambda-calculus term notation for the generated code.
-In this example, the term is ``.
+In this example, the term is `b ⇒ a ⇒ User(b, a b)`.
+

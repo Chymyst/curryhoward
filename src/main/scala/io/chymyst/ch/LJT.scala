@@ -192,7 +192,7 @@ object LJT {
             case CurriedE(args, f) ⇒
               // We need to construct x ⇒ ... ⇒ a ⇒ y ⇒ ... ⇒ z ⇒ f instead.
               // Note that sequent.premises.length is the number of implications in x ⇒ ... before ⇒ a.
-              val newHeads = args.tail.take(sequent.premises.length) ++ Seq(args.head) ++ args.drop(sequent.premises.length + 1)
+              val newHeads = args.drop(1).take(sequent.premises.length) ++ Seq(args.head) ++ args.drop(sequent.premises.length + 1)
               CurriedE(newHeads, f)
             case _ ⇒ throw new Exception(s"Internal error: proof term $proofTerms must be a function")
           }
@@ -268,7 +268,7 @@ object LJT {
             // Wrapped Unit or wrapped single term.
             case other if nct.caseObjectName.isDefined ⇒ NamedConjunctE(Nil, nct)
             case other ⇒
-              println(s"debug: wrapping $other into type $nct")
+//              println(s"debug: wrapping $other into type $nct")
               NamedConjunctE(Seq(other), nct)
           }
           sequent.constructResultTerm(result)

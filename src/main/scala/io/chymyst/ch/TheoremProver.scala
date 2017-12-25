@@ -6,7 +6,7 @@ import io.chymyst.ch.TermExpr.ProofTerm
 
 object TheoremProver {
 
-  private val debug = true
+  private val debug = false
 
   def explode[T](src: Seq[Seq[T]]): Seq[Seq[T]] = {
     src.foldLeft[Seq[Seq[T]]](Seq(Seq())) { case (prevSeqSeq, newSeq) ⇒

@@ -248,7 +248,7 @@ final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T
       case CurriedE(heads, body) ⇒
         // substitute arg as first variable into body and return CurriedE unless we have no more arguments, else return new body
         val result: TermExpr[T] = TermExpr.subst(heads.head, argSimpl, body.simplify).simplify
-        heads.tail match {
+        heads.drop(1) match {
           case Nil ⇒ result
           case h ⇒ CurriedE(h, result)
         }
