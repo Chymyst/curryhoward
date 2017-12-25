@@ -66,9 +66,11 @@ class LJTSpec3 extends FlatSpec with Matchers {
     r2 shouldEqual 123
   }
 */
-  it should "produce correct type parameters for Left" in {
-    val b = testReifyType[Left[Int, Double]]
-    b shouldEqual NamedConjunctT("Left", List(BasicT("Int"), BasicT("Double")), List("value"), BasicT("Int"))
+  it should "produce correct type parameters for Either with concrete types" in {
+    val t = testReifyType[Either[Int, Double]]
+    val typeList = List(BasicT("Int"), BasicT("Double"))
+    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", typeList, List("value"), BasicT("Int")),
+      NamedConjunctT("Right", typeList, List("value"), BasicT("Double"))))
   }
 
   it should "generate code for the weak law of _tertium non datur_" in {

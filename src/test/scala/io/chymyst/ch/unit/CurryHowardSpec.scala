@@ -34,7 +34,7 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     }
   */
 
-  behavior of "reifyTypes"
+  behavior of "reifyType"
 
   it should "produce correct type expressions for function types" in {
     val t = testReifyType[Int ⇒ Double ⇒ String]
@@ -54,7 +54,18 @@ class CurryHowardSpec extends FlatSpec with Matchers {
     t shouldEqual BasicT("Int") ->: BasicT("Double") ->: NamedConjunctT("AA", List(BasicT("Double")), List("x", "t"), ConjunctT(List(BasicT("Int"), BasicT("Double"))))
   }
 
-  it should "produce correct type expressions for sealed traits" in {
+  it should "produce correct type expressions for sealed traits with generic types" in {
+    sealed trait AA[U]
+    case class AA1[V](x: V, d: Double) extends AA[V]
+    case class AA2[W](y: W, b: Boolean) extends AA[W]
+    def t[T] = testReifyType[T ⇒ Double ⇒ AA[T]]
+    t[String] shouldEqual TP("T") ->: BasicT("Double") ->: DisjunctT("AA", List(TP("T")), Seq(
+      NamedConjunctT("AA1", List(TP("T")), List("x", "d"), ConjunctT(List(TP("T"), BasicT("Double")))),
+      NamedConjunctT("AA2", List(TP("T")), List("y", "b"), ConjunctT(List(TP("T"), BasicT("Boolean"))))
+    ))
+  }
+
+  it should "produce correct type expressions for sealed traits with concrete types" in {
     sealed trait AA[T]
     case class AA1[T](x: T, d: Double) extends AA[T]
     case class AA2[T](y: T, b: Boolean) extends AA[T]
