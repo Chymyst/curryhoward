@@ -45,6 +45,8 @@ object MyApp extends App {
 
 ```
 
+See also the [tutorial](docs/Tutorial.md).
+
 # Unit tests
 
 `sbt test`

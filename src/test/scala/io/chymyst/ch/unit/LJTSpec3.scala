@@ -113,7 +113,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     def f3[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E]]
 
-    f3[Int, Int, Int, Int, Int].size shouldEqual 3
+    f3[Int, Int, Int, Int, Int].size shouldEqual 2
   }
 
   it should "generate the example in the tutorial" in {
