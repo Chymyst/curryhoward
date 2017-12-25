@@ -75,7 +75,7 @@ class CurryHowardMacros(val c: whitebox.Context) {
     val matchedTypeArgs = args.map(s ⇒ matchType(s))
     //    if (debug) if (tMap.nonEmpty) println(s"DEBUG: matchType obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint)}")
     //    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
-    //    val valParamLists = t.paramLists
+    //    val valParamLists = t.paramLists // typeU.paramLists(0)(0).name.decodedName is "x" as TermName; also typeU.finalResultType
     // use something like t.paramLists(0)(0).typeSignature and also .isImplicit to extract types of function parameters
     t.typeSymbol.name.decodedName.toString match {
       case name if name matches "(scala\\.)?Tuple[0-9]+" ⇒ ConjunctT(matchedTypeArgs)
@@ -323,14 +323,38 @@ class CurryHowardMacros(val c: whitebox.Context) {
   }
 
   // TODO: can we replace this with blackbox? So far this only works with whitebox.
+  // Obtain one implementation of the type U, which must be given as the type parameter.
+  // This function does not attempt to detect the left-hand side type,
+  // and so does not give rise to the "recursive value must have type" error.
   def ofTypeImpl[U: c.WeakTypeTag]: c.Tree = {
     val typeU: c.Type = c.weakTypeOf[U]
-    inhabitInternal(typeU)
+    inhabitOneInternal(typeU)
   }
 
+  // Obtain one implementation of the type U. Detect the type U as given on the left-hand side.
   def inhabitImpl[U]: c.Tree = {
     val typeU = c.internal.enclosingOwner.typeSignature
-    inhabitInternal(typeU)
+    // Detect whether we are given a function with arguments.
+    typeU.resultType.paramLists match {
+      case Nil ⇒ inhabitOneInternal(typeU)
+      case lists ⇒
+        val givenVars = lists.flatten.map(s ⇒ PropE(s.name.decodedName.toString, matchType(s.typeSignature)))
+        val resultType = matchType(typeU.finalResultType)
+        val typeStructure = givenVars.map(_.tExpr).reverse.foldLeft(resultType) { case (prev, t) ⇒ t ->: prev }
+        inhabitInternal(typeStructure) match {
+          case Right(term) ⇒
+            val termFound = givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify
+            c.info(c.enclosingPosition, s"Returning term: $termFound", force = true)
+            val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
+            val result = reifyTerm(termFound, paramTerms)
+            if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
+            result
+          case Left(errorMessage) ⇒
+            c.error(c.enclosingPosition, errorMessage)
+            q"null"
+        }
+
+    }
   }
 
   def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = {
@@ -338,32 +362,36 @@ class CurryHowardMacros(val c: whitebox.Context) {
     inhabitAllInternal(typeU)
   }
 
-  private def inhabitInternal(typeT: c.Type): c.Tree = {
-    type TExprType = String // (String, c.Type)
-    val typeStructure: TypeExpr[TExprType] = matchType(typeT)
+  private def inhabitOneInternal(typeT: c.Type): c.Tree = {
+    val typeStructure: TypeExpr[String] = matchType(typeT)
+    inhabitInternal(typeStructure) match {
+      case Right(termFound) ⇒
+        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = true)
+        val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
+        val result = reifyTerm(termFound, paramTerms)
+        //        val resultType = tq"${typeT.finalResultType}"
+        //        val resultWithType = q"$result: $resultType" // this does not work
+        if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
+        result
+      case Left(errorMessage) ⇒
+        c.error(c.enclosingPosition, errorMessage)
+        q"null"
+    }
+
+  }
+
+  private def inhabitInternal(typeStructure: TypeExpr[String]): Either[String, TermExpr[String]] = {
     // TODO Check that there aren't repeated types among the curried arguments, print warning.
     TheoremProver.findProofs(typeStructure) match {
       case (Nil, _) ⇒
-        c.error(c.enclosingPosition, s"type ${typeStructure.prettyPrint} cannot be implemented")
-        q"null" // Avoid other spurious errors, return a valid tree here.
+        Left(s"type ${typeStructure.prettyPrint} cannot be implemented")
       case (List(termFound), allTerms) ⇒
         val count = allTerms.length
         if (count > 1) c.warning(c.enclosingPosition, s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(_.prettyPrint).mkString(";\n ")}.")
         //        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
-        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
-        val paramTerms: Map[PropE[TExprType], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
-        val result = reifyTerm(termFound, paramTerms)
-
-        //        val resultType = tq"${typeT.finalResultType}"
-        //        val resultWithType = q"$result: $resultType" // this does not work
-        if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
-
-        // use resultWithType? Doesn't seem to work.
-        result
-
+        Right(termFound)
       case (list, _) ⇒
-        c.error(c.enclosingPosition, s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} equivalent ways:\n ${list.map(_.prettyPrint).mkString(";\n ")}.")
-        q"null"
+        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} equivalent ways:\n ${list.map(_.prettyPrint).mkString(";\n ")}.")
     }
   }
 

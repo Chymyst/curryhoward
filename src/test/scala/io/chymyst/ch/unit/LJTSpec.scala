@@ -1,7 +1,7 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch.LJT.followsFromAxioms
-import io.chymyst.ch.{#->, ConjunctT, CurriedE, DisjunctE, DisjunctT, FreshIdents, PropE, Sequent, TP, TermExpr, TheoremProver, TypeExpr}
+import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
 
 class LJTSpec extends FlatSpec with Matchers {
@@ -181,11 +181,13 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "inhabit type using +Rn" in {
-    "def f[X]: X ⇒ Option[X] = implement" shouldNot compile
+    def f[X]: X ⇒ Option[X] = implement
 
-    //    f(1) shouldEqual Some(1)
+    f(1) shouldEqual Some(1)
 
-    //    def f[X, Y]: X ⇒ Either[X, Y] = implement
+    def g[X, Y]: X ⇒ Either[X, Y] = implement
+
+    g("abc") shouldEqual Left("abc")
   }
 
 }

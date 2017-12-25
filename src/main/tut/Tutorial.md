@@ -63,4 +63,4 @@ makeUser[Int, String](123)(n => "id:" + (n * 100).toString)
 ```
 
 The library prints the lambda-calculus term notation for the generated code.
-In this example, the term is ``.
+In this example, the term is `b ⇒ a ⇒ User(b, a b)`.

@@ -69,4 +69,3 @@ res0: User[Int,String] = User(123,id:12300)
 
 The library prints the lambda-calculus term notation for the generated code.
 In this example, the term is `b ⇒ a ⇒ User(b, a b)`.
-

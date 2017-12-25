@@ -28,7 +28,6 @@ class TheoremProverSpec extends FlatSpec with Matchers {
 
   it should "implement trivial unwrapping" in {
     val aT = TP(1)
-    val a = PropE("a", aT)
     val wrappedT = NamedConjunctT("MyWrapper", List(), List("name"), List(aT))
 
     val sequent1 = Sequent(List(wrappedT), aT, freshVar)
@@ -39,7 +38,6 @@ class TheoremProverSpec extends FlatSpec with Matchers {
 
   it should "implement trivial wrapping" in {
     val aT = TP(1)
-    val a = PropE("a", aT)
     val wrappedT = NamedConjunctT("MyWrapper", List(), List("name"), List(aT))
 
     val sequent2 = Sequent(List(aT), wrappedT, freshVar)
