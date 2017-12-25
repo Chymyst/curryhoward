@@ -150,6 +150,7 @@ optionId(None) == None
 
 ```
 
-There are two possible implementations of the given type; the "trivial" implementation always returns `None`, and is rejected by the algorithm because it ignores the information given in the original data.
+There are two possible implementations of the type `Option[X] ⇒ Option[X]`: the "trivial" implementation (always return `None`), and the "interesting" implementation (return the same value as given).
+The "trivial" implementation is rejected by the algorithm because it ignores the information given in the original data.
 
 Generally, the algorithm prefers implementations that use more parts of the disjunction.

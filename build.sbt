@@ -1,14 +1,9 @@
-val scalaV = "2.12.4"
-
-lazy val scalatest = "org.scalatest" %% "scalatest" % "3.0.4" % Test
-lazy val scalacheck = "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
-
 lazy val common = Seq(
-  scalaVersion := scalaV,
-  scalacOptions += "-deprecation",
+  scalaVersion := "2.12.4",
   crossScalaVersions := Seq("2.11.11", "2.12.4"),
   libraryDependencies ++= Seq(
-    scalatest, scalacheck
+    "org.scalatest" %% "scalatest" % "3.0.4" % Test,
+    "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
   )
 )
 
@@ -28,6 +23,9 @@ lazy val warningsForWartRemover = Seq(Wart.Equals, Wart.JavaConversions, Wart.Is
 lazy val curryhoward: Project = (project in file("."))
   .settings(common)
   .settings(
+    organization := "io.chymyst",
+    version := "0.1.0",
+
     licenses := Seq("Apache License, Version 2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
     homepage := Some(url("https://github.com/Chymyst/curryhoward")),
     description := "Automatic code generation from function types using the Curry-Howard correspondence",
@@ -38,13 +36,12 @@ lazy val curryhoward: Project = (project in file("."))
       "-unchecked",
       "-encoding", "UTF-8",
       "-feature",
-      //    "-language:existentials",
+      "-language:existentials",
       "-language:higherKinds",
       "-language:implicitConversions",
-      //    "-opt:l:project", // this is deprecated
-//      "-opt:l:inline",
-//      "-Yvirtpatmat",
-//      "-Ydelambdafy:inline",
+      "-opt:l:inline",
+      "-Yvirtpatmat",
+      "-Ydelambdafy:inline",
       // "-Xfatal-warnings",
       "-Xlint",
       "-Yno-adapted-args", // Makes calling a() fail to substitute a Unit argument into a.apply(x: Unit)
@@ -71,3 +68,24 @@ lazy val curryhoward: Project = (project in file("."))
       "org.scala-lang" % "scala-reflect" % scalaVersion.value
     )
   )
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// Publishing to Sonatype Maven repository
+publishMavenStyle := true
+//
+// pomIncludeRepository := { _ => false } // not sure we need this.
+// http://www.scala-sbt.org/release/docs/Using-Sonatype.html says we might need it
+// because "sometimes we have optional dependencies for special features".
+//
+publishTo := {
+  val nexus = "https://oss.sonatype.org/"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "content/repositories/snapshots")
+  else
+    Some("releases" at nexus + "service/local/staging/deploy/maven2")
+}
+//
+publishArtifact in Test := false
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////////
