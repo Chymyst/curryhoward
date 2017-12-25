@@ -33,7 +33,7 @@ case class Wrap2e[A](a: A) extends Wrap2
 class LJTSpec3 extends FlatSpec with Matchers {
 
   behavior of "terms with case classes"
-/*
+
   it should "generate code for case class" in {
     def f[A, B]: Wrap1[A, B] ⇒ B = implement
 
@@ -65,20 +65,13 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     r2 shouldEqual 123
   }
-*/
-  it should "produce correct type parameters for Either with concrete types" in {
-    val t = testReifyType[Either[Int, Double]]
-    val typeList = List(BasicT("Int"), BasicT("Double"))
-    t shouldEqual DisjunctT("Either", typeList, List(NamedConjunctT("Left", typeList, List("value"), BasicT("Int")),
-      NamedConjunctT("Right", typeList, List("value"), BasicT("Double"))))
-  }
 
   it should "generate code for the weak law of _tertium non datur_" in {
-    //    def f[A, B]: (Either[A, A ⇒ B] ⇒ B) ⇒ B = implement
+        def f[A, B]: (Either[A, A ⇒ B] ⇒ B) ⇒ B = implement
   }
 
     it should "generate code using various disjunction rules" in {
-  //    def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
+//      def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
     }
 
   behavior of "named types"

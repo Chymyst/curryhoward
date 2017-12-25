@@ -308,7 +308,22 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
   }
 }
 
-// Match a disjunct term with n functions.
+/** Match a disjunct term of type A + B + ... + C with n functions.
+  * The type of the result of this term is Z.
+  * This represents code of the form
+  * {{{
+  *   term match {
+  *     case a: A  ⇒ ...
+  *     case b: B ⇒ ...
+  *     ...
+  *     case c: C ⇒ ...
+  *   }
+  * }}}
+  *
+  * @param term  Term to be matched. Must be of disjunction type.
+  * @param cases List of functions of types A ⇒ Z, ..., C ⇒ Z
+  * @tparam T Type of the internal representation of the term names.
+  */
 final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends TermExpr[T] {
   override def map[U](f: T ⇒ U): TermExpr[U] = MatchE(term map f, cases map (_.map(f)))
 
@@ -328,7 +343,13 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
   }
 
   // TODO: simplify when term is a DisjunctE
-  override def simplify: TermExpr[T] = MatchE(term.simplify, cases.map(_.simplify))
+  override def simplify: TermExpr[T] = term.simplify match {
+    case DisjunctE(index, total, t, tExpr) ⇒
+      if (total == cases.length) {
+       AppE(cases(index), t).simplify
+      } else throw new Exception(s"Internal error: MatchE with ${cases.length} cases applied to DisjunctE with $total parts, but must be of equal size")
+    case t ⇒ MatchE(t, cases.map(_.simplify))
+  }
 }
 
 // Inject a value into the i-th part of the disjunction of type tExpr.
