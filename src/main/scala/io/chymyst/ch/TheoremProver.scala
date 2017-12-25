@@ -17,45 +17,43 @@ object TheoremProver {
     }
   }
 
-  def apply[T](typeStructure: TypeExpr[T]): List[TermExpr[T]] = findProofs(typeStructure)
-
   private[ch] val freshVar = new FreshIdents(prefix = "x")
 
-  def findProofs[T](typeStructure: TypeExpr[T]): List[TermExpr[T]] = {
+  private[ch] def findProofs[T](typeStructure: TypeExpr[T]): (List[TermExpr[T]], Seq[TermExpr[T]]) = {
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
-    val pp = findProofTerms(mainSequent)
+    val proofTerms = findProofTerms(mainSequent).map(_.prettyRename).distinct
     if (debug) {
-      val prettyPP = pp.map(p ⇒ (p.prettyPrint, p.unusedArgs.size, p.unusedTupleParts, p.unusedArgs, p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }))
+      val prettyPT = proofTerms.map(p ⇒ (p.prettyPrint, p.unusedArgs.size, p.unusedTupleParts, p.unusedArgs, p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }))
         .sortBy { case (pString, s1, s2, unusedArgs, usedTupleParts) ⇒ s1 + s2 }
-      println(s"debug: got proof terms:\n ${prettyPP.mkString(";\n ")}")
-    } else if (pp.size > 1) {
-      println(s"type $typeStructure has ${pp.size} implementations (laws need checking?)")
+      println(s"debug: got proof terms:\n ${prettyPT.mkString(";\n ")}")
     }
-    // Return the group of proofs that leave the smallest number of arguments unused.
-    pp.map(proofTerm ⇒ (proofTerm, proofTerm.unusedArgs.size + proofTerm.unusedTupleParts))
+    // Return the group of proofs that leave the smallest number of values unused, but has the smallest use count of those that are used.
+    val chosenTerms = proofTerms
+      .map(proofTerm ⇒ (proofTerm, (proofTerm.unusedArgs.size + proofTerm.unusedTupleParts + proofTerm.unusedMatchClauseVars, proofTerm.argsMultiUseCount)))
       .groupBy(_._2) // Map[Int, Seq[(ProofTerm[T], Int)]]
       .mapValues(_.map(_._1)) // Map[Int, Seq[ProofTerm[T]]]
       .toSeq.sortBy(_._1) // Seq[(Int, Seq[ProofTerm[T]])]
       .headOption // Option[(Int, Seq[ProofTerm[T]])]
       .map(_._2.toList) // Option[List[ProofTerm[T]]]
       .getOrElse(List())
-      .map(_.prettyRename)
+    (chosenTerms, proofTerms)
   }
 
   // Main recursive function that computes the list of available proofs for a sequent.
   // The main assumption is that the depth-first proof search terminates.
   // No loop checking is performed on sequents.
-  def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
+  private[ch] def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
     def concatProofs(ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
-      if (debug) println(s"debug: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents}")
+      if (debug) println(s"debug: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents.map(_.toString).mkString("; ")}")
       // All the new sequents need to be proved before we can continue. They may have several proofs each.
       val newProofs: Seq[Seq[ProofTerm[T]]] = ruleResult.newSequents.map(findProofTerms)
       val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
       val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
-      val result = transformedProofs.map(_.simplify).distinct
+      val result = transformedProofs.map(_.simplify).distinct // Note: at this point, it is a mistake to do prettyRename, because we are calling this function recursively.
+      // We will call prettyRename() at the very end of the proof search.
       if (debug) {
-        println(s"debug: transformed ${transformedProofs.length} proof terms:\n ${transformedProofs.map(_.prettyPrint).mkString(";\n ")},\nafter simplify:\n ${result.map(_.prettyPrint).mkString(";\n ")}")
-        println(s"debug: types of transformed proofs:\n ${transformedProofs.map(_.tExpr).mkString(";\n ")},\nafter simplify:\n ${result.map(_.tExpr).mkString(";\n ")}")
+        println(s"debug: for sequent $sequent, after rule ${ruleResult.ruleName}, transformed ${transformedProofs.length} proof terms:\n ${transformedProofs.mkString(";\n ")},\nafter simplifying:\n ${result.mkString(";\n ")}")
+        //        println(s"debug: types of transformed proofs:\n ${transformedProofs.map(_.tExpr.prettyPrint).mkString(";\n ")},\nafter simplify:\n ${result.map(_.tExpr.prettyPrint).mkString(";\n ")}")
       }
       result
     }
@@ -97,7 +95,10 @@ object TheoremProver {
         }
     }
     val terms = fromRules.distinct
-    if (debug) println(s"debug: returning terms:\n ${terms.map(_.prettyPrint).mkString(";\n ")}")
+    if (debug) {
+      val termsMessage = if (terms.nonEmpty) "terms:\n " + terms.map(_.prettyPrint).mkString(";\n ") + "\n" else "no terms"
+      println(s"debug: returning $termsMessage for sequent $sequent")
+    }
     terms
   }
 

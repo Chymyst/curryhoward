@@ -11,7 +11,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
     def result[A, B, C]: (String, String) = testType[_ ⇒ B]
 
     val res = result._1
-    res shouldEqual "<oc>_ → B"
+    res shouldEqual "<oc>_ ⇒ B"
   }
 
   it should "get printable representation of enclosing owner's type" in {
@@ -41,32 +41,32 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of function types" in {
     def result[A, B, C]: (String, String) = testType[A ⇒ B]
 
-    result._1 shouldEqual "A → B"
+    result._1 shouldEqual "A ⇒ B"
   }
 
   it should "get printable representation of fixed types with type constructors" in {
-    def result[A, B, C]: (String, String) = testType[Option[Seq[Int]] ⇒ Option[List[Set[A]]] ⇒ B]
+    def result[P, Q, R]: (String, String) = testType[Option[Seq[Int]] ⇒ Option[IndexedSeq[Set[P]]] ⇒ Q]
 
-    result._1 shouldEqual "None + <tc>Seq[Int] → None + <tc>List[Set[A]] → B"
+    result._1 shouldEqual "Option[<tc>Seq[Int]]{None.type + Some[<tc>Seq[Int]]} ⇒ Option[<tc>IndexedSeq[Set[P]]]{None.type + Some[<tc>IndexedSeq[Set[P]]]} ⇒ Q"
   }
 
   it should "get printable representation of fixed types with type constructors with [_]" in {
-    def result[A, B, C]: (String, String) = testType[Option[_] ⇒ B]
+    def result[P, Q, R]: (String, String) = testType[Option[_] ⇒ Q]
 
     val res = result._1
-    res shouldEqual "None + <oc>_ → B"
+    res shouldEqual "Option[<oc>_]{None.type + Some[<oc>_]} ⇒ Q"
   }
 
   it should "get printable representation of Option types" in {
-    def result[A, B, C]: (String, String) = testType[Option[A] ⇒ Either[A, B]]
+    def result[P, Q, R]: (String, String) = testType[Option[P] ⇒ Either[P, Q]]
 
-    result._1 shouldEqual "None + A → A + B"
+    result._1 shouldEqual "Option[P]{None.type + Some[P]} ⇒ Either[P,Q]{Left[P,Q] + Right[P,Q]}"
   }
 
   it should "get printable representation of Any, Unit, and Nothing types" in {
     def result[A, B, C]: (String, String) = testType[Any ⇒ Nothing ⇒ Unit]
 
-    result._1 shouldEqual "<oc>_ → 0 → Unit"
+    result._1 shouldEqual "<oc>_ ⇒ 0 ⇒ Unit"
   }
 
   it should "not confuse a type parameter with a type inheriting from Any" in {
@@ -74,7 +74,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
 
     def result[A, B, C]: (String, String) = testType[A ⇒ Q]
 
-    result._1 shouldEqual "A → <oc>Q"
+    result._1 shouldEqual "A ⇒ <oc>Q"
   }
 
   it should "get printable representation of tuple types" in {
@@ -86,13 +86,32 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of tuple as function argument" in {
     def result[A, B, C]: (String, String) = testType[((A, B)) ⇒ C]
 
-    result._1 shouldEqual "(A, B) → C"
+    result._1 shouldEqual "(A, B) ⇒ C"
   }
 
   it should "get printable representation of tuple of basic types" in {
     def result[A, B, C]: (String, String) = testType[(Int, String, Boolean, Float, Double, Long, Symbol, Char)]
 
     result._1 shouldEqual "(" + CurryHowardMacros.basicTypes.map("<c>" + _).mkString(", ") + ")"
+  }
+
+  it should "get printable representation of single case class" in {
+
+    def result[T, U]: (String, String) = testType[Wrap1[T, U]]
+
+    result._1 shouldEqual "Wrap1[T,U]"
+  }
+
+  it should "get printable representation of sealed trait with type parameters" in {
+    def result[T, U]: (String, String) = testType[SimpleChoice[T]]
+
+    result._1 shouldEqual "SimpleChoice[T]{SimpleChoice1[T] + SimpleChoice2[T]}"
+  }
+
+  it should "get printable representation of sealed trait without type parameters" in {
+    def result[T, U]: (String, String) = testType[Wrap2]
+
+    result._1 shouldEqual "Wrap2{Wrap2a + Wrap2b + Wrap2c.type + Wrap2d[A] + Wrap2e[A]}"
   }
 
   it should "get printable representation of case class" in {
@@ -106,6 +125,6 @@ class MatchTypeSpec extends FlatSpec with Matchers {
 
     def result[T]: (String, String) = testType[Test1[T] ⇒ Test2]
 
-    result._1 shouldEqual "<tc>Test1[T] → <oc>Test2"
+    result._1 shouldEqual "Test1[T]{A[T] + B} ⇒ Test2{C + D}"
   }
 }

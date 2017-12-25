@@ -10,20 +10,31 @@ The calculus LJT as presented by Galmiche and Larchey-Wendling (1998).
 Axioms:
 -------
 
-+ (G*, X) |- X  -- axiom Id -- here X is atomic, although the same rule would be valid for non-atomic X, we will not use it because in that way we avoid duplication of derivations.
-+ G* |- 1  -- axiom T -- here 1 represents the Unit type, and the expression must be constructed somehow in the term.
++ (G*, X) |- X  -- axiom Id -- here X is atomic, although the same rule would be valid for non-atomic X, we do not allow that because in that way we avoid needless duplication of derivations.
++ G* |- 1  -- axiom T -- here 1 represents the Unit type (possibly a named Unit).
 - (G*, 0) |- A  -- axiom F -- we will not use it. Instead, we will treat `Nothing` as just another type parameter. (We will treat `Any` in this way, too.)
 
-Invertible rules:
------------------
+Invertible unambiguous rules:
+-----------------------------
 
-+ (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
-+ G* |- A & B when G* |- A and G* |- B  -- rule &R -- duplicates the context G*
-(G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
-+ G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
+Rules that do not change the goal:
+
++ (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L. Deletes premise, adds two premises.
++ (G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2. Deletes premise, adds premise.
++ (G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3. Deletes premise, adds two premises.
+
++ (G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L. Duplicates the context G*. Generates two new sequents. Deletes premise, adds premise in each new sequent.
+
+Rules that change the goal:
+
++ G* |- A ⇒ B when (G*, A) |- B  -- rule ->R. Replaces goal, adds premise.
+
++ G* |- A & B when G* |- A and G* |- B  -- rule &R. Duplicates the context G*. Replaces goal, generates two new sequents.
+
+Invertible ambiguous rules:
+---------------------------
+
 + (G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1 -- here X is atomic, although the same rule would be valid for non-atomic X.
-(G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
-(G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
 
 Non-invertible rules:
 ---------------------
@@ -32,6 +43,11 @@ Non-invertible rules:
 + G* |- A + B when G* |- B  -- rule +R2
 + (G*, (A ⇒ B) ⇒ C) |- D when (G*, C) |- D and (G*, B ⇒ C) |- A ⇒ B  -- rule ->L4
 
+Additional rules for named conjunctions:
+
++ G* |- Named(A, B) when G* |- (A & B)  -- rule _&R
++ G*, Named(A, B) |- C when G*, (A & B) |- C  -- rule _&L
++ G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L
  */
 
 object LJT {
@@ -41,6 +57,9 @@ object LJT {
     ruleConjunctionAtLeft,
     ruleImplicationAtLeft2,
     ruleImplicationAtLeft3,
+    ruleNamedConjunctionAtLeft,
+    ruleNamedConjunctionAtRight,
+    ruleImplicationWithNamedConjunctionAtLeft,
     // The following rules are tried later because they duplicate the context G*.
     ruleDisjunctionAtLeft,
     ruleConjunctionAtRight
@@ -51,7 +70,7 @@ object LJT {
   def nonInvertibleRulesForSequent[T](sequent: Sequent[T]): Seq[ForwardRule[T]] = {
     // Generate all +Rn rules if the sequent has a disjunction goal.
     (sequent.goal match {
-      case DisjunctT(terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
+      case DisjunctT(_, _, terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
       case _ ⇒ Seq[ForwardRule[T]]()
     }) ++ Seq(ruleImplicationAtLeft4[T]) // This rule is for all sequents.
   }
@@ -76,34 +95,11 @@ object LJT {
     fromIdAxiom ++ fromTAxiom
   }
 
-  // (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
-  // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
-  private def ruleConjunctionAtLeft[T] = ForwardRule[T](name = "&L", { sequent ⇒
-    val indexedPremises = sequent.premises.zipWithIndex
-    indexedPremises.collectFirst { case (ConjunctT(heads), index) ⇒ (heads, index) } match {
-      case Some((heads, i)) ⇒
-        val newPremises: List[TypeExpr[T]] = (heads ++ omitPremise(indexedPremises, i)).toList
-        Seq(RuleResult("&L", List(sequent.copy(premises = newPremises)), { proofTerms ⇒
-          // This rule expects one proof term.
-          val proofTerm = proofTerms.head
-          val thePremiseVarAB = sequent.premiseVars(i)
-          val valuesAB: List[TermExpr[T]] = heads.indices.map(ProjectE(_, thePremiseVarAB)).toList
-          val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
-          val result = TermExpr.applyToVars(proofTerm, valuesAB ++ oldPremisesWithoutI)
-          sequent.constructResultTerm(result)
-        }
-        )
-        )
-      case None ⇒ Seq()
-    }
-  }
-  )
-
   // (G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
   // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
   private def ruleDisjunctionAtLeft[T] = ForwardRule[T](name = "+L", { sequent ⇒
     val indexedPremises = sequent.premises.zipWithIndex
-    indexedPremises.collectFirst { case (DisjunctT(heads), index) ⇒ (heads, index) } match {
+    indexedPremises.collectFirst { case (DisjunctT(_, _, heads), index) ⇒ (heads, index) } match {
       case Some((heads, i)) ⇒
         val premisesWithoutAB = omitPremise(indexedPremises, i)
         val newSequents = heads.map { h ⇒ sequent.copy(premises = h :: premisesWithoutAB) }
@@ -113,7 +109,8 @@ object LJT {
 
           val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
           val freshVarsAB = heads.map(PropE(sequent.freshVar(), _)).toList
-          val subTerms = proofTerms.zip(freshVarsAB).map { case (pt, fv) ⇒ TermExpr.applyToVars(pt, fv :: oldPremisesWithoutI) }
+          // Each part of the disjunction is matched with a function of the form fv ⇒ proofTerm(fv, other_premises).
+          val subTerms = proofTerms.zip(freshVarsAB).map { case (pt, fv) ⇒ CurriedE(List(fv), TermExpr.applyToVars(pt, fv :: oldPremisesWithoutI)) }
           val result = MatchE(thePremiseVarAB, subTerms.toList)
           sequent.constructResultTerm(result)
         }
@@ -124,63 +121,62 @@ object LJT {
   }
   )
 
-  // (G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
-  // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
-  private def ruleImplicationAtLeft2[T] = ForwardRule[T](name = "->L2", { sequent ⇒
-    val indexedPremises = sequent.premises.zipWithIndex
-    indexedPremises.collectFirst { case (ConjunctT(heads) #-> argC, index) ⇒ (heads, argC, index) } match {
-      case Some((heads, argC, i)) ⇒
-        val newPremiseABC = heads.reverse.foldLeft(argC) { case (prev, h) ⇒ h ->: prev }
-        val newPremises: List[TypeExpr[T]] = newPremiseABC :: omitPremise(indexedPremises, i)
-        Seq(RuleResult("->L2", List(sequent.copy(premises = newPremises)), { proofTerms ⇒
-          // This rule expects one proof term.
-          val proofTerm = proofTerms.head
-          val thePremiseVarAB = sequent.premiseVars(i) // of type A*B ⇒ C
+  final case class UniRuleLogic[T](additionalPremises: Seq[TypeExpr[T]], produceAdditionalTerms: (Sequent[T], PropE[T]) ⇒ List[TermExpr[T]])
 
-          val freshVarsAB = heads.map(PropE(sequent.freshVar(), _)).toList
-          val func_A_B_to_C = CurriedE(freshVarsAB, AppE(thePremiseVarAB, ConjunctE(freshVarsAB)))
+  // Uniform rules: delete one premise, add one or more new premises, do not change the goal, generate only one new sequent.
 
-          val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
-          val result = TermExpr.applyToVars(proofTerm, func_A_B_to_C :: oldPremisesWithoutI)
-          sequent.constructResultTerm(result)
-        }
-        )
-        )
-      case None ⇒ Seq()
+  // Helper method for constructing uniform rules.
+  // Those rules are of the form  (G*, P) |- C when (G*, P1, P2, ..., Pn) |- C
+  // Those rules do not need to be multiplexed. They return a single RuleResult if applicable.
+  private def uniformRule[T](ruleName: String)(ruleLogic: PartialFunction[TypeExpr[T], UniRuleLogic[T]]) =
+    ForwardRule[T](ruleName, { sequent ⇒
+      val indexedPremises = sequent.premises.zipWithIndex
+      indexedPremises.collectFirst { case (p, i) if ruleLogic.isDefinedAt(p) ⇒ (ruleLogic(p), i) } match {
+        case Some((UniRuleLogic(additionalPremises, produceAdditionalTerms), i)) ⇒
+          val newPremises: List[TypeExpr[T]] = additionalPremises.toList ++ omitPremise(indexedPremises, i)
+          Seq(RuleResult(ruleName, List(sequent.copy(premises = newPremises)), { proofTerms ⇒
+            val proofTerm = proofTerms.head // This rule expects one proof term for the sequent (G*, P1, P2, ..., Pn) |- C.
+
+            val thePremiseVar = sequent.premiseVars(i) // The premise variable P.
+
+            val additionalValues: List[TermExpr[T]] = produceAdditionalTerms(sequent, thePremiseVar) // The terms P1, P2, ..., Pn.
+
+            val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
+            val result = TermExpr.applyToVars(proofTerm, additionalValues ++ oldPremisesWithoutI)
+            sequent.constructResultTerm(result) // The proof term for the sequent (G*, P1, P2, ..., Pn) |- C.
+          }
+          )
+          )
+
+        case None ⇒ Seq()
+      }
     }
+    )
+
+  // (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L
+  private def ruleConjunctionAtLeft[T] = uniformRule[T]("&L") {
+    case ConjunctT(heads) ⇒ UniRuleLogic(heads, (sequent, premiseVar) ⇒ heads.indices.map(ProjectE(_, premiseVar)).toList)
   }
-  )
+
+  // (G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
+  private def ruleImplicationAtLeft2[T] = uniformRule[T]("->L2") {
+    case ConjunctT(heads) #-> argC ⇒ UniRuleLogic(Seq(heads.reverse.foldLeft(argC) { case (prev, h) ⇒ h ->: prev }), { (sequent, premiseVar) ⇒
+      val freshVarsAB = heads.map(PropE(sequent.freshVar(), _)).toList
+      val func_A_B_to_C = CurriedE(freshVarsAB, AppE(premiseVar, ConjunctE(freshVarsAB)))
+      List(func_A_B_to_C)
+    })
+  }
 
   // (G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
-  // This rule does not need to be multiplexed. It can return a single RuleResult if it is applicable.
-  private def ruleImplicationAtLeft3[T] = ForwardRule[T](name = "->L3", { sequent ⇒
-    val indexedPremises = sequent.premises.zipWithIndex
-    indexedPremises.collectFirst { case ((t@DisjunctT(heads)) #-> argC, index) ⇒ (t, heads, argC, index) } match {
-      case Some((disjunctT, heads, argC, i)) ⇒
-
-        val newPremisesABC = heads.map(_ ->: argC).toList ++ omitPremise(indexedPremises, i)
-
-        Seq(RuleResult("->L3", List(sequent.copy(premises = newPremisesABC)), { proofTerms ⇒
-          // This rule expects one proof term.
-          val proofTerm = proofTerms.head
-          val thePremiseVarAB = sequent.premiseVars(i) // of type A+B ⇒ C
-
-          val freshVarsAB = heads.map(PropE(sequent.freshVar(), _)).toList
-
-          val functionsAC_BC: Seq[TermExpr[T]] = freshVarsAB.zipWithIndex.map { case (fv, ind) ⇒
-            CurriedE(List(fv), AppE(thePremiseVarAB, DisjunctE(ind, heads.length, fv, disjunctT)))
-          }
-
-          val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
-          val result = TermExpr.applyToVars(proofTerm, functionsAC_BC ++ oldPremisesWithoutI)
-          sequent.constructResultTerm(result)
-        }
-        )
-        )
-      case None ⇒ Seq()
-    }
+  private def ruleImplicationAtLeft3[T] = uniformRule[T]("->L3") {
+    case (disjunctT@DisjunctT(_, _, heads)) #-> argC ⇒ UniRuleLogic(heads.map(_ ->: argC), { (sequent, premiseVar) ⇒
+      val freshVarsAB = heads.map(PropE(sequent.freshVar(), _))
+      val functionsAC_BC = freshVarsAB.zipWithIndex.map { case (fv, ind) ⇒
+        CurriedE(List(fv), AppE(premiseVar, DisjunctE(ind, heads.length, fv, disjunctT)))
+      }
+      functionsAC_BC.toList
+    })
   }
-  )
 
   // G* |- A ⇒ B when (G*, A) |- B  -- rule ->R
   private def ruleImplicationAtRight[T] = ForwardRule[T](name = "->R", sequent ⇒
@@ -253,6 +249,74 @@ object LJT {
       case _ ⇒ Seq()
     }
   )
+
+  // G* |- Named(A, B) when G* |- (A & B)  -- rule _&R
+  private def ruleNamedConjunctionAtRight[T] = ForwardRule[T](name = "_&R", sequent ⇒
+    sequent.goal match {
+      case nct@NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+        val unwrapped = wrapped match {
+          case Nil ⇒ // empty wrapper means a named Unit as a case object
+            UnitT(constructor)
+          case _ ⇒ ConjunctT(wrapped)
+        }
+        Seq(RuleResult("_&R", Seq(sequent.copy(goal = unwrapped)), { proofTerms ⇒
+          // This rule takes one proof term.
+          val proofTerm = proofTerms.head
+          val result = sequent.substitute(proofTerm) match {
+            // Wrapped conjunction having more than one part.
+            case ConjunctE(terms) ⇒ NamedConjunctE(terms, nct)
+            // Wrapped Unit or wrapped single term.
+            case other if nct.caseObjectName.isDefined ⇒ NamedConjunctE(Nil, nct)
+            case other ⇒ NamedConjunctE(Seq(other), nct)
+          }
+          sequent.constructResultTerm(result)
+        })
+        )
+      case _ ⇒ Seq()
+    }
+  )
+
+  // G*, Named(A, B) |- C when G*, A, B |- C  -- rule _&L
+  private def ruleNamedConjunctionAtLeft[T] = uniformRule[T]("_&L") {
+    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+      val unwrapped = wrapped match {
+        case Nil ⇒ // empty wrapper means a named Unit as a case object
+          List(UnitT(constructor))
+        case _ ⇒ wrapped
+      }
+      UniRuleLogic(unwrapped, { (sequent, premiseVar) ⇒
+        // Need to produce the terms termsAB : A, B, ..., given premiseVar : Named(A, B).
+        val termsAB: List[TermExpr[T]] = wrapped match {
+          case Nil ⇒ // empty wrapper means a named Unit as a case object
+            List(UnitE(UnitT(constructor)))
+          case terms ⇒ // wrapper is not empty, so some terms are present
+            accessors.indices.map(ProjectE(_, premiseVar)).toList
+        }
+        termsAB
+      })
+  }
+
+  // G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L
+  private def ruleImplicationWithNamedConjunctionAtLeft[T] = uniformRule[T]("_->L") {
+    case (nct@NamedConjunctT(constructor, tParams, accessors, wrapped)) #-> argC ⇒
+      val unwrapped = ConjunctT(wrapped match {
+        case Nil ⇒ // empty wrapper means a named Unit as a case object
+          List(UnitT(constructor))
+        case _ ⇒ wrapped
+      })
+      UniRuleLogic(Seq(unwrapped ->: argC), { (sequent, premiseVar) ⇒
+        val fv = PropE(sequent.freshVar(), unwrapped)
+        // Need to produce a term termAB_C : (A & B) ⇒ C, given premiseVar : Named(A, B) ⇒ C.
+        // Use the free variable fv : A & B. We first construct namedAB : Named(A, B) using fv, and then apply premiseVar to it.
+        // The resulting term is fv ⇒ premiseVar namedAB
+        val namedAB: TermExpr[T] = wrapped match {
+          case Nil ⇒ NamedConjunctE(Seq(fv), nct)
+          case _ ⇒ NamedConjunctE(accessors.indices.map(ProjectE(_, fv)), nct)
+        }
+        val termAB_C = CurriedE(List(fv), AppE(premiseVar, namedAB))
+        List(termAB_C)
+      })
+  }
 
   // G* |- A + B when G* |- A  -- rule +R1
   // Generate all such rules for any disjunct.

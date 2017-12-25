@@ -9,7 +9,7 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   it should "inhabit type using ->L1" in {
     val typeExpr = TP(1) ->: ((TP(1) ->: TP(2)) ->: TP(2))
-    val proofs = TheoremProver.findProofs(typeExpr)
+    val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
   }
 
@@ -54,19 +54,25 @@ class LJTSpec2 extends FlatSpec with Matchers {
     def f1[A, B, C] = ofType[(A ⇒ B) ⇒ ((A ⇒ B) ⇒ C) ⇒ C]
   }
 
-  it should "generate the weak Peirce law" in {
+  it should "generate the weak Peirce's law and related laws" in {
+    // Weak Peirce's law.
     def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
 
-    // This cannot be implemented.
-    "def f[A,B]: ((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B = implement" shouldNot compile
+    // This cannot be implemented (weak double negation reduction).
+    "def h[A,B]: ((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B = implement" shouldNot compile
   }
 
   behavior of "product type projectors"
 
   it should "generate code that produces product types" in {
+    // TODO: fix "notype" problem
     def f[A, B] = ofType[A ⇒ B ⇒ (A, B)]
 
     f(123)("abc") shouldEqual ((123, "abc"))
+
+    def g[A, B]: A ⇒ B ⇒ (A, B) = implement
+
+    g(123)("abc") shouldEqual ((123, "abc"))
   }
 
   val g: Int ⇒ String = _.toString
@@ -110,11 +116,21 @@ class LJTSpec2 extends FlatSpec with Matchers {
     g("abc")(_ + 1)._2(100) shouldEqual 101
   }
 
+  behavior of "misc. proof terms"
+
+  it should "select implementation by argument usage counts" in {
+    def f[A]: A ⇒ (A ⇒ A) ⇒ A = implement // Implement as b ⇒ a ⇒ a b rather than b ⇒ _ ⇒ b.
+
+    f(123)(_ + 1) shouldEqual 124
+
+    // Triple negation is equivalent to single negation. The single "correct" implementation is b ⇒ a ⇒ b (c ⇒ c a).
+    def g[A, B]: (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B = implement
+  }
+
   behavior of "other examples"
 
   it should "generate code for reader monad's fmap" in {
     def f[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
-
   }
 
   it should "generate code using rule ->L2" in {
@@ -138,21 +154,5 @@ class LJTSpec2 extends FlatSpec with Matchers {
   it should "generate code for state monad update-mapping function using rule ->L2" in {
     def f[S, A, B]: (S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
   }
-
-  /*
-        it should "generate code using various disjunction rules" in {
-          def f[A, B, C, D, E]: A ⇒ Either[B, C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E] = implement
-        }
-
-      behavior of "named types"
-
-      it should "generate code by reflection on named type" in {
-        type MyType[T] = (Int, T, T)
-
-        def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement
-
-        f(1)("abc") shouldEqual ((1, "abc", "abc"))
-      }
-  */
 
 }

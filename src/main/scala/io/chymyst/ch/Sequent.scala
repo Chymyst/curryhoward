@@ -24,7 +24,7 @@ final case class Sequent[T](premises: List[TypeExpr[T]], goal: TypeExpr[T], fres
     */
   def constructResultTerm(result: TermExpr[T]): TermExpr[T] = CurriedE(premiseVars, result)
 
-  override lazy val toString: String = s"[(${premises.mkString(", ")}) |- $goal]"
+  override lazy val toString: String = s"[${premises.map(_.prettyPrint).mkString("; ")} |- ${goal.prettyPrint}]"
 }
 
 class FreshIdents(prefix: String) {
