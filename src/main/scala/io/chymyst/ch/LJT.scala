@@ -17,6 +17,9 @@ Axioms:
 Invertible unambiguous rules:
 -----------------------------
 
+Unambiguous rules either can be applied to premises in only one way, or they cannot be applied.
+Therefore, applying these rules in any order will not yield alternative proof terms.
+
 Rules that do not change the goal:
 
 + (G*, A & B) |- C when (G*, A, B) |- C  -- rule &L. Deletes premise, adds two premises.
@@ -33,6 +36,8 @@ Rules that change the goal:
 
 Invertible ambiguous rules:
 ---------------------------
+
+Ambiguous rules can be applied to the premises in several different ways, possibly generating alternative proof terms.
 
 + (G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1 -- here X is atomic, although the same rule would be valid for non-atomic X.
 

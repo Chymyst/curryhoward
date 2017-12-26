@@ -123,28 +123,48 @@ class LJTSpec3 extends FlatSpec with Matchers {
     makeUser(123, (x: Int) ⇒ x.toString) shouldEqual User(123, "123")
   }
 
-  behavior of "named types"
+  behavior of "toType"
+
+  it should "detect type of all relevant variables" in {
+    val yyy: Int = 123
+    val zzz: String = "abc"
+    val p = toType[(Int, String)](yyy, zzz)
+    p shouldEqual ((123, "abc"))
+  }
+
+  it should "use toType without arguments" in {
+    val p = toType[Int ⇒ Int]()
+    p(123) shouldEqual 123
+  }
 
   // TODO: make this work
+  it should "use toType with constant arguments" in {
+    """val p = toType[(Int, String)](123, "abc")""" shouldNot compile
+//    p shouldEqual ((123, "abc"))
+  }
   /*
-  it should "generate code by reflection on named type that has no type parameters" in {
-    type MyType = (Int, String)
+    behavior of "named types"
 
-    def f: MyType ⇒ Int = implement
+    // TODO: make this work
 
-    f((123, "abc")) shouldEqual 123
-  }
+    it should "generate code by reflection on named type that has no type parameters" in {
+      type MyType = (Int, String)
 
-  // TODO: make this work
-  // This does not work because we match Tuple3 but `args` show only one type parameter. So this
-  // is incorrectly recognized as a tuple with a single element of type T.
+      def f: MyType ⇒ Int = implement
 
-  it should "generate code by reflection on named type with type parameters" in {
-    type MyType[T] = (Int, T, T)
+      f((123, "abc")) shouldEqual 123
+    }
 
-    def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement
+    // TODO: make this work
+    // This does not work because we match Tuple3 but `args` show only one type parameter. So this
+    // is incorrectly recognized as a tuple with a single element of type T.
 
-    f(1)("abc") shouldEqual ((1, "abc", "abc"))
-  }
-*/
+    it should "generate code by reflection on named type with type parameters" in {
+      type MyType[T] = (Int, T, T)
+
+      def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement
+
+      f(1)("abc") shouldEqual ((1, "abc", "abc"))
+    }
+  */
 }

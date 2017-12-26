@@ -341,7 +341,7 @@ class CurryHowardMacros(val c: whitebox.Context) {
       case lists ⇒
         val givenVars = lists.flatten.map(s ⇒ PropE(s.name.decodedName.toString, matchType(s.typeSignature)))
         val resultType = matchType(typeU.finalResultType)
-        val typeStructure = givenVars.map(_.tExpr).reverse.foldLeft(resultType) { case (prev, t) ⇒ t ->: prev }
+        val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.tExpr ->: prev }
         inhabitInternal(typeStructure) match {
           case Right(term) ⇒
             val termFound = givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify
@@ -356,6 +356,35 @@ class CurryHowardMacros(val c: whitebox.Context) {
         }
 
     }
+  }
+
+  def toTypeImpl[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
+    val typeUGiven: c.Type = c.weakTypeOf[U]
+    val typeUT = matchType(typeUGiven)
+
+    // For some reason, this does not work, even though very similar code works for inhabitImpl.
+    // The error is in `val p: (Int, String) = toType(123, "abc"). It infers `Nothing` as the _correct_ type of the expression `p` for some reason!
+//        val (typeU, typeUT) = matchType(typeUGiven) match {
+//          case NothingT(_) ⇒
+//            val typeU = c.internal.enclosingOwner.typeSignature.finalResultType
+//            (typeU, matchType(typeU))
+//          case t ⇒ (typeUGiven, t)
+//        }
+    val givenVars: Seq[PropE[String]] = values.map(v ⇒ PropE(v.tree.symbol.name.decodedName.toString, matchType(v.actualType)))
+    val typeStructure = givenVars.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
+    inhabitInternal(typeStructure) match {
+      case Right(term) ⇒
+        val termFound = givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify
+        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = true)
+        val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
+        val result = reifyTerm(termFound, paramTerms)
+        if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
+        q"($result : $typeUGiven)"
+      case Left(errorMessage) ⇒
+        c.error(c.enclosingPosition, errorMessage)
+        q"null"
+    }
+
   }
 
   def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = {

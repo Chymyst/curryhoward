@@ -5,6 +5,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/io.chymyst/curryhoward_2.12.svg)](http://search.maven.org/#search%7Cga%7C1%7Cio.chymyst)
 
 # curryhoward
+
 A library for automatic implementation of fully type-parametric functions via the Curry-Howard isomorphism.
 
 The Curry-Howard isomorphism maps functions with fully parametric types to theorems in the intuitionistic propositional logic (IPL) with universally quantified propositions.
@@ -65,6 +66,7 @@ See also the [tutorial](docs/Tutorial.md).
 
 - Recursive case classes (including `List`!) cause stack overflow
 - Type aliases `type MyType[T] = (Int, T)` generate incorrect code
+- No support for the conventional Scala-style function types with multiple arguments, e.g. `(T, U) ⇒ T`; tuples need to be used instead, e.g. `((T, U)) ⇒ T`
 
 # Examples
 
@@ -129,7 +131,7 @@ If there exist some equational laws that apply to this function, the laws need t
 
 ## Case classes
 
-Sealed traits and case classes are supported:
+Sealed traits and case classes are supported, including `Option` and `Either`:
 
 ```scala
 def eitherCommut[A, B]: Either[A, B] ⇒ Either[B, A] = implement
@@ -139,7 +141,7 @@ def eitherAssoc[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = 
 ```
 
 Case objects are treated as named `Unit` type.
- 
+
 The "smallest information loss" heuristic allows us to select the "better" implementation in the following example:
 
 ```scala
