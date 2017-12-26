@@ -1,10 +1,10 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.CurryHowardMacros._
+import io.chymyst.ch.Macros._
 import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
 
-class CurryHowardMacrosSpec extends FlatSpec with Matchers {
+class MacrosSpec extends FlatSpec with Matchers {
   /* Not used now.
     behavior of "syntax for untyped functions"
 

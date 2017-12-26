@@ -113,7 +113,8 @@ sealed trait TermExpr[+T] {
   } yield s"$letter$number"
 
   def prettyRename: TermExpr[T] = {
-    val oldVars = usedVars // Let's see if reversing helps achieve a more natural style, a -> b -> c -> .... rather than c -> b -> a -> ...
+    val oldVars = usedVars // Use a `Seq` here rather than a `Set` for the list of variable names.
+    // This achieves deterministic renaming, which is important for checking that different terms are equivalent up to renaming.
     val newVars = prettyVars.take(oldVars.length).toSeq
     this.renameAllVars(oldVars, newVars)
   }

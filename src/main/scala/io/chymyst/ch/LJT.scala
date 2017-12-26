@@ -2,8 +2,6 @@ package io.chymyst.ch
 
 import io.chymyst.ch.TermExpr.ProofTerm
 
-import scala.collection.immutable
-
 /*
 The calculus LJT as presented by Galmiche and Larchey-Wendling (1998).
 

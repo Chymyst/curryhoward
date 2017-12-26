@@ -128,12 +128,12 @@ class LJTSpec3 extends FlatSpec with Matchers {
   it should "detect type of all relevant variables" in {
     val yyy: Int = 123
     val zzz: String = "abc"
-    val p = toType[(Int, String)](yyy, zzz)
+    val p = ofType[(Int, String)](yyy, zzz)
     p shouldEqual ((123, "abc"))
   }
 
   it should "use toType without arguments" in {
-    val p = toType[Int ⇒ Int]()
+    val p = ofType[Int ⇒ Int]()
     p(123) shouldEqual 123
   }
 
@@ -143,10 +143,6 @@ class LJTSpec3 extends FlatSpec with Matchers {
 //    p shouldEqual ((123, "abc"))
   }
 
-  it should "use inhabitImpl1 for testing" in {
-    val x: Int ⇒ Int = implement1
-    x(123) shouldEqual 123
-  }
   /*
     behavior of "named types"
 
