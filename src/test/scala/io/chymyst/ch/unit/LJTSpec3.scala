@@ -142,6 +142,11 @@ class LJTSpec3 extends FlatSpec with Matchers {
     """val p = toType[(Int, String)](123, "abc")""" shouldNot compile
 //    p shouldEqual ((123, "abc"))
   }
+
+  it should "use inhabitImpl1 for testing" in {
+    val x: Int ⇒ Int = implement1
+    x(123) shouldEqual 123
+  }
   /*
     behavior of "named types"
 

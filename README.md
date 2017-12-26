@@ -39,7 +39,7 @@ object MyApp extends App {
 
   def f[X, Y]: X => Y => X = implement
 
-  // The code `(x: X) ⇒ (y: Y) ⇒ x` is generated for the function `f`.
+  // The fully polymorphic code `(x: X) ⇒ (y: Y) ⇒ x` is generated for the function `f`.
   
   f(123)("abc") // returns 123
 }
@@ -56,23 +56,30 @@ See also the [tutorial](docs/Tutorial.md).
 
 - The theorem prover for the full IPL is working
 - When a type cannot be inhabited, signal a compile-time error
-- Unit type, constant types, tuples, sealed traits / case classes / case objects are supported
+- Support for `Unit` type, constant types, type parametrs, function types, tuples, sealed traits / case classes / case objects
 - Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T` can be used
 - When a type can be implemented in more than one way, heuristics ("least information loss") are used to prefer implementations that are more likely to satisfy algebraic laws 
 - Signal error when a type can be implemented in more than one way despite using heuristics
-- Tests and tutorial examples
+- Tests and a tutorial
 
 # Bugs and to-do
 
 - Recursive case classes (including `List`!) cause stack overflow
 - Type aliases `type MyType[T] = (Int, T)` generate incorrect code
 - No support for the conventional Scala-style function types with multiple arguments, e.g. `(T, U) ⇒ T`; tuples need to be used instead, e.g. `((T, U)) ⇒ T`
+- `toType()` cannot work with constant arguments, needs variables
+- The type parameters must be named the same in the sealed trait and in each case class, otherwise things break
 
-# Examples
+# Examples of functionality
+
+The following code examples show how various functions are implemented automatically, given their type.
 
 ```scala
 // "Weak" Peirce's law:
 def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
+
+// Weak law of _tertium non datur_
+def f[A, B]: (Either[A, A ⇒ B] ⇒ B) ⇒ B = implement
 
 ```
 
@@ -85,7 +92,6 @@ def flatMap[E, A, B]: (E ⇒ A) ⇒ (A ⇒ E ⇒ B) ⇒ (E ⇒ B) = implement
 
 ```
 
-Unit types, tuples, and constant types are supported.
 Constant types are treated as type parameters.
 
 ```scala
@@ -95,6 +101,38 @@ def f[A, B]: A ⇒ Int ⇒ (A, Int) = implement
 f("abc")(123) // returns the tuple ("abc", 123)
 
 ```
+
+## Alternative syntax
+
+There are three ways in which code can be generated based on type:
+
+1. the type is specified on the left-hand side: `def f: ... = implement`
+2. the type is specified as an explicit type parameter on the right-hand side, and it is not necessary to define a new value: `ofType[...](...)`
+3. the type is specified as an explicit type parameter on the right-hand side, and all possible implementations are returned: `allOfType[...](...)`
+
+```scala
+// Conventional Scala syntax for functions.
+def f1[T, U](x: T, y: T ⇒ U) : (T, U) = implement
+
+// Fully or partially curried functions.
+def f2[T, U](x: T): (T ⇒ U) ⇒ (T, U) = implement
+
+def f3[T, U]: T ⇒ (T ⇒ U) ⇒ (T, U) = implement
+
+// Specifying
+
+// Using locally generated expressions. 
+case class UserId(name: String, id: Long)
+
+val a: Int = 123
+val b: String = "abc"
+val c: Int ⇒ Long = _.toLong
+
+ofType[UserId](a, b, c).id // 123L
+
+```
+
+## Heuristics for choosing different implementations
 
 If the theorem prover finds several alternative implementations of a function, it attempts to find the implementation with the smallest "information loss".
 

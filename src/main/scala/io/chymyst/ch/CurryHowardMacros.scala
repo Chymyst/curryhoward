@@ -358,6 +358,31 @@ class CurryHowardMacros(val c: whitebox.Context) {
     }
   }
 
+  def inhabitImpl1[U]: c.Tree = {
+    val typeU = c.internal.enclosingOwner.typeSignature
+    // Detect whether we are given a function with arguments.
+    typeU.resultType.paramLists match {
+      case Nil ⇒ inhabitOneInternal(typeU)
+      case lists ⇒
+        val givenVars = lists.flatten.map(s ⇒ PropE(s.name.decodedName.toString, matchType(s.typeSignature)))
+        val resultType = matchType(typeU.finalResultType)
+        val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.tExpr ->: prev }
+        inhabitInternal(typeStructure) match {
+          case Right(term) ⇒
+            val termFound = givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify
+            c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = true)
+            val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
+            val result = reifyTerm(termFound, paramTerms)
+            if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
+            result
+          case Left(errorMessage) ⇒
+            c.error(c.enclosingPosition, errorMessage)
+            q"null"
+        }
+
+    }
+  }
+
   def toTypeImpl[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
     val typeUGiven: c.Type = c.weakTypeOf[U]
     val typeUT = matchType(typeUGiven)
