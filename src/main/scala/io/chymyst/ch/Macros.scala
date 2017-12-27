@@ -26,6 +26,7 @@ note: to re­run compile after a successful compile you need either to clean or 
 - use blackbox macros instead of whitebox if possible (5) ?? Seems to prevent the " = implement" and "= ofType[]" syntax from working.
 - implement uncurried functions and multiple argument lists (6)?? Not sure this helps. We can already do this with `implement`.
 - use a special subclass of Function1 that also carries symbolic information about the lambda-term (6)
+
  */
 
 // TODO: can we replace this with blackbox? So far this only works with whitebox.
@@ -33,7 +34,9 @@ class Macros(val c: whitebox.Context) {
 
   import c.universe._
 
-  private val debug = Macros.options contains "macros"
+  private def debug = Macros.options contains "macros"
+
+  private def showReturningTerm = Macros.options contains "term"
 
   private val basicRegex = s"(?:scala.|java.lang.)*(${Macros.basicTypes.mkString("|")})".r
 
@@ -339,7 +342,7 @@ class Macros(val c: whitebox.Context) {
       case Right((messageOpt, t)) ⇒
         messageOpt.foreach(message ⇒ c.warning(c.enclosingPosition, message))
         val termFound = transform(t)
-        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = true)
+        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = showReturningTerm)
         val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
         val result = reifyTerm(termFound, paramTerms)
         c.info(c.enclosingPosition, "Returning code: ${showCode(result)}", force = debug)
