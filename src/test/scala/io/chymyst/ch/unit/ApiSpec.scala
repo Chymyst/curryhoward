@@ -14,7 +14,7 @@ class ApiSpec extends LawChecking {
     fEqual(f1[Int], f2[Int])
   }
 
-  behavior of "syntax of `implement` and `typeOf`"
+  behavior of "syntax of `implement` and `ofType`"
 
   it should "compile" in {
     def f1[X, Y]: X ⇒ Y ⇒ X = implement
@@ -82,6 +82,10 @@ class ApiSpec extends LawChecking {
 
   it should "fail to compile when two possible implementations are equally good" in {
     "def f1[X, A, B]: X ⇒ A ⇒ X ⇒ X = implement" shouldNot compile
+
+    def f1[X, A, B] = allOfType[X ⇒ A ⇒ X ⇒ X]
+
+    f1[Int, String, Boolean].length shouldEqual 2
   }
 
   it should "generate correct code for the const function with extra unused arguments" in {
@@ -116,4 +120,21 @@ class ApiSpec extends LawChecking {
     f1(true) shouldEqual true
   }
 
+  behavior of "ofType and allOfType"
+
+  it should "find implementation with given arguments" in {
+    val x = ofType[(Int, String)](123, (x: Int) ⇒ x.toString + "abc")
+    x shouldEqual ((123, "123abc"))
+
+    ofType[(Int, Int, String)](123, (x: Int) ⇒ (b: Boolean) ⇒ x.toString + b.toString, false) shouldEqual ((123, 123, "123false"))
+  }
+
+  it should "find all implementations with given arguments when there is one implementation" in {
+    val x = allOfType[(Int, String)](123, (x: Int) ⇒ x.toString + "abc")
+    x.length shouldEqual 1
+  }
+
+  it should "find all implementations with given arguments when there is more than one implementation" in {
+    allOfType[(Int, String)](123, 456, (x: Int) ⇒ x.toString + "abc").length shouldEqual 2
+  }
 }

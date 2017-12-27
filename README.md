@@ -102,8 +102,6 @@ The generated code is purely functional and assumes that all given values and ty
 - Recursive case classes (including `List`!) cause stack overflow
 - Type aliases `type MyType[T] = (Int, T)` will silently generate incorrect code
 - No support for the conventional Java-style function types with multiple arguments, e.g. `(T, U) ⇒ T`; tuple types need to be used instead, e.g. `((T, U)) ⇒ T`
-- `ofType(x, y, ...)` works only when `x`, `y`, ... are variables but not when they are expressions (gives NullPointerException trying to obtain the variable's name)
-- variable names may clash with automatically generated names
 - The type parameters must be named the same in the sealed trait and in each case class, otherwise the code may fail
 
 # Examples of working functionality

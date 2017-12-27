@@ -342,9 +342,16 @@ class Macros(val c: whitebox.Context) {
     inhabitOneInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify }
   }
 
-  def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = {
+  def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = allOfTypeImplWithValues[U]()
+
+  def allOfTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
     val typeU: c.Type = c.weakTypeOf[U]
-    inhabitAllInternal(typeU, Map())
+    val typeUT: TypeExpr[String] = matchType(typeU)
+    val givenVars: Seq[(PropE[String], c.Tree)] = values.zipWithIndex
+      .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", matchType(v.actualType)), v.tree) }
+    val givenVarsAsArgs = givenVars.map(_._1)
+    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
+    inhabitAllInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify }
   }
 
   /** Construct a Scala code tree that implements a type expression tree.
@@ -379,16 +386,20 @@ class Macros(val c: whitebox.Context) {
 
   }
 
-  private def inhabitAllInternal(typeT: c.Type, givenTerms: Map[PropE[String], c.Tree]): c.Tree = {
-    type TExprType = String // (String, c.Type)
-    val typeStructure: TypeExpr[TExprType] = matchType(typeT)
-    val terms = TheoremProver.findProofs(typeStructure)._1.map { termFound ⇒
+  private def inhabitAllInternal(
+    typeStructure: TypeExpr[String],
+    givenTerms: Map[PropE[String], c.Tree]
+  )(
+    transform: TermExpr[String] ⇒ TermExpr[String] = identity
+  ): c.Tree = {
+    val terms = TheoremProver.findProofs(typeStructure)._1.map { term ⇒
+      val termFound = transform(term)
       c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
-      val paramTerms: Map[PropE[TExprType], c.Tree] = TermExpr.propositions(termFound).map(p ⇒ p → reifyParam(p)).toMap
+      val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).map(p ⇒ p → reifyParam(p)).toMap
       val result = reifyTerm(termFound, paramTerms, givenTerms)
       c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = debug)
 
-      result // use resultWithType? Doesn't seem to work.
+      result
     }
     q"Seq(..$terms)"
   }

@@ -34,6 +34,15 @@ package object ch {
     */
   def allOfType[U]: Seq[U] = macro Macros.allOfTypeImpl[U]
 
+  /** Automatically implement an expression of a given type using given values, and return all possible inequivalent implementations.
+    * The type parameter `U` _must_ be specified.
+    *
+    * @tparam U Type of the expression to be implemented.
+    * @param values Zero or more expressions that may be used while implementing the type.
+    * @return A sequence of all possible inequivalent automatically constructed expressions of type `U`.
+    */
+  def allOfType[U](values: Any*): Seq[U] = macro Macros.allOfTypeImplWithValues[U]
+
   /** Automatically implement an expression of a given type, using given values.
     * The type parameter `U` _must_ be specified.
     *
