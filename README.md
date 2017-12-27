@@ -23,6 +23,11 @@ The `curryhoward` library provides Scala macros that generate code automatically
 
 The code is generated at compile time. A compile-time error occurs when there are several inequivalent implementations for a given type, or if the type cannot be implemented at all (i.e. when the given propositional formula is not a theorem).
 
+See the [youtube presentation](https://youtu.be/cESdgot_ZxY) and the [tutorial](docs/Tutorial.md) for more details.
+
+
+# How it works
+
 The current implementation uses an IPL theorem prover based on the sequent calculus called LJT as presented in:
 
 [D. Galmiche , D. Larchey-Wendling. _Formulae-as-Resources Management for an Intuitionistic Theorem Prover_ (1998)](http://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.35.2618). 	In 5th Workshop on Logic, Language, Information and Computation, WoLLIC'98, Sao Paulo.
@@ -70,8 +75,6 @@ val user = ofType[User](f, s, x)
 ```
 
 The generated code is purely functional and assumes that all given values and types are free of side effects.
-
-See the [tutorial](docs/Tutorial.md) for more details.
 
 # Unit tests
 
