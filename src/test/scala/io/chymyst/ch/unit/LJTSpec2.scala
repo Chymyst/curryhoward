@@ -38,7 +38,8 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
     f1(123)(f2) shouldEqual "123"
   }
-  it should "generate code for the 'lemma'" in {
+
+  it should "generate code for the 'stepping stone lemma'" in {
     def f1[A, B, C]: ((A ⇒ B) ⇒ C) ⇒ B ⇒ C = implement
 
     val result: String => Boolean = f1[Int, String, Boolean](f ⇒ f(0) == "0")
@@ -48,6 +49,17 @@ class LJTSpec2 extends FlatSpec with Matchers {
     result("abc") shouldEqual false
 
     "def f2[A, B,C] = ofType[((A ⇒ B) ⇒ C) ⇒ A ⇒ B]" shouldNot compile
+  }
+
+  it should "generate code for the 'Vorobieff lemma'" in {
+    def f1[A, B, C]: (((A ⇒ B) ⇒ C) ⇒ A ⇒ B) ⇒ (B ⇒ C) ⇒ (A ⇒ B) = implement
+
+    def f2[A, B, C]: ((B ⇒ C) ⇒ (A ⇒ B)) ⇒ (((A ⇒ B) ⇒ C) ⇒ A ⇒ B) = implement
+  }
+
+  it should "deterministically rename variables in the proof terms before comparing" in {
+    // This should not generate two different proof terms.
+    def f2a[A, B, C]: ((B ⇒ C) ⇒ (A ⇒ B)) ⇒ (((A ⇒ B) ⇒ C) ⇒ B ⇒ C) = implement
   }
 
   it should "generate code for modus ponens with implication in premise" in {

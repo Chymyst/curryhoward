@@ -2,8 +2,6 @@ package io.chymyst.ch
 
 import io.chymyst.ch.TermExpr.ProofTerm
 
-import scala.collection.immutable
-
 /*
 The calculus LJT as presented by Galmiche and Larchey-Wendling (1998).
 
@@ -16,6 +14,9 @@ Axioms:
 
 Invertible unambiguous rules:
 -----------------------------
+
+Unambiguous rules either can be applied to premises in only one way, or they cannot be applied.
+Therefore, applying these rules in any order will not yield alternative proof terms.
 
 Rules that do not change the goal:
 
@@ -33,6 +34,8 @@ Rules that change the goal:
 
 Invertible ambiguous rules:
 ---------------------------
+
+Ambiguous rules can be applied to the premises in several different ways, possibly generating alternative proof terms.
 
 + (G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1 -- here X is atomic, although the same rule would be valid for non-atomic X.
 

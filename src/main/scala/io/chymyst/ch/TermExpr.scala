@@ -6,24 +6,24 @@ object TermExpr {
   type VarName = String
   type ProofTerm[T] = TermExpr[T]
 
-  def propositions[T](termExpr: TermExpr[T]): Set[PropE[T]] = termExpr match {
-    case p: PropE[T] ⇒ Set(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
+  def propositions[T](termExpr: TermExpr[T]): Seq[PropE[T]] = (termExpr match {
+    case p: PropE[T] ⇒ Seq(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
     case AppE(head, arg) ⇒ propositions(head) ++ propositions(arg)
     case CurriedE(heads, body) ⇒ // Can't pattern-match directly for some reason! Some trouble with the type parameter T.
-      heads.asInstanceOf[List[PropE[T]]].toSet ++ propositions(body)
-    case ConjunctE(terms) ⇒ terms.flatMap(propositions).toSet
+      heads.asInstanceOf[List[PropE[T]]] ++ propositions(body)
+    case ConjunctE(terms) ⇒ terms.flatMap(propositions)
     case ProjectE(index, term) ⇒ propositions(term)
-    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(propositions).toSet
-    case MatchE(term, cases) ⇒ propositions(term) ++ cases.flatMap(propositions).toSet
+    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(propositions)
+    case MatchE(term, cases) ⇒ propositions(term) ++ cases.flatMap(propositions)
     case DisjunctE(_, _, term, _) ⇒ propositions(term)
-    case UnitE(_) ⇒ Set()
-  }
+    case UnitE(_) ⇒ Seq()
+  }).distinct
 
   private val freshIdents = new FreshIdents("z")
 
   private val makeFreshNames: Iterator[VarName] = Iterator.iterate(freshIdents())(_ ⇒ freshIdents())
 
-  def allFreshNames(names1: Seq[VarName], names2: Seq[VarName], namesToExclude: Set[VarName]): Seq[VarName] = {
+  def allFreshNames(names1: Seq[VarName], names2: Seq[VarName], namesToExclude: Seq[VarName]): Seq[VarName] = {
     val requiredNumber = names1.length
     val allExcluded = (names1 ++ names2 ++ namesToExclude).toSet
     makeFreshNames.filterNot(allExcluded.contains).take(requiredNumber).toSeq
@@ -113,7 +113,8 @@ sealed trait TermExpr[+T] {
   } yield s"$letter$number"
 
   def prettyRename: TermExpr[T] = {
-    val oldVars = usedVars.toSeq.sorted.reverse // Let's see if reversing helps achieve a more natural style, a -> b -> c -> .... rather than c -> b -> a -> ...
+    val oldVars = usedVars // Use a `Seq` here rather than a `Set` for the list of variable names.
+    // This achieves deterministic renaming, which is important for checking that different terms are equivalent up to renaming.
     val newVars = prettyVars.take(oldVars.length).toSeq
     this.renameAllVars(oldVars, newVars)
   }
@@ -164,29 +165,29 @@ sealed trait TermExpr[+T] {
     case DisjunctE(index, total, term, tExpr) ⇒ term.usedTuplePartsSeq
   }
 
-  lazy val freeVars: Set[VarName] = this match {
-    case PropE(name, tExpr) ⇒ Set(name)
+  lazy val freeVars: Seq[VarName] = (this match {
+    case PropE(name, tExpr) ⇒ Seq(name)
     case AppE(head, arg) ⇒ head.freeVars ++ arg.freeVars
-    case CurriedE(heads, body) ⇒ body.freeVars -- heads.map(_.name).toSet
-    case UnitE(tExpr) ⇒ Set()
-    case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars).toSet
-    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.freeVars).toSet
+    case CurriedE(heads, body) ⇒ body.freeVars.filterNot(heads.map(_.name).toSet.contains)
+    case UnitE(tExpr) ⇒ Seq()
+    case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars)
+    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.freeVars)
     case p: ProjectE[T] ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
-    case MatchE(term, cases) ⇒ term.freeVars ++ cases.flatMap(_.freeVars).toSet
+    case MatchE(term, cases) ⇒ term.freeVars ++ cases.flatMap(_.freeVars)
     case d: DisjunctE[T] ⇒ d.term.freeVars
-  }
+  }).distinct
 
-  lazy val usedVars: Set[VarName] = this match {
-    case PropE(name, tExpr) ⇒ Set(name)
+  lazy val usedVars: Seq[VarName] = (this match {
+    case PropE(name, tExpr) ⇒ Seq(name)
     case AppE(head, arg) ⇒ head.usedVars ++ arg.usedVars
-    case CurriedE(heads, body) ⇒ body.usedVars ++ heads.map(_.name).toSet
-    case UnitE(tExpr) ⇒ Set()
-    case ConjunctE(terms) ⇒ terms.flatMap(_.usedVars).toSet
-    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.usedVars).toSet
+    case CurriedE(heads, body) ⇒ body.usedVars ++ heads.map(_.name)
+    case UnitE(tExpr) ⇒ Seq()
+    case ConjunctE(terms) ⇒ terms.flatMap(_.usedVars)
+    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.usedVars)
     case p: ProjectE[T] ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
-    case MatchE(term, cases) ⇒ term.usedVars ++ cases.flatMap(_.usedVars).toSet
+    case MatchE(term, cases) ⇒ term.usedVars ++ cases.flatMap(_.usedVars)
     case d: DisjunctE[T] ⇒ d.term.usedVars
-  }
+  }).distinct
 
   def varCount(varName: VarName): Int = this match {
     case PropE(name, tExpr) ⇒ if (name == varName) 1 else 0
@@ -354,7 +355,6 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
     case Nil ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
   }
 
-  // TODO: simplify when term is a DisjunctE
   override def simplify: TermExpr[T] = term.simplify match {
     case DisjunctE(index, total, t, _) ⇒
       if (total == cases.length) {

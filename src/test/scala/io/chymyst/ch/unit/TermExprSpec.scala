@@ -25,7 +25,7 @@ class TermExprSpec extends FlatSpec with Matchers {
   behavior of "TermExpr#propositions"
 
   it should "get the list of propositions" in {
-    TermExpr.propositions(CurriedE(List(PropE("A", TP("A"))), AppE(PropE("B", TP("B") ->: TP("A")), PropE("B", TP("B"))))) shouldEqual Set(PropE("A", TP("A")), PropE("B", TP("B")), PropE("B", TP("B") ->: TP("A")))
+    TermExpr.propositions(CurriedE(List(PropE("A", TP("A"))), AppE(PropE("B", TP("B") ->: TP("A")), PropE("B", TP("B"))))) shouldEqual Seq(PropE("A", TP("A")), PropE("B", TP("B") ->: TP("A")), PropE("B", TP("B")))
   }
 
   behavior of "TermExpr#prettyPrint"
@@ -37,15 +37,15 @@ class TermExprSpec extends FlatSpec with Matchers {
     // b ⇒ c ⇒ b (a ⇒ a c)  is of type (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B
     val termExpr = CurriedE(List(b, c), AppE(b, CurriedE(List(a), AppE(a, c))))
     termExpr.toString shouldEqual "\\((b:((A ⇒ B) ⇒ B) ⇒ B) ⇒ (c:A) ⇒ ((b:((A ⇒ B) ⇒ B) ⇒ B))(\\((a:A ⇒ B) ⇒ ((a:A ⇒ B))((c:A)))))"
-    termExpr.prettyPrint shouldEqual "(b ⇒ a ⇒ b (c ⇒ c a))"
+    termExpr.prettyPrint shouldEqual "(a ⇒ c ⇒ a (b ⇒ b c))"
   }
 
   behavior of "TermExpr#freeVars"
 
   it should "detect free variables" in {
-    termExpr1.freeVars shouldEqual Set()
-    termExpr2.freeVars shouldEqual Set("x1")
-    termExpr3.freeVars shouldEqual Set()
+    termExpr1.freeVars shouldEqual Seq()
+    termExpr2.freeVars shouldEqual Seq("x1")
+    termExpr3.freeVars shouldEqual Seq()
   }
 
   behavior of "TermExpr#equiv"

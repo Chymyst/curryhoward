@@ -1,6 +1,6 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.CurryHowardMacros.testType
+import io.chymyst.ch.Macros.testType
 import org.scalatest.{FlatSpec, Matchers}
 
 class MatchTypeSpec2 extends FlatSpec with Matchers {

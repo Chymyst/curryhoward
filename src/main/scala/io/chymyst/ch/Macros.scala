@@ -19,51 +19,26 @@ Run the remote­debug config in idea. That will connect it to your running sbt. 
 note: to re­run compile after a successful compile you need either to clean or change some code
  */
 
-/*
-Done:
-+ finish the implicational fragment (0)
-+ implement all rules of the LJT calculus (1)
-+ make sure Unit works (2)
-+ better output of parentheses for type expressions
-+ check unused arguments and sort results accordingly (3)
-+ only output the results with smallest number of unused arguments, if that is unique (3)
-+ add more error messages: print alternative lambda-terms when we refuse to implement (5)
-+ use a symbolic evaluator to simplify the lambda-terms (5)
-+ support named conjunctions (case classes) explicitly (3) and support disjunctions on that basis
-+ support sealed traits / case classes (5)
-+ implement Option and Either in inhabited terms (2)
-
-+ add documentation using the `tut` plugin (3)
-+ support natural syntax def f[T](x: T): T = implement (3)
- */
-
 // TODO:
 /*  Priority is given in parentheses.
-- use c.Type instead of String for correct code generation (3)?? Probably impossible since we can't reify types directly from reflection results, - need to use names.
-- probably can simplify data structures by eliminating [T]
+- use c.Type and c.Tree instead of String for correct code generation (3)?? Probably impossible since we can't reify types directly from reflection results, - need to use names.
+- probably can simplify data structures by eliminating [T], VarName, and ProofTerm
 - use blackbox macros instead of whitebox if possible (5) ?? Seems to prevent the " = implement" and "= ofType[]" syntax from working.
-- implement uncurried functions and multiple argument lists (6)
+- implement uncurried functions and multiple argument lists (6)?? Not sure this helps. We can already do this with `implement`.
 - use a special subclass of Function1 that also carries symbolic information about the lambda-term (6)
-- support recursive types such as List (right now this crashes with stack overflow)
-- support type aliases (right now they are broken)
 
-- implement a new API of the form `val a: Int = from(x, y, z)` or `val a = to[Int](x, y, z)`, equivalent to
-
-```scala
-def f[T,X,Y,Z]: X => Y => Z => T = implement
-val a: Int = f[Int, X, Y, Z](x, y, z)
-```
-
- Release as a separate open-source project after (0)-(4) are done.
  */
 
-class CurryHowardMacros(val c: whitebox.Context) {
+// TODO: can we replace this with blackbox? So far this only works with whitebox.
+class Macros(val c: whitebox.Context) {
 
   import c.universe._
 
-  private val debug = false
+  private def debug = Macros.options contains "macros"
 
-  private val basicRegex = s"(?:scala.|java.lang.)*(${CurryHowardMacros.basicTypes.mkString("|")})".r
+  private def showReturningTerm = Macros.options contains "terms"
+
+  private val basicRegex = s"(?:scala.|java.lang.)*(${Macros.basicTypes.mkString("|")})".r
 
   // TODO: use c.Type instead of String -- ??? Not sure this is ever going to work.
   private def matchType(t: c.Type, tMap: Map[c.Name, c.Type] = Map()): TypeExpr[String] = {
@@ -235,7 +210,7 @@ class CurryHowardMacros(val c: whitebox.Context) {
   def testReifyTypeImpl[U: c.WeakTypeTag]: c.Expr[TypeExpr[String]] = {
     val typeU: c.Type = c.weakTypeOf[U]
     val result = matchType(typeU.resultType)
-    if (debug) println(s"DEBUG: reified result from type $typeU is ${result.prettyPrint}")
+    c.info(c.enclosingPosition, s"Recognized type from type $typeU is ${result.prettyPrint}", force = debug)
 
     implicit def liftedNamedConjuct: Liftable[NamedConjunctT[String]] = Liftable[NamedConjunctT[String]] {
       case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, Seq(..$tParams), Seq(..$accessors), $wrapped)"
@@ -323,39 +298,38 @@ class CurryHowardMacros(val c: whitebox.Context) {
     c.Expr[(String, String)](q"($s1,$s2)")
   }
 
-  // TODO: can we replace this with blackbox? So far this only works with whitebox.
-  // Obtain one implementation of the type U, which must be given as the type parameter.
-  // This function does not attempt to detect the left-hand side type,
-  // and so does not give rise to the "recursive value must have type" error.
-  def ofTypeImpl[U: c.WeakTypeTag]: c.Tree = {
-    val typeU: c.Type = c.weakTypeOf[U]
-    inhabitOneInternal(typeU)
-  }
-
   // Obtain one implementation of the type U. Detect the type U as given on the left-hand side.
   def inhabitImpl[U]: c.Tree = {
     val typeU = c.internal.enclosingOwner.typeSignature
     // Detect whether we are given a function with arguments.
-    typeU.resultType.paramLists match {
-      case Nil ⇒ inhabitOneInternal(typeU)
+    val result = typeU.resultType.paramLists match {
+      case Nil ⇒ inhabitOneInternal(matchType(typeU))()
       case lists ⇒
         val givenVars = lists.flatten.map(s ⇒ PropE(s.name.decodedName.toString, matchType(s.typeSignature)))
         val resultType = matchType(typeU.finalResultType)
-        val typeStructure = givenVars.map(_.tExpr).reverse.foldLeft(resultType) { case (prev, t) ⇒ t ->: prev }
-        inhabitInternal(typeStructure) match {
-          case Right(term) ⇒
-            val termFound = givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify
-            c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = true)
-            val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
-            val result = reifyTerm(termFound, paramTerms)
-            if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
-            result
-          case Left(errorMessage) ⇒
-            c.error(c.enclosingPosition, errorMessage)
-            q"null"
-        }
-
+        val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.tExpr ->: prev }
+        inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify }
     }
+    result
+  }
+
+  // Obtain one implementation of the type U, which must be given as the type parameter.
+  // This function does not attempt to detect the left-hand side type,
+  // and so does not give rise to the "recursive value must have type" error.
+  def ofTypeImpl[U: c.WeakTypeTag]: c.Tree = ofTypeImplWithValues[U]()
+
+  def ofTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
+    val typeUGiven: c.Type = c.weakTypeOf[U]
+    //    val typeUT = matchType(typeUGiven)
+    val (typeU, typeUT) = matchType(typeUGiven) match {
+      case NothingT(_) ⇒
+        val typeU = c.internal.enclosingOwner.typeSignature.finalResultType
+        (typeU, matchType(typeU))
+      case t ⇒ (typeUGiven, t)
+    }
+    val givenVars: Seq[PropE[String]] = values.map(v ⇒ PropE(v.tree.symbol.name.decodedName.toString, matchType(v.actualType)))
+    val typeStructure = givenVars.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
+    inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify }
   }
 
   def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = {
@@ -363,37 +337,21 @@ class CurryHowardMacros(val c: whitebox.Context) {
     inhabitAllInternal(typeU)
   }
 
-  private def inhabitOneInternal(typeT: c.Type): c.Tree = {
-    val typeStructure: TypeExpr[String] = matchType(typeT)
-    inhabitInternal(typeStructure) match {
-      case Right(termFound) ⇒
-        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = true)
+  private def inhabitOneInternal(typeStructure: TypeExpr[String])(transform: TermExpr[String] ⇒ TermExpr[String] = identity): c.Tree = {
+    TheoremProver.inhabitInternal(typeStructure) match {
+      case Right((messageOpt, t)) ⇒
+        messageOpt.foreach(message ⇒ c.warning(c.enclosingPosition, message))
+        val termFound = transform(t)
+        c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = showReturningTerm)
         val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
         val result = reifyTerm(termFound, paramTerms)
-        //        val resultType = tq"${typeT.finalResultType}"
-        //        val resultWithType = q"$result: $resultType" // this does not work
-        if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
+        c.info(c.enclosingPosition, "Returning code: ${showCode(result)}", force = debug)
         result
       case Left(errorMessage) ⇒
         c.error(c.enclosingPosition, errorMessage)
         q"null"
     }
 
-  }
-
-  private def inhabitInternal(typeStructure: TypeExpr[String]): Either[String, TermExpr[String]] = {
-    // TODO Check that there aren't repeated types among the curried arguments, print warning.
-    TheoremProver.findProofs(typeStructure) match {
-      case (Nil, _) ⇒
-        Left(s"type ${typeStructure.prettyPrint} cannot be implemented")
-      case (List(termFound), allTerms) ⇒
-        val count = allTerms.length
-        if (count > 1) c.warning(c.enclosingPosition, s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(_.prettyPrint).mkString(";\n ")}.")
-        //        println(s"DEBUG: Term found: $termFound, propositions: ${TermExpr.propositions(termFound)}")
-        Right(termFound)
-      case (list, _) ⇒
-        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} equivalent ways:\n ${list.map(_.prettyPrint).mkString(";\n ")}.")
-    }
   }
 
   private def inhabitAllInternal(typeT: c.Type): c.Tree = {
@@ -403,20 +361,27 @@ class CurryHowardMacros(val c: whitebox.Context) {
       c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
       val paramTerms: Map[PropE[TExprType], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
       val result = reifyTerm(termFound, paramTerms)
-      if (debug) println(s"DEBUG: returning code: ${showCode(result)}")
-      // use resultWithType? Doesn't seem to work.
-      result
+      c.info(c.enclosingPosition, "Returning code: ${showCode(result)}", force = debug)
+
+      result // use resultWithType? Doesn't seem to work.
     }
     q"Seq(..$terms)"
   }
 }
 
-object CurryHowardMacros {
+object Macros {
+  /** The JVM system property `curryhoward.log` can be set to a comma-separated list of words.
+    * Each word must be one of `prover`, `macros`, or `terms`.
+    *
+    * @return The set of options defined by the user.
+    */
+  private[ch] def options: Set[String] = Option(System.getProperty("curryhoward.log")).getOrElse("").split(",").toSet
+
   private[ch] val basicTypes = List("Int", "String", "Boolean", "Float", "Double", "Long", "Symbol", "Char")
 
-  private[ch] def testType[U]: (String, String) = macro CurryHowardMacros.testTypeImpl[U]
+  private[ch] def testType[U]: (String, String) = macro Macros.testTypeImpl[U]
 
-  private[ch] def testReifyType[U]: TypeExpr[String] = macro CurryHowardMacros.testReifyTypeImpl[U]
+  private[ch] def testReifyType[U]: TypeExpr[String] = macro Macros.testReifyTypeImpl[U]
 
-  private[ch] def testReifyTerm[U]: List[TermExpr[String]] = macro CurryHowardMacros.testReifyTermsImpl[U]
+  private[ch] def testReifyTerm[U]: List[TermExpr[String]] = macro Macros.testReifyTermsImpl[U]
 }
