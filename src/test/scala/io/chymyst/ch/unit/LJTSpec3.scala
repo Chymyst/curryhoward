@@ -116,11 +116,38 @@ class LJTSpec3 extends FlatSpec with Matchers {
     f3[Int, Int, Int, Int, Int].size shouldEqual 2
   }
 
-  it should "generate the example in the tutorial" in {
+  it should "enumerate all implementations for the Reader-Option monad" in {
+    def points[D, A] = allOfType[A ⇒ (D ⇒ Option[A])]().length
+
+    def maps[D, A, B] = allOfType[(D ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ (D ⇒ Option[B])]().length
+
+    def flatmaps[D, A, B] = allOfType[(D ⇒ Option[A]) ⇒ (A ⇒ (D ⇒ Option[B])) ⇒ (D ⇒ Option[B])]().length
+
+    points[Int, String] shouldEqual 1
+    maps[Int, String, Boolean] shouldEqual 1
+    flatmaps[Int, String, Boolean] shouldEqual 2
+  }
+
+  it should "generate methods for the Density-Option monad" in {
+    def points[D, A] = allOfType[A ⇒ ((Option[A] ⇒ D) ⇒ Option[A])]().length
+
+    //    def maps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
+
+    points[Int, String] shouldEqual 1
+    //    maps[Int, String, Boolean] shouldEqual 1
+
+    //    def flatmaps[D,A,B] = allOfType[ ((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
+    //
+    //    flatmaps[Int, String, Boolean] shouldEqual 1
+  }
+
+  it should "generate the examples in the tutorial" in {
     case class User[N, I](name: N, id: I)
     def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
 
     makeUser(123, (x: Int) ⇒ x.toString) shouldEqual User(123, "123")
+
+    ofType[User[Int, String]](123, (x: Int) ⇒ x.toString) shouldEqual User(123, "123")
   }
 
   behavior of "ofType"
