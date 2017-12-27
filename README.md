@@ -169,11 +169,9 @@ def f3[T, U]: T ⇒ (T ⇒ U) ⇒ (T, U) = implement
 // Generating code within expressions.
 case class User(name: String, id: Long)
 
-val a: Int = 123
-val b: String = "abc"
-val c: Int ⇒ Long = _.toLong
+val f: Int ⇒ Long = _.toLong
 
-ofType[User](a, b, c).id // 123L
+ofType[User](123, "abc", f).id // 123L
 
 ```
 
