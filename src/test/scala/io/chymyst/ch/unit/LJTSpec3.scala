@@ -123,7 +123,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
     makeUser(123, (x: Int) ⇒ x.toString) shouldEqual User(123, "123")
   }
 
-  behavior of "toType"
+  behavior of "ofType"
 
   it should "detect type of all relevant variables" in {
     val yyy: Int = 123
@@ -138,34 +138,39 @@ class LJTSpec3 extends FlatSpec with Matchers {
   }
 
   // TODO: make this work
-  it should "use toType with constant arguments" in {
-    """val p = toType[(Int, String)](123, "abc")""" shouldNot compile
-//    p shouldEqual ((123, "abc"))
+  it should "use ofType with constant arguments" in {
+    """val p = ofType[(Int, String)](123, "abc")""" shouldNot compile
+    //    p shouldEqual ((123, "abc"))
   }
 
-  /*
-    behavior of "named types"
+  behavior of "named types"
 
-    // TODO: make this work
+  // TODO: make this work
 
-    it should "generate code by reflection on named type that has no type parameters" in {
-      type MyType = (Int, String)
+  it should "generate code by reflection on named type that has no type parameters" in {
+    type MyType = (Int, String)
 
-      def f: MyType ⇒ Int = implement
+    "def f: MyType ⇒ Int = implement" shouldNot compile
 
-      f((123, "abc")) shouldEqual 123
-    }
+    //      f((123, "abc")) shouldEqual 123
+  }
 
-    // TODO: make this work
-    // This does not work because we match Tuple3 but `args` show only one type parameter. So this
-    // is incorrectly recognized as a tuple with a single element of type T.
+  it should "generate code by reflection on named type that represents the Reader monad" in {
+    type MyType[T] = Int ⇒ T
 
-    it should "generate code by reflection on named type with type parameters" in {
-      type MyType[T] = (Int, T, T)
+    "def f[T]: MyType[T] ⇒ Int ⇒ T = implement" shouldNot compile
+  }
 
-      def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement
+  // TODO: make this work
+  // This does not work because we match Tuple3 but `args` show only one type parameter. So this
+  // is incorrectly recognized as a tuple with a single element of type T.
 
-      f(1)("abc") shouldEqual ((1, "abc", "abc"))
-    }
-  */
+  it should "generate code by reflection on named type with type parameters" in {
+    type MyType[T] = (Int, T, T)
+
+    "def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement" shouldNot compile
+
+    //      f(1)("abc") shouldEqual ((1, "abc", "abc"))
+  }
+
 }
