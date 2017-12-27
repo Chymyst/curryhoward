@@ -23,6 +23,11 @@ The `curryhoward` library provides Scala macros that generate code automatically
 
 The code is generated at compile time. A compile-time error occurs when there are several inequivalent implementations for a given type, or if the type cannot be implemented at all (i.e. when the given propositional formula is not a theorem).
 
+See the [youtube presentation](https://youtu.be/cESdgot_ZxY) and the [tutorial](docs/Tutorial.md) for more details.
+
+
+# How it works
+
 The current implementation uses an IPL theorem prover based on the sequent calculus called LJT as presented in:
 
 [D. Galmiche , D. Larchey-Wendling. _Formulae-as-Resources Management for an Intuitionistic Theorem Prover_ (1998)](http://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.35.2618). 	In 5th Workshop on Logic, Language, Information and Computation, WoLLIC'98, Sao Paulo.
@@ -71,8 +76,6 @@ val user = ofType[User](f, s, x)
 
 The generated code is purely functional and assumes that all given values and types are free of side effects.
 
-See the [tutorial](docs/Tutorial.md) for more details.
-
 # Unit tests
 
 `sbt test`
@@ -99,8 +102,6 @@ See the [tutorial](docs/Tutorial.md) for more details.
 - Recursive case classes (including `List`!) cause stack overflow
 - Type aliases `type MyType[T] = (Int, T)` will silently generate incorrect code
 - No support for the conventional Java-style function types with multiple arguments, e.g. `(T, U) ⇒ T`; tuple types need to be used instead, e.g. `((T, U)) ⇒ T`
-- `ofType(x, y, ...)` works only when `x`, `y`, ... are variables but not when they are expressions (gives NullPointerException trying to obtain the variable's name)
-- variable names may clash with automatically generated names
 - The type parameters must be named the same in the sealed trait and in each case class, otherwise the code may fail
 
 # Examples of working functionality
@@ -168,11 +169,9 @@ def f3[T, U]: T ⇒ (T ⇒ U) ⇒ (T, U) = implement
 // Generating code within expressions.
 case class User(name: String, id: Long)
 
-val a: Int = 123
-val b: String = "abc"
-val c: Int ⇒ Long = _.toLong
+val f: Int ⇒ Long = _.toLong
 
-ofType[User](a, b, c).id // 123L
+ofType[User](123, "abc", f).id // 123L
 
 ```
 

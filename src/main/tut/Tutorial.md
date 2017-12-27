@@ -128,16 +128,18 @@ makeUser(123, (n: Int) ⇒ "id:" + (n * 100).toString)
 we now write
 
 ```tut
-val x = 123
-val y: Int ⇒ String = (n: Int) ⇒ "id:" + (n * 100).toString
-ofType[User[Int, String]](x, y)
+ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
 ```
 
 The macro `ofType[T](x, y, ..., z)` generates an expression of type `T` built up from the given values `x`, `y`, ..., `z`.
 The values `x`, `y`, ..., `z` can have any type (but their type must be known or specified at that point).
 
-Unlike `implement`, the macro `ofType` requires us to write an explicit type parameter that designates the desired result type.
-Writing `ofType()` will not work.
+Unlike `implement`, the macro `ofType()` is designed to be used within expressions, and so we are required to write an explicit type parameter that designates the desired result type.
+The macro `ofType()` will not work without specifying a type expression as its type parameter:
+
+```tut:fail
+val x: Int = ofType(123)
+```
 
 # Choosing between different possible implementations
 
