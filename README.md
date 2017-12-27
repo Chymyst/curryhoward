@@ -53,20 +53,23 @@ def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E �
 
 ```
 
-The function `ofType` is designed for generating expressions from previously known terms:
+The function `ofType` is designed for generating expressions using previously computed values:
 
 ```scala
 import io.chymyst.ch.ofType
 
+case class User(name: String, id: Long)
+
 val x: Int = 123
 val s: String = "abc"
 val f: Int ⇒ Long = _.toLong // whatever
-case class User(name: String, id: Long)
 
 val user = ofType[User](f, s, x)
-// Generates the expression User(s, f(x))
+// Generates the expression User(s, f(x)) from previously computed values f, s, x
 
 ```
+
+The generated code is purely functional and assumes that all given values and types are free of side effects.
 
 See the [tutorial](docs/Tutorial.md) for more details.
 
@@ -77,7 +80,7 @@ See the [tutorial](docs/Tutorial.md) for more details.
 # Status
 
 - The theorem prover for the full IPL is working
-- When a type cannot be inhabited, signal a compile-time error
+- When a type cannot be implemented, signal a compile-time error
 - Debugging options are available
 - Support for `Unit` type, constant types, type parametrs, function types, tuples, sealed traits / case classes / case objects
 - Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T` can be used
@@ -145,11 +148,11 @@ Case objects are treated as named versions of the `Unit` type.
 
 ## Alternative syntax
 
-There are three ways in which code can be generated based on type:
+There are three ways in which code can be generated based on a given type:
 
-1. the type and extra values are specified on the left-hand side: `def f[...](...): ... = implement`
-2. the type and extra values are specified within an expressoin: `ofType[...](...)`
-3. all possible implementations are returned: `allOfType[...](...)`
+1. `def f[...](...): ... = implement` -- the type and extra values are specified on the left-hand side 
+2. `ofType[...](...)` -- the type and extra values are specified within an expression
+3. `allOfType[...](...)` -- similar to `ofType[...](...)`, except that now all inequivalent implementations are returned 
 
 ```scala
 import io.chymyst.ch._
@@ -162,9 +165,7 @@ def f2[T, U](x: T): (T ⇒ U) ⇒ (T, U) = implement
 
 def f3[T, U]: T ⇒ (T ⇒ U) ⇒ (T, U) = implement
 
-// Specifying
-
-// Using local expressions. 
+// Generating code within expressions.
 case class User(name: String, id: Long)
 
 val a: Int = 123

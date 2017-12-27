@@ -36,7 +36,7 @@ class Macros(val c: whitebox.Context) {
 
   private def debug = Macros.options contains "macros"
 
-  private def showReturningTerm = Macros.options contains "term"
+  private def showReturningTerm = Macros.options contains "terms"
 
   private val basicRegex = s"(?:scala.|java.lang.)*(${Macros.basicTypes.mkString("|")})".r
 
@@ -370,6 +370,11 @@ class Macros(val c: whitebox.Context) {
 }
 
 object Macros {
+  /** The JVM system property `curryhoward.log` can be set to a comma-separated list of words.
+    * Each word must be one of `prover`, `macros`, or `terms`.
+    *
+    * @return The set of options defined by the user.
+    */
   private[ch] def options: Set[String] = Option(System.getProperty("curryhoward.log")).getOrElse("").split(",").toSet
 
   private[ch] val basicTypes = List("Int", "String", "Boolean", "Float", "Double", "Long", "Symbol", "Char")
