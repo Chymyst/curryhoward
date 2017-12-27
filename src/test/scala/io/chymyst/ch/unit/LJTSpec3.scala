@@ -137,10 +137,9 @@ class LJTSpec3 extends FlatSpec with Matchers {
     p(123) shouldEqual 123
   }
 
-  // TODO: make this work
   it should "use ofType with constant arguments" in {
-    """val p = ofType[(Int, String)](123, "abc")""" shouldNot compile
-    //    p shouldEqual ((123, "abc"))
+    val p = ofType[(Int, String)](123, "abc")
+    p shouldEqual ((123, "abc"))
   }
 
   behavior of "named types"

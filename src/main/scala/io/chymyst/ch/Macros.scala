@@ -166,30 +166,32 @@ class Macros(val c: whitebox.Context) {
       param
   }
 
-  private def reifyTerm(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree]): c.Tree = {
+  private def reifyTerm(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree], givenTerms: Map[PropE[String], c.Tree]): c.Tree = {
+    def reifyT(termExpr: TermExpr[String]): c.Tree = reifyTerm(termExpr, paramTerms, givenTerms)
     termExpr match {
-      case PropE(name, _) =>
-        val tn = TermName(name.toString)
-        q"$tn"
-      case AppE(head, arg) => q"${reifyTerm(head, paramTerms)}(${reifyTerm(arg, paramTerms)})"
+      case p@PropE(name, _) ⇒ givenTerms.getOrElse(p, q"${TermName(name.toString)}")
+//      case PropE(name, _) ⇒
+//        val tn = TermName(name.toString)
+//        q"$tn"
+      case AppE(head, arg) ⇒ q"${reifyT(head)}(${reifyT(arg)})"
 
       // If `heads` = List(x, y, z) and `body` = b then the code must be x => y => z => b
-      case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyTerm(body, paramTerms)) { case (prevTree, paramE) ⇒
+      case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyT(body)) { case (prevTree, paramE) ⇒
         val param = paramTerms(paramE) // Look up the parameter in the precomputed table.
         q"($param ⇒ $prevTree)"
       }
-      case UnitE(_) => q"()"
-      case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTerm(t, paramTerms))})"
+      case UnitE(_) ⇒ q"()"
+      case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyT(t))})"
       case NamedConjunctE(terms, tExpr) ⇒
         val constructorE = q"${TermName(tExpr.constructor)}[..${tExpr.tParams.map(reifyType)}]"
         if (terms.isEmpty)
           constructorE // avoid spurious parameter lists for case objects
         else
-          q"$constructorE(..${terms.map(t ⇒ reifyTerm(t, paramTerms))})"
+          q"$constructorE(..${terms.map(t ⇒ reifyT(t))})"
       case ProjectE(index, term) ⇒
         val accessor = TermName(term.accessor(index))
-        q"${reifyTerm(term, paramTerms)}.$accessor"
-      case DisjunctE(_, _, term, _) ⇒ q"${reifyTerm(term, paramTerms)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
+        q"${reifyT(term)}.$accessor"
+      case DisjunctE(_, _, term, _) ⇒ q"${reifyT(term)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
       case MatchE(term, cases) ⇒
         // Each term within `cases` is always a CurriedE because it is of the form fv ⇒ proofTerm(fv, other_premises).
         val casesTrees: Seq[c.Tree] = cases.map {
@@ -199,11 +201,11 @@ class Macros(val c: whitebox.Context) {
               case Some(constructor) ⇒ pq"_ : ${TermName(constructor)}.type"
               case None ⇒ pq"${TermName(fvName)} : ${reifyType(fvType)}"
             }
-            cq"$pat => ${reifyTerm(body, paramTerms)}"
+            cq"$pat => ${reifyT(body)}"
           case cc ⇒ throw new Exception(s"Internal error: `case` term ${cc.prettyPrint} must be a function")
         }
 
-        q"${reifyTerm(term, paramTerms)} match { case ..$casesTrees }"
+        q"${reifyT(term)} match { case ..$casesTrees }"
     }
   }
 
@@ -321,33 +323,53 @@ class Macros(val c: whitebox.Context) {
   def ofTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
     val typeUGiven: c.Type = c.weakTypeOf[U]
     val typeUT = matchType(typeUGiven)
+
     // TODO: decide if we can still use `ofType` with auto-detection of left-hand side values.
     // If so, we can stop using two different names for these use cases.
     // This does not seem to work in a macro with arguments! (But it might for the version of `ofTypeImpl` without arguments.)
-//    match {
-//      case NothingT(_) ⇒
-//        val typeU = c.internal.enclosingOwner.typeSignature.finalResultType
-//        matchType(typeU)
-//      case t ⇒ t
-//    }
-    val givenVars: Seq[PropE[String]] = values.map(v ⇒ PropE(v.tree.symbol.name.decodedName.toString, matchType(v.actualType)))
-    val typeStructure = givenVars.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
-    inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify }
+    //    match {
+    //      case NothingT(_) ⇒
+    //        val typeU = c.internal.enclosingOwner.typeSignature.finalResultType
+    //        matchType(typeU)
+    //      case t ⇒ t
+    //    }
+
+    // We need to obtain the actual type of the given terms, rather than the `Any` type as specified in the type signature.
+    val givenVars: Seq[(PropE[String], c.Tree)] = values.zipWithIndex
+      .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", matchType(v.actualType)), v.tree) }
+    val givenVarsAsArgs = givenVars.map(_._1)
+    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
+    inhabitOneInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify }
   }
 
   def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = {
     val typeU: c.Type = c.weakTypeOf[U]
-    inhabitAllInternal(typeU)
+    inhabitAllInternal(typeU, Map())
   }
 
-  private def inhabitOneInternal(typeStructure: TypeExpr[String])(transform: TermExpr[String] ⇒ TermExpr[String] = identity): c.Tree = {
+  /** Construct a Scala code tree that implements a type expression tree.
+    * The implementation is chosen according to the "least information loss" principle.
+    * It is an error if several inequivalent implementations are obtained.
+    * The implemented code is logged to the console if required.
+    *
+    * @param typeStructure A type expression to be implemented.
+    * @param givenArgs     Available Scala values that can be used while implementing the type.
+    * @param transform     A final transformation for the implemented expression (e.g. apply it to some given arguments).
+    * @return A Scala expression tree for the implemented expression.
+    */
+  private def inhabitOneInternal(
+    typeStructure: TypeExpr[String],
+    givenArgs: Map[PropE[String], c.Tree] = Map()
+  )(
+    transform: TermExpr[String] ⇒ TermExpr[String] = identity
+  ): c.Tree = {
     TheoremProver.inhabitInternal(typeStructure) match {
       case Right((messageOpt, t)) ⇒
         messageOpt.foreach(message ⇒ c.warning(c.enclosingPosition, message))
         val termFound = transform(t)
         c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = showReturningTerm)
-        val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
-        val result = reifyTerm(termFound, paramTerms)
+        val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).map(p ⇒ p → reifyParam(p)).toMap
+        val result = reifyTerm(termFound, paramTerms, givenArgs)
         c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = debug)
         result
       case Left(errorMessage) ⇒
@@ -357,13 +379,13 @@ class Macros(val c: whitebox.Context) {
 
   }
 
-  private def inhabitAllInternal(typeT: c.Type): c.Tree = {
+  private def inhabitAllInternal(typeT: c.Type, givenTerms: Map[PropE[String], c.Tree]): c.Tree = {
     type TExprType = String // (String, c.Type)
     val typeStructure: TypeExpr[TExprType] = matchType(typeT)
     val terms = TheoremProver.findProofs(typeStructure)._1.map { termFound ⇒
       c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
-      val paramTerms: Map[PropE[TExprType], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
-      val result = reifyTerm(termFound, paramTerms)
+      val paramTerms: Map[PropE[TExprType], c.Tree] = TermExpr.propositions(termFound).map(p ⇒ p → reifyParam(p)).toMap
+      val result = reifyTerm(termFound, paramTerms, givenTerms)
       c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = debug)
 
       result // use resultWithType? Doesn't seem to work.
