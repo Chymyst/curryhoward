@@ -12,8 +12,8 @@ object TermExpr {
     case CurriedE(heads, body) ⇒ // Can't pattern-match directly for some reason! Some trouble with the type parameter T.
       heads.asInstanceOf[List[PropE[T]]] ++ propositions(body)
     case ConjunctE(terms) ⇒ terms.flatMap(propositions)
-    case ProjectE(index, term) ⇒ propositions(term)
-    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(propositions)
+    case ProjectE(_, term) ⇒ propositions(term)
+    case NamedConjunctE(terms, _) ⇒ terms.flatMap(propositions)
     case MatchE(term, cases) ⇒ propositions(term) ++ cases.flatMap(propositions)
     case DisjunctE(_, _, term, _) ⇒ propositions(term)
     case UnitE(_) ⇒ Seq()
@@ -89,7 +89,7 @@ sealed trait TermExpr[+T] {
   }
 
   private[ch] def prettyPrintWithParentheses(level: Int): String = this match {
-    case PropE(name, tExpr) ⇒ s"$name"
+    case PropE(name, _) ⇒ s"$name"
     case AppE(head, arg) ⇒
       val r = s"${head.prettyPrintWithParentheses(0)} ${arg.prettyPrintWithParentheses(1)}"
       if (level == 1) s"($r)" else r
@@ -121,7 +121,7 @@ sealed trait TermExpr[+T] {
 
   def accessor(index: Int): String = tExpr match {
     case NamedConjunctT(_, _, accessors, _) ⇒ accessors(index).toString
-    case ConjunctT(terms) ⇒ s"_${index + 1}"
+    case ConjunctT(_) ⇒ s"_${index + 1}"
     case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : ${tExpr.prettyPrint} because its type is not a conjunction")
   }
 
@@ -132,15 +132,15 @@ sealed trait TermExpr[+T] {
   private[ch] def unusedArgs: Set[VarName] = Set()
 
   private[ch] def unusedMatchClauseVars: Int = this match {
-    case PropE(name, tExpr) ⇒ 0
+    case PropE(_, _) ⇒ 0
     case AppE(head, arg) ⇒ head.unusedMatchClauseVars + arg.unusedMatchClauseVars
-    case CurriedE(heads, body) ⇒ body.unusedMatchClauseVars
-    case UnitE(tExpr) ⇒ 0
+    case CurriedE(_, body) ⇒ body.unusedMatchClauseVars
+    case UnitE(_) ⇒ 0
     case NamedConjunctE(terms, tExpr) ⇒ terms.map(_.unusedMatchClauseVars).sum
     case ConjunctE(terms) ⇒ terms.map(_.unusedMatchClauseVars).sum
-    case ProjectE(index, term) ⇒ term.unusedMatchClauseVars
-    case MatchE(term, cases) ⇒ cases.map(_.unusedArgs.size).sum
-    case DisjunctE(index, total, term, tExpr) ⇒ term.unusedMatchClauseVars
+    case ProjectE(_, term) ⇒ term.unusedMatchClauseVars
+    case MatchE(_, cases) ⇒ cases.map(_.unusedArgs.size).sum
+    case DisjunctE(_, _, term, _) ⇒ term.unusedMatchClauseVars
   }
 
   private[ch] lazy val unusedTupleParts: Int =
@@ -154,51 +154,51 @@ sealed trait TermExpr[+T] {
 
   // Can't use Set[TermExpr[T]] because of lack of covariance in `Set[A]`.
   private[ch] lazy val usedTuplePartsSeq: Seq[(TermExpr[T], Int)] = this match {
-    case PropE(name, tExpr) ⇒ Seq()
+    case PropE(_, _) ⇒ Seq()
     case AppE(head, arg) ⇒ head.usedTuplePartsSeq ++ arg.usedTuplePartsSeq
-    case CurriedE(heads, body) ⇒ body.usedTuplePartsSeq
-    case UnitE(tExpr) ⇒ Seq()
+    case CurriedE(_, body) ⇒ body.usedTuplePartsSeq
+    case UnitE(_) ⇒ Seq()
     case ConjunctE(terms) ⇒ terms.flatMap(_.usedTuplePartsSeq)
-    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.usedTuplePartsSeq)
+    case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.usedTuplePartsSeq)
     case ProjectE(index, term) ⇒ Seq((term, index + 1)) ++ term.usedTuplePartsSeq
     case MatchE(term, cases) ⇒ term.usedTuplePartsSeq ++ cases.flatMap(_.usedTuplePartsSeq)
-    case DisjunctE(index, total, term, tExpr) ⇒ term.usedTuplePartsSeq
+    case DisjunctE(_, _, term, _) ⇒ term.usedTuplePartsSeq
   }
 
   lazy val freeVars: Seq[VarName] = (this match {
-    case PropE(name, tExpr) ⇒ Seq(name)
+    case PropE(name, _) ⇒ Seq(name)
     case AppE(head, arg) ⇒ head.freeVars ++ arg.freeVars
     case CurriedE(heads, body) ⇒ body.freeVars.filterNot(heads.map(_.name).toSet.contains)
-    case UnitE(tExpr) ⇒ Seq()
+    case UnitE(_) ⇒ Seq()
     case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars)
-    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.freeVars)
+    case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.freeVars)
     case p: ProjectE[T] ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
     case MatchE(term, cases) ⇒ term.freeVars ++ cases.flatMap(_.freeVars)
     case d: DisjunctE[T] ⇒ d.term.freeVars
   }).distinct
 
   lazy val usedVars: Seq[VarName] = (this match {
-    case PropE(name, tExpr) ⇒ Seq(name)
+    case PropE(name, _) ⇒ Seq(name)
     case AppE(head, arg) ⇒ head.usedVars ++ arg.usedVars
     case CurriedE(heads, body) ⇒ body.usedVars ++ heads.map(_.name)
-    case UnitE(tExpr) ⇒ Seq()
+    case UnitE(_) ⇒ Seq()
     case ConjunctE(terms) ⇒ terms.flatMap(_.usedVars)
-    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.usedVars)
+    case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.usedVars)
     case p: ProjectE[T] ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
     case MatchE(term, cases) ⇒ term.usedVars ++ cases.flatMap(_.usedVars)
     case d: DisjunctE[T] ⇒ d.term.usedVars
   }).distinct
 
   def varCount(varName: VarName): Int = this match {
-    case PropE(name, tExpr) ⇒ if (name == varName) 1 else 0
+    case PropE(name, _) ⇒ if (name == varName) 1 else 0
     case AppE(head, arg) ⇒ head.varCount(varName) + arg.varCount(varName)
-    case CurriedE(heads, body) ⇒ body.varCount(varName)
-    case UnitE(tExpr) ⇒ 0
+    case CurriedE(_, body) ⇒ body.varCount(varName)
+    case UnitE(_) ⇒ 0
     case NamedConjunctE(terms, tExpr) ⇒ terms.map(_.varCount(varName)).sum
     case ConjunctE(terms) ⇒ terms.map(_.varCount(varName)).sum
-    case ProjectE(index, term) ⇒ term.varCount(varName)
+    case ProjectE(_, term) ⇒ term.varCount(varName)
     case MatchE(term, cases) ⇒ term.varCount(varName) + cases.map(_.varCount(varName)).sum
-    case DisjunctE(index, total, term, tExpr) ⇒ term.varCount(varName)
+    case DisjunctE(_, _, term, _) ⇒ term.varCount(varName)
   }
 
   lazy val argsMultiUseCount: Int = 0
@@ -217,7 +217,7 @@ sealed trait TermExpr[+T] {
         PropE(replacedName, tExpr)
       case AppE(head, arg) ⇒ AppE(rename(head), rename(arg))
       case CurriedE(heads, body) ⇒ CurriedE(heads.map(h ⇒ rename(h).asInstanceOf[PropE[T]]), rename(body))
-      case UnitE(tExpr) ⇒ this
+      case UnitE(_) ⇒ this
       case ConjunctE(terms) ⇒ ConjunctE(terms.map(rename))
       case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms map rename, tExpr)
       case ProjectE(index, term) ⇒ ProjectE(index, rename(term))

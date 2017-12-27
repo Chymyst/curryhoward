@@ -256,7 +256,7 @@ object LJT {
   // G* |- Named(A, B) when G* |- (A & B)  -- rule _&R
   private def ruleNamedConjunctionAtRight[T] = ForwardRule[T](name = "_&R", sequent ⇒
     sequent.goal match {
-      case nct@NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+      case nct@NamedConjunctT(constructor, _, _, wrapped) ⇒
         val unwrapped = wrapped match {
           case Nil ⇒ // empty wrapper means a named Unit as a case object
             UnitT(constructor)
@@ -269,7 +269,7 @@ object LJT {
             // Wrapped conjunction having more than one part.
             case ConjunctE(terms) ⇒ NamedConjunctE(terms, nct)
             // Wrapped Unit or wrapped single term.
-            case other if nct.caseObjectName.isDefined ⇒ NamedConjunctE(Nil, nct)
+            case _ if nct.caseObjectName.isDefined ⇒ NamedConjunctE(Nil, nct)
             case other ⇒
 //              println(s"debug: wrapping $other into type $nct")
               NamedConjunctE(Seq(other), nct)
@@ -283,7 +283,7 @@ object LJT {
 
   // G*, Named(A, B) |- C when G*, A, B |- C  -- rule _&L
   private def ruleNamedConjunctionAtLeft[T] = uniformRule[T]("_&L") {
-    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+    case NamedConjunctT(constructor, _, accessors, wrapped) ⇒
       val unwrapped = wrapped match {
         case Nil ⇒ // empty wrapper means a named Unit as a case object
           List(UnitT(constructor))
@@ -294,7 +294,7 @@ object LJT {
         val termsAB: List[TermExpr[T]] = wrapped match {
           case Nil ⇒ // empty wrapper means a named Unit as a case object
             List(UnitE(UnitT(constructor)))
-          case terms ⇒ // wrapper is not empty, so some terms are present
+          case _ ⇒ // wrapper is not empty, so some terms are present
             accessors.indices.map(ProjectE(_, premiseVar)).toList
         }
         termsAB
@@ -303,7 +303,7 @@ object LJT {
 
   // G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L
   private def ruleImplicationWithNamedConjunctionAtLeft[T] = uniformRule[T]("_->L") {
-    case (nct@NamedConjunctT(constructor, tParams, accessors, wrapped)) #-> argC ⇒
+    case (nct@NamedConjunctT(constructor, _, accessors, wrapped)) #-> argC ⇒
       val unwrapped = ConjunctT(wrapped match {
         case Nil ⇒ // empty wrapper means a named Unit as a case object
           List(UnitT(constructor))
@@ -358,8 +358,7 @@ object LJT {
       RuleResult[T]("->L4", List(sequent.copy(premises = newPremisesBCAB, goal = a ->: b), sequent.copy(premises = newPremisesCD)), { proofTerms ⇒
         // This rule expects two different proof terms.
         val Seq(termBCAB, termCD) = proofTerms
-        val CurriedE(termCDheads, termCDbody) = termCD
-        val CurriedE(termBCABheads, termBCABbody) = termCD
+
         val implPremiseVarABC = sequent.premiseVars(i) // (A ⇒ B) ⇒ C
 
         val oldPremisesWithoutImplPremise = omitPremise(sequent.premiseVars.zipWithIndex, i)

@@ -133,7 +133,7 @@ class Macros(val c: whitebox.Context) {
       case TP(nameT) ⇒ makeTypeName(nameT)
       case BasicT(nameT) ⇒ makeTypeName(nameT)
       case OtherT(nameT) ⇒ makeTypeName(nameT)
-      case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+      case NamedConjunctT(constructor, tParams, _, _) ⇒
         val constructorT = makeTypeName(constructor)
         val constructorWithTypeParams = if (tParams.isEmpty) constructorT else {
           val tParamsTrees = tParams.map(reifyType)
@@ -147,7 +147,7 @@ class Macros(val c: whitebox.Context) {
       case ConjunctT(terms) ⇒ // Assuming this is a tuple type.
         val tpts = terms.map(reifyType)
         tq"(..$tpts)"
-      case DisjunctT(constructor, tParams, terms) ⇒
+      case DisjunctT(constructor, tParams, _) ⇒
         val constructorT = makeTypeName(constructor)
         if (tParams.isEmpty) constructorT else {
           val tParamsTrees = tParams.map(reifyType)
@@ -168,7 +168,7 @@ class Macros(val c: whitebox.Context) {
 
   private def reifyTerm(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree]): c.Tree = {
     termExpr match {
-      case p@PropE(name, typeName) =>
+      case PropE(name, _) =>
         val tn = TermName(name.toString)
         q"$tn"
       case AppE(head, arg) => q"${reifyTerm(head, paramTerms)}(${reifyTerm(arg, paramTerms)})"
@@ -189,7 +189,7 @@ class Macros(val c: whitebox.Context) {
       case ProjectE(index, term) ⇒
         val accessor = TermName(term.accessor(index))
         q"${reifyTerm(term, paramTerms)}.$accessor"
-      case DisjunctE(index, total, term, tExpr) ⇒ q"${reifyTerm(term, paramTerms)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
+      case DisjunctE(_, _, term, _) ⇒ q"${reifyTerm(term, paramTerms)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
       case MatchE(term, cases) ⇒
         // Each term within `cases` is always a CurriedE because it is of the form fv ⇒ proofTerm(fv, other_premises).
         val casesTrees: Seq[c.Tree] = cases.map {
@@ -320,13 +320,16 @@ class Macros(val c: whitebox.Context) {
 
   def ofTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
     val typeUGiven: c.Type = c.weakTypeOf[U]
-    //    val typeUT = matchType(typeUGiven)
-    val (typeU, typeUT) = matchType(typeUGiven) match {
-      case NothingT(_) ⇒
-        val typeU = c.internal.enclosingOwner.typeSignature.finalResultType
-        (typeU, matchType(typeU))
-      case t ⇒ (typeUGiven, t)
-    }
+    val typeUT = matchType(typeUGiven)
+    // TODO: decide if we can still use `ofType` with auto-detection of left-hand side values.
+    // If so, we can stop using two different names for these use cases.
+    // This does not seem to work in a macro with arguments! (But it might for the version of `ofTypeImpl` without arguments.)
+//    match {
+//      case NothingT(_) ⇒
+//        val typeU = c.internal.enclosingOwner.typeSignature.finalResultType
+//        matchType(typeU)
+//      case t ⇒ t
+//    }
     val givenVars: Seq[PropE[String]] = values.map(v ⇒ PropE(v.tree.symbol.name.decodedName.toString, matchType(v.actualType)))
     val typeStructure = givenVars.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
     inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify }
@@ -345,7 +348,7 @@ class Macros(val c: whitebox.Context) {
         c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = showReturningTerm)
         val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
         val result = reifyTerm(termFound, paramTerms)
-        c.info(c.enclosingPosition, "Returning code: ${showCode(result)}", force = debug)
+        c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = debug)
         result
       case Left(errorMessage) ⇒
         c.error(c.enclosingPosition, errorMessage)
@@ -361,7 +364,7 @@ class Macros(val c: whitebox.Context) {
       c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
       val paramTerms: Map[PropE[TExprType], c.Tree] = TermExpr.propositions(termFound).toSeq.map(p ⇒ p → reifyParam(p)).toMap
       val result = reifyTerm(termFound, paramTerms)
-      c.info(c.enclosingPosition, "Returning code: ${showCode(result)}", force = debug)
+      c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = debug)
 
       result // use resultWithType? Doesn't seem to work.
     }
