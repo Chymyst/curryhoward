@@ -132,7 +132,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
     p shouldEqual ((123, "abc"))
   }
 
-  it should "use toType without arguments" in {
+  it should "use ofType without arguments" in {
     val p = ofType[Int ⇒ Int]()
     p(123) shouldEqual 123
   }
