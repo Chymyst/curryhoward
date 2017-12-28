@@ -31,6 +31,8 @@ case class Wrap2e[A](a: A) extends Wrap2
 
 class LJTSpec3 extends FlatSpec with Matchers {
 
+  System.setProperty("curryhoward.log", "prover,macros,terms")
+
   behavior of "terms with case classes"
 
   it should "generate code for case class" in {
@@ -51,10 +53,11 @@ class LJTSpec3 extends FlatSpec with Matchers {
     f(GadtChoice2("abc", true)) shouldEqual true
   }
 
-  // TODO: make this work
-  //    def f: Wrap2 ⇒ Wrap2c.type = implement
+  it should "generate code with case objects correctly" in {
+    def f: Wrap2 ⇒ Wrap2c.type = implement
+  }
 
-  it should "generate code for sealed trait" in {
+  it should "generate code for a sealed trait" in {
     def f[A, B]: GadtChoice[A] ⇒ B = implement
 
     val r1 = f[String, Boolean](GadtChoice1(123, "abc", true))
@@ -65,6 +68,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     r2 shouldEqual 123
   }
+
   it should "generate code for the weak law of _tertium non datur_" in {
     def f[A, B, C]: (Either[A, A ⇒ B] ⇒ B) ⇒ Either[B, C] = implement
   }
@@ -95,9 +99,10 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     def f1b[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = implement
 
+    // Case match expressions should be simplified into identity functions, so we should get one expression here.
     def f2a[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ Either[C, D]]
 
-    f2a[Int, Int, Int, Int, Int].size shouldEqual 4
+    f2a[Int, Int, Int, Int, Int].size shouldEqual 1
 
     def f2b[A, B, C, D, E]: Either[A, B] ⇒ (Either[A, B] ⇒ Either[C, D]) ⇒ Either[C, D] = implement
 
@@ -113,14 +118,85 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     def f3[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E]]
 
-    f3[Int, Int, Int, Int, Int].size shouldEqual 2
+    f3[Int, Int, Int, Int, Int].size shouldEqual 1
   }
 
-  it should "generate the example in the tutorial" in {
+  it should "generate methods for Continuation monad with no ambiguity" in {
+    case class Cont[X, R](c: (X ⇒ R) ⇒ R)
+
+    def points[D, A] = allOfType[A ⇒ Cont[A, D]]().length
+
+    points[Int, String] shouldEqual 1
+
+    def maps[D, A, B] = allOfType[Cont[A, D] ⇒ (A ⇒ B) ⇒ Cont[B, D]]().length
+
+    maps[Int, String, Boolean] shouldEqual 1
+
+    def flatmaps[D, A, B] = allOfType[Cont[A, D] ⇒ (A ⇒ Cont[B, D]) ⇒ Cont[B, D]]().length
+
+    flatmaps[Int, String, Boolean] shouldEqual 1
+  }
+
+  it should "generate contramap involving Option as argument" in {
+    allOfType[Option[Int] ⇒ (Option[Int] ⇒ String) ⇒ String].length shouldEqual 1
+
+    def contramaps[D, A, B] = allOfType[(Option[A] ⇒ D) ⇒ (B ⇒ A) ⇒ (Option[B] ⇒ D)].length
+
+    contramaps[Int, String, Boolean] shouldEqual 1
+  }
+
+  it should "enumerate all implementations for the Reader-Option monad" in {
+    def points[D, A] = allOfType[A ⇒ (D ⇒ Option[A])]().length
+
+    def maps[D, A, B] = allOfType[(D ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ (D ⇒ Option[B])]().length
+
+    def flatmaps[D, A, B] = allOfType[(D ⇒ Option[A]) ⇒ (A ⇒ (D ⇒ Option[B])) ⇒ (D ⇒ Option[B])]().length
+
+    points[Int, String] shouldEqual 1
+    maps[Int, String, Boolean] shouldEqual 1
+    flatmaps[Int, String, Boolean] shouldEqual 1
+  }
+
+  it should "fail to generate join or contrajoin involving Option as argument" in {
+    def contrajoins1[D, A] = allOfType[(Option[A] ⇒ D) ⇒ (Option[Option[A] ⇒ D] ⇒ D)].length
+
+    def contrajoins2[D, A] = allOfType[(Option[Option[A] ⇒ D] ⇒ D) ⇒ (Option[A] ⇒ D)].length
+
+    contrajoins1[Int, String] shouldEqual 0
+    contrajoins2[Int, String] shouldEqual 0
+  }
+
+  it should "generate methods for the Density-Option monad" in {
+    def points[D, A] = allOfType[A ⇒ ((Option[A] ⇒ D) ⇒ Option[A])]()
+
+    points[Int, String].length shouldEqual 1
+    points[Int, String].head("abc")(_ ⇒ 123) shouldEqual Some("abc")
+
+    def maps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]()
+
+    maps[Int, String, String].length shouldEqual 1
+    // Should not be a trivial implementation that always returns `None`.
+    val dString: (Option[String] ⇒ Int) ⇒ Option[String] = f ⇒ if (f(Some("abc")) > f(Some("ab"))) Some("abc") else None
+    val f: String ⇒ String = identity
+    val g: Option[String] ⇒ Int = os ⇒ if (os.contains("abc")) 10 else 0
+    maps[Int, String, String].head(dString)(f)(g) shouldEqual Some("abc")
+
+    // This takes a longer time.
+    def flatmaps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
+
+    flatmaps[Int, String, Boolean] shouldEqual 1
+
+    // However, we can still select the "best" implementation automatically.
+    def flatmap[D, A, B] = ofType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]()
+  }
+
+  it should "generate the examples in the tutorial" in {
     case class User[N, I](name: N, id: I)
     def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
 
     makeUser(123, (x: Int) ⇒ x.toString) shouldEqual User(123, "123")
+
+    ofType[User[Int, String]](123, (x: Int) ⇒ x.toString) shouldEqual User(123, "123")
   }
 
   behavior of "ofType"
@@ -171,5 +247,4 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     //      f(1)("abc") shouldEqual ((1, "abc", "abc"))
   }
-
 }

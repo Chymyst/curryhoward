@@ -95,6 +95,7 @@ class LawsSpec extends LawChecking {
       val flatMap_pure = flatMapReader(reader)(pointReader)
       fEqual(flatMap_pure, reader)
     }
+
   }
 
   it should "check laws for State monad" in {

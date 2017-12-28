@@ -36,7 +36,7 @@ class TermExprSpec extends FlatSpec with Matchers {
     val b = PropE("b", ((TP("A") ->: TP("B")) ->: TP("B")) ->: TP("B"))
     // b ⇒ c ⇒ b (a ⇒ a c)  is of type (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B
     val termExpr = CurriedE(List(b, c), AppE(b, CurriedE(List(a), AppE(a, c))))
-    termExpr.toString shouldEqual "\\((b:((A ⇒ B) ⇒ B) ⇒ B) ⇒ (c:A) ⇒ ((b:((A ⇒ B) ⇒ B) ⇒ B))(\\((a:A ⇒ B) ⇒ ((a:A ⇒ B))((c:A)))))"
+    termExpr.toString shouldEqual "\\((b:((A ⇒ B) ⇒ B) ⇒ B) ⇒ (c:A) ⇒ (b \\((a:A ⇒ B) ⇒ (a c))))"
     termExpr.prettyPrint shouldEqual "(a ⇒ c ⇒ a (b ⇒ b c))"
   }
 
@@ -61,7 +61,7 @@ class TermExprSpec extends FlatSpec with Matchers {
     val termExpr0 = PropE("y", TP(1))
     val termExpr1 = CurriedE(List(PropE("x", TP(1) ->: TP(1))), termExpr0) // x: A -> x
     val termExpr2 = AppE(termExpr1, PropE("z", TP(1) ->: TP(1)))
-    termExpr2.simplify shouldEqual termExpr0 // (x: A -> y)(z) == y
+    termExpr2.simplify() shouldEqual termExpr0 // (x: A -> y)(z) == y
   }
 
   it should "simplify nested terms" in {
@@ -69,11 +69,11 @@ class TermExprSpec extends FlatSpec with Matchers {
     val x2 = PropE("x2", TP(1) ->: TP(2)) // x2: A → B
     val x3 = PropE("x3", TP(1)) // x3: A
     val t1 = AppE(f1, PropE("y", TP(2)))
-    t1.simplify shouldEqual CurriedE(List(PropE("x5", TP(1))), PropE("y", TP(2)))
+    t1.simplify() shouldEqual CurriedE(List(PropE("x5", TP(1))), PropE("y", TP(2)))
 
     // x3:A -> (x2:A → B) -> (x4:B  -> x5:A -> x4:B) ( (x2:A → B)(x3:A) ) (x3:A)
     val termExpr4 = CurriedE(List(x3, x2), AppE( AppE(f1, AppE(x2, x3)), x3))
-    termExpr4.simplify shouldEqual CurriedE(List(x3, x2), AppE(x2, x3))
+    termExpr4.simplify() shouldEqual CurriedE(List(x3, x2), AppE(x2, x3))
   }
 
   behavior of "Sequent#constructResultTerm"

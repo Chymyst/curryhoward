@@ -48,13 +48,15 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
     result("abc") shouldEqual false
 
-    "def f2[A, B,C] = ofType[((A ⇒ B) ⇒ C) ⇒ A ⇒ B]" shouldNot compile
+    def notFound[A, B, C] = allOfType[((A ⇒ B) ⇒ C) ⇒ A ⇒ B].length
+
+    notFound[Int, String, Boolean] shouldEqual 0
   }
 
   it should "generate code for the 'Vorobieff lemma'" in {
-    def f1[A, B, C]: (((A ⇒ B) ⇒ C) ⇒ A ⇒ B) ⇒ (B ⇒ C) ⇒ (A ⇒ B) = implement
+    def fVorobieff1[A, B, C]: (((A ⇒ B) ⇒ C) ⇒ (A ⇒ B)) ⇒ (B ⇒ C) ⇒ (A ⇒ B) = implement
 
-    def f2[A, B, C]: ((B ⇒ C) ⇒ (A ⇒ B)) ⇒ (((A ⇒ B) ⇒ C) ⇒ A ⇒ B) = implement
+    def fVorobieff2[A, B, C]: ((B ⇒ C) ⇒ (A ⇒ B)) ⇒ (((A ⇒ B) ⇒ C) ⇒ (A ⇒ B)) = implement
   }
 
   it should "deterministically rename variables in the proof terms before comparing" in {
@@ -71,7 +73,9 @@ class LJTSpec2 extends FlatSpec with Matchers {
     def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
 
     // This cannot be implemented (weak double negation reduction).
-    "def h[A,B]: ((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B = implement" shouldNot compile
+    def h[A, B] = allOfType[((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B].length
+
+    h[Int, String] shouldEqual 0
   }
 
   behavior of "product type projectors"
@@ -91,7 +95,6 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   it should "generate code that consumes product types" in {
     def f[A, B, C] = ofType[A ⇒ ((A ⇒ B, C)) ⇒ B]
-
 
     f(123)((g, "abc")) shouldEqual "123"
   }
@@ -131,11 +134,12 @@ class LJTSpec2 extends FlatSpec with Matchers {
   behavior of "misc. proof terms"
 
   it should "select implementation by argument usage counts" in {
-    def f[A]: A ⇒ (A ⇒ A) ⇒ A = implement // Implement as b ⇒ a ⇒ a b rather than b ⇒ _ ⇒ b.
+    // Should implement as b ⇒ a ⇒ a b rather than b ⇒ _ ⇒ b.
+    def f[A]: A ⇒ (A ⇒ A) ⇒ A = implement
 
     f(123)(_ + 1) shouldEqual 124
 
-    // Triple negation is equivalent to single negation. The single "correct" implementation is b ⇒ a ⇒ b (c ⇒ c a).
+    // Triple negation is equivalent to single negation. The "preferred" implementation is b ⇒ a ⇒ b (c ⇒ c a).
     def g[A, B]: (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B = implement
   }
 

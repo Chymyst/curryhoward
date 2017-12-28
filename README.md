@@ -93,7 +93,7 @@ The generated code is purely functional and assumes that all given values and ty
 
 # To-do items
 
-- use a special subclass of Function1 that also carries symbolic information about the lambda-term
+- generate a custom subclass of `Function1` that also carries symbolic information about the lambda-term
 - add an API that exposes the `TermExpr` structures generated from type
 - add facilities to reason about terms at run time (e.g. check the laws)
 

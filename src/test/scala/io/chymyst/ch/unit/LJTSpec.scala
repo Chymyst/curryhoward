@@ -78,18 +78,18 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "correctly produce proofs from the Id axiom" in {
-    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(0), freshVar)) shouldEqual Seq()
+    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(0), freshVar)) shouldEqual ((Seq(), Seq()))
 
-    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(1), freshVar)) shouldEqual Seq(
+    followsFromAxioms(Sequent[Int](List(TP(3), TP(2), TP(1)), TP(1), freshVar)) shouldEqual ((Seq(
       CurriedE(List(PropE("x4", TP(3)), PropE("x5", TP(2)), PropE("x6", TP(1))), PropE("x6", TP(1)))
-    )
+    ), Seq()))
   }
 
   it should "produce several proofs from the Id axiom" in {
-    followsFromAxioms(Sequent[Int](List(TP(1), TP(2), TP(1)), TP(1), freshVar)) shouldEqual Seq(
+    followsFromAxioms(Sequent[Int](List(TP(1), TP(2), TP(1)), TP(1), freshVar)) shouldEqual ((Seq(
       CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x7", TP(1))),
       CurriedE(List(PropE("x7", TP(1)), PropE("x8", TP(2)), PropE("x9", TP(1))), PropE("x9", TP(1)))
-    )
+    ), Seq()))
   }
 
   it should "find proof term for given sequent with premises" in {
