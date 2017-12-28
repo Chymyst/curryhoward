@@ -63,12 +63,12 @@ class LJTSpec2 extends FlatSpec with Matchers {
   }
 
   it should "generate code for modus ponens with implication in premise" in {
-    "def f1[A, B, C] = ofType[(A ⇒ B) ⇒ ((A ⇒ B) ⇒ C) ⇒ C]" shouldNot compile
+    def f1[A, B, C] = ofType[(A ⇒ B) ⇒ ((A ⇒ B) ⇒ C) ⇒ C]
   }
 
   it should "generate the weak Peirce's law and related laws" in {
     // Weak Peirce's law.
-    "def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement" shouldNot compile
+    def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
 
     // This cannot be implemented (weak double negation reduction).
     def h[A, B] = allOfType[((((A ⇒ B) ⇒ B) ⇒ A) ⇒ B) ⇒ B].length
@@ -92,10 +92,9 @@ class LJTSpec2 extends FlatSpec with Matchers {
   val g: Int ⇒ String = _.toString
 
   it should "generate code that consumes product types" in {
-    "def f[A, B, C] = ofType[A ⇒ ((A ⇒ B, C)) ⇒ B]" shouldNot compile
+    def f[A, B, C] = ofType[A ⇒ ((A ⇒ B, C)) ⇒ B]
 
-
-//    f(123)((g, "abc")) shouldEqual "123"
+    f(123)((g, "abc")) shouldEqual "123"
   }
 
   it should "generate code that consumes and produces product types" in {
@@ -137,8 +136,8 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
     f(123)(_ + 1) shouldEqual 124
 
-    // Triple negation is equivalent to single negation. The single "correct" implementation is b ⇒ a ⇒ b (c ⇒ c a).
-    "def g[A, B]: (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B = implement" shouldNot compile
+    // Triple negation is equivalent to single negation. The "preferred" implementation is b ⇒ a ⇒ b (c ⇒ c a).
+    def g[A, B]: (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B = implement
   }
 
   behavior of "other examples"

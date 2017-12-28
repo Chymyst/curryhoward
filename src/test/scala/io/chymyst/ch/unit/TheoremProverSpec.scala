@@ -44,7 +44,7 @@ class TheoremProverSpec extends FlatSpec with Matchers {
     val terms2 = TheoremProver.findProofTerms(sequent2)
     terms2.length shouldEqual 1
     terms2.head.prettyPrint shouldEqual "(a ⇒ MyWrapper(a))"
-    terms2.head.toString shouldEqual "\\((x7:1) ⇒ MyWrapper((x7:1)))"
+    terms2.head.toString shouldEqual "\\((x7:1) ⇒ MyWrapper(x7))"
   }
 
   it should "implement wrapping and unwrapping for higher multiplicity and nested usage" in {

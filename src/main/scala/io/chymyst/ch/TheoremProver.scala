@@ -22,7 +22,7 @@ object TheoremProver {
             Right((None, termFound))
         }
       case (list, _) ⇒
-        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} equivalent ways:\n ${list.map(_.prettyPrint).mkString(" ;\n ")} .")
+        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} inequivalent ways:\n ${list.map(_.prettyPrint).mkString(" ;\n ")} .")
     }
   }
 
@@ -40,7 +40,7 @@ object TheoremProver {
   private[ch] def findProofs[T](typeStructure: TypeExpr[T]): (List[TermExpr[T]], Seq[TermExpr[T]]) = {
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
-    val proofTerms = findProofTerms(mainSequent).map(_.prettyRename.simplifyWithEta).distinct
+    val proofTerms = findProofTerms(mainSequent).map(_.prettyRename.simplify(withEta = true)).distinct
     if (debug) {
       val prettyPT = proofTerms.map(p ⇒ (p.prettyPrint, p.unusedArgs.size, p.unusedTupleParts, p.unusedArgs, p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }))
         .sortBy { case (_, s1, s2, _, _) ⇒ s1 + s2 }
@@ -69,7 +69,7 @@ object TheoremProver {
       val newProofs: Seq[Seq[ProofTerm[T]]] = ruleResult.newSequents.map(findProofTerms)
       val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
       val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
-      val result = transformedProofs.map(_.simplify).distinct // Note: at this point, it is a mistake to do prettyRename, because we are calling this function recursively.
+      val result = transformedProofs.map(_.simplify()).distinct // Note: at this point, it is a mistake to do prettyRename, because we are calling this function recursively.
       // We will call prettyRename() at the very end of the proof search.
       if (debug) {
         println(s"DEBUG: for sequent $sequent, after rule ${ruleResult.ruleName}, transformed ${transformedProofs.length} proof terms:\n ${transformedProofs.mkString(" ;\n ")} ,\nafter simplifying:\n ${result.mkString(" ;\n ")} .")

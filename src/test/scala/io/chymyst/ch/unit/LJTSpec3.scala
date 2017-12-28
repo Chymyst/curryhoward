@@ -98,9 +98,10 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     def f1b[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = implement
 
+    // Case match expressions should be simplified into identity functions, so we should get one expression here.
     def f2a[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ Either[C, D]]
 
-    f2a[Int, Int, Int, Int, Int].size shouldEqual 4
+    f2a[Int, Int, Int, Int, Int].size shouldEqual 1
 
     def f2b[A, B, C, D, E]: Either[A, B] ⇒ (Either[A, B] ⇒ Either[C, D]) ⇒ Either[C, D] = implement
 
@@ -119,18 +120,20 @@ class LJTSpec3 extends FlatSpec with Matchers {
     f3[Int, Int, Int, Int, Int].size shouldEqual 2
   }
 
-  it should "generate methods for Continuation monad" in {
+  it should "generate methods for Continuation monad with no ambiguity" in {
     case class Cont[X, R](c: (X ⇒ R) ⇒ R)
 
     def points[D, A] = allOfType[A ⇒ Cont[A, D]]().length
 
+    points[Int, String] shouldEqual 1
+
     def maps[D, A, B] = allOfType[Cont[A, D] ⇒ (A ⇒ B) ⇒ Cont[B, D]]().length
+
+    maps[Int, String, Boolean] shouldEqual 1
 
     def flatmaps[D, A, B] = allOfType[Cont[A, D] ⇒ (A ⇒ Cont[B, D]) ⇒ Cont[B, D]]().length
 
-    points[Int, String] shouldEqual 1
-    maps[Int, String, Boolean] shouldEqual 1
-    flatmaps[Int, String, Boolean] shouldEqual 2
+    flatmaps[Int, String, Boolean] shouldEqual 1
   }
 
   it should "generate contramap involving Option as argument" in {
@@ -165,9 +168,10 @@ class LJTSpec3 extends FlatSpec with Matchers {
   it should "generate methods for the Density-Option monad" in {
     def points[D, A] = allOfType[A ⇒ ((Option[A] ⇒ D) ⇒ Option[A])]().length
 
+    points[Int, String] shouldEqual 1
+
     def maps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
 
-    points[Int, String] shouldEqual 1
     maps[Int, String, Boolean] shouldEqual 1
 
     // This takes a long time and a lot of GC...
