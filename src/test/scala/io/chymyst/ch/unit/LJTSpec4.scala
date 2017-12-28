@@ -8,7 +8,7 @@ class LJTSpec4 extends FlatSpec with Matchers {
   // Playground for easier debugging.
   behavior of "misc. tests"
 
-  it should "compile" in {
+  it should "work" in {
 
   }
 }
