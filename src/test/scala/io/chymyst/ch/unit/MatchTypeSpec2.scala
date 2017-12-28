@@ -1,6 +1,5 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch
 import io.chymyst.ch._
 import io.chymyst.ch.Macros.testType
 import org.scalatest.{FlatSpec, Matchers}

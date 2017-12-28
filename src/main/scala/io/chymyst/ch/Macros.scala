@@ -54,8 +54,8 @@ class Macros(val c: whitebox.Context) {
     // `finalResultType` seems to help here.
     val matchedTypeArgs = t.finalResultType.typeArgs.map(s ⇒ tMap.getOrElse(s.typeSymbol.name.decodedName.toString, matchType(s)))
     // Very verbose.
-        if (debug) println(s"DEBUG: matchType on $t with $tMap obtained args = ${t.finalResultType.typeArgs}")
-        if (debug) println(s"DEBUG: matchType obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint)}")
+//        if (debug) println(s"DEBUG: matchType on $t with $tMap obtained args = ${t.finalResultType.typeArgs}")
+//        if (debug) println(s" DEBUG: matchType obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint)}")
 
     //    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
     //    val valParamLists = t.paramLists // typeU.paramLists(0)(0).name.decodedName is "x" as TermName; also typeU.finalResultType
@@ -74,7 +74,7 @@ class Macros(val c: whitebox.Context) {
           .map(_.name.decodedName.toString)
           .zip(matchedTypeArgs)
           .toMap
-        if (debug) println(s"DEBUG: matchType on $t with $tMap obtained typeMap = ${typeMap.mapValues(_.prettyPrint)}")
+        if (debug) println(s" DEBUG: matchType on $t with $tMap obtained typeMap = ${typeMap.mapValues(_.prettyPrint)}")
 
         if (t.typeSymbol.asClass.isModuleClass) { // `case object` is a "module class", but also a "case class".
           NamedConjunctT(fullName, Nil, Nil, Nil)
@@ -89,7 +89,7 @@ class Macros(val c: whitebox.Context) {
             .collect { case s: MethodSymbol if s.isCaseAccessor ⇒
               val accessorType = matchType(s.typeSignature.resultType)
               val substitutedType = TypeExpr.substAll(accessorType, typeMap)
-              if (debug) println(s"DEBUG: matchType on $t with $tMap obtained substitutedType = ${substitutedType.prettyPrint} from accessorType = ${accessorType.prettyPrint}")
+//              if (debug) println(s"  DEBUG: matchType on $t with $tMap obtained substitutedType = ${substitutedType.prettyPrint} from accessorType = ${accessorType.prettyPrint}")
 
               (s.name.decodedName.toString, substitutedType)
             }
@@ -123,7 +123,7 @@ class Macros(val c: whitebox.Context) {
             subclasses.map(s ⇒ matchType(s.asType.toType, typeMap)) match {
               case part :: Nil ⇒ part // A single case class implementing a trait.
               case parts ⇒
-                if (debug) println(s"DEBUG: matchType on $t with $tMap returning DisjunctT($fullName, ${matchedTypeArgs.map(_.prettyPrint)}), parts=${parts.map(_.prettyPrint)}")
+//                if (debug) println(s"  DEBUG: matchType on $t with $tMap returning DisjunctT($fullName, ${matchedTypeArgs.map(_.prettyPrint)}), parts=${parts.map(_.prettyPrint)}")
                 DisjunctT(fullName, matchedTypeArgs, parts) // Several case classes implementing a trait.
             }
           } else if (matchedTypeArgs.isEmpty) OtherT(fullName)
@@ -143,8 +143,6 @@ class Macros(val c: whitebox.Context) {
 
     typeExpr match {
       case head #-> body ⇒ tq"(${reifyType(head)}) ⇒ ${reifyType(body)}"
-      // TODO: Stop using String as type parameter T, use c.Type instead
-      // TODO: make match exhaustive on tExpr, by using c.Type instead of String
       case TP(nameT) ⇒ makeTypeName(nameT)
       case BasicT(nameT) ⇒ makeTypeName(nameT)
       case OtherT(nameT) ⇒ makeTypeName(nameT)
