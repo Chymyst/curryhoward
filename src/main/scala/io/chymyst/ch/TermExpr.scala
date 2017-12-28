@@ -2,9 +2,17 @@ package io.chymyst.ch
 
 import io.chymyst.ch.TermExpr.VarName
 
+import scala.annotation.tailrec
+
 object TermExpr {
   type VarName = String
   type ProofTerm[T] = TermExpr[T]
+
+  @tailrec
+  def simplifyWithEtaUntilStable[T](t: TermExpr[T]): TermExpr[T] = {
+    val simplified = t.simplify(withEta = true)
+    if (t == simplified) t else simplifyWithEtaUntilStable(simplified)
+  }
 
   def propositions[T](termExpr: TermExpr[T]): Seq[PropE[T]] = (termExpr match {
     case p: PropE[T] ⇒ Seq(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
