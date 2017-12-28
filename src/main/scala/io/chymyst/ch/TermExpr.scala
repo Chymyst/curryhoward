@@ -15,7 +15,7 @@ object TermExpr {
   }
 
   def propositions[T](termExpr: TermExpr[T]): Seq[PropE[T]] = (termExpr match {
-    case p: PropE[T] ⇒ Seq(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
+    case p@PropE(_, _) ⇒ Seq(p.asInstanceOf[PropE[T]]) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
     case AppE(head, arg) ⇒ propositions(head) ++ propositions(arg)
     case CurriedE(heads, body) ⇒ // Can't pattern-match directly for some reason! Some trouble with the type parameter T.
       heads.asInstanceOf[List[PropE[T]]] ++ propositions(body)
@@ -144,11 +144,11 @@ sealed trait TermExpr[+T] {
     case AppE(head, arg) ⇒ head.unusedArgs ++ arg.unusedArgs
     case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVars) ++ body.unusedArgs
     case UnitE(_) ⇒ Set()
-    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.unusedArgs).toSet
+    case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.unusedArgs).toSet
     case ConjunctE(terms) ⇒ terms.flatMap(_.unusedArgs).toSet
     case ProjectE(_, term) ⇒ term.unusedArgs
     case MatchE(term, cases) ⇒ term.unusedArgs ++ cases.flatMap {
-      case CurriedE(List(prop), body) ⇒ body.unusedArgs // the case arg is counted in unusedMatchClauseVars
+      case CurriedE(List(_), body) ⇒ body.unusedArgs // the case arg is counted in unusedMatchClauseVars
       case c ⇒ c.unusedArgs
     }.toSet
     case DisjunctE(_, _, term, _) ⇒ term.unusedArgs
@@ -426,7 +426,7 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
       // Then the entire term can be replaced by f.
       case t ⇒
         val bodyTerms: Set[Option[TermExpr[T]]] = casesSimplified.map {
-          case c@CurriedE(List(head@PropE(name, headT)), body) if c.unusedArgs contains name ⇒ Some(body)
+          case c@CurriedE(List(PropE(name, _)), body) if c.unusedArgs contains name ⇒ Some(body)
           case _ ⇒ None
         }.toSet
         bodyTerms.headOption match {
