@@ -179,7 +179,7 @@ class LawsSpec extends LawChecking {
     val pointS = new FPoint[OOption] {
       override def f[A]: A => OOption[A] = implement // This works.
     }
-/*
+
     // Here we have 4 implementations, and there is no good heuristic to use so far that can choose the correct functor instance.
     def maps[A, B] = allOfType[(A => B) => OOption[A] => OOption[B]]
     // All implementations should transform a non-empty option correctly.
@@ -192,8 +192,8 @@ class LawsSpec extends LawChecking {
     def flatmaps[A, B] = allOfType[(A => OOption[B]) => OOption[A] => OOption[B]]
 
     val flatmapsIntString = flatmaps[Int, String]
-    flatmapsIntString.length shouldEqual 4
-*/
+    flatmapsIntString.length shouldEqual 44
+
 
     /*    val fmapS = new FMap[OOption] {
           override def f[A, B]: (A => B) => OOption[A] => OOption[B] = implement
