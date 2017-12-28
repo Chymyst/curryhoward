@@ -39,11 +39,13 @@ object TheoremProver {
 
   private[ch] def findProofs[T](typeStructure: TypeExpr[T]): (List[TermExpr[T]], Seq[TermExpr[T]]) = {
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
-    val proofTerms = findProofTerms(mainSequent).map(_.prettyRename).distinct
+    // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
+    val proofTerms = findProofTerms(mainSequent).map(_.prettyRename.simplifyWithEta).distinct
     if (debug) {
       val prettyPT = proofTerms.map(p ⇒ (p.prettyPrint, p.unusedArgs.size, p.unusedTupleParts, p.unusedArgs, p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }))
         .sortBy { case (_, s1, s2, _, _) ⇒ s1 + s2 }
-      println(s"DEBUG: obtained proof terms:\n ${prettyPT.mkString(" ;\n ")} .")
+      val proofTermsMessage = if (prettyPT.isEmpty) "no proof terms." else s"proof terms:\n ${prettyPT.mkString(" ;\n ")} ."
+      println(s"DEBUG: for sequent $mainSequent, obtained $proofTermsMessage")
     }
     // Return the group of proofs that leave the smallest number of values unused, but has the smallest use count of those that are used.
     val chosenTerms = proofTerms

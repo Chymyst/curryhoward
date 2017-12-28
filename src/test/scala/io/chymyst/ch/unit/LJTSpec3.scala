@@ -31,6 +31,8 @@ case class Wrap2e[A](a: A) extends Wrap2
 
 class LJTSpec3 extends FlatSpec with Matchers {
 
+  System.setProperty("curryhoward.log", "prover,macros,terms")
+
   behavior of "terms with case classes"
 
   it should "generate code for case class" in {
@@ -65,6 +67,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     r2 shouldEqual 123
   }
+
   it should "generate code for the weak law of _tertium non datur_" in {
     def f[A, B, C]: (Either[A, A ⇒ B] ⇒ B) ⇒ Either[B, C] = implement
   }
@@ -116,6 +119,28 @@ class LJTSpec3 extends FlatSpec with Matchers {
     f3[Int, Int, Int, Int, Int].size shouldEqual 2
   }
 
+  it should "generate methods for Continuation monad" in {
+    case class Cont[X, R](c: (X ⇒ R) ⇒ R)
+
+    def points[D, A] = allOfType[A ⇒ Cont[A, D]]().length
+
+    def maps[D, A, B] = allOfType[Cont[A, D] ⇒ (A ⇒ B) ⇒ Cont[B, D]]().length
+
+    def flatmaps[D, A, B] = allOfType[Cont[A, D] ⇒ (A ⇒ Cont[B, D]) ⇒ Cont[B, D]]().length
+
+    points[Int, String] shouldEqual 1
+    maps[Int, String, Boolean] shouldEqual 1
+    flatmaps[Int, String, Boolean] shouldEqual 2
+  }
+
+  it should "generate contramap involving Option as argument" in {
+    allOfType[Option[Int] ⇒ (Option[Int] ⇒ String) ⇒ String].length shouldEqual 1
+
+    def contramaps[D, A, B] = allOfType[(Option[A] ⇒ D) ⇒ (B ⇒ A) ⇒ (Option[B] ⇒ D)].length
+
+    contramaps[Int, String, Boolean] shouldEqual 1
+  }
+
   it should "enumerate all implementations for the Reader-Option monad" in {
     def points[D, A] = allOfType[A ⇒ (D ⇒ Option[A])]().length
 
@@ -128,17 +153,28 @@ class LJTSpec3 extends FlatSpec with Matchers {
     flatmaps[Int, String, Boolean] shouldEqual 2
   }
 
+  it should "fail to generate join or contrajoin involving Option as argument" in {
+    def contrajoins1[D, A] = allOfType[(Option[A] ⇒ D) ⇒ (Option[Option[A] ⇒ D] ⇒ D)].length
+
+    def contrajoins2[D, A] = allOfType[(Option[Option[A] ⇒ D] ⇒ D) ⇒ (Option[A] ⇒ D)].length
+
+    contrajoins1[Int, String] shouldEqual 0
+    contrajoins2[Int, String] shouldEqual 0
+  }
+
   it should "generate methods for the Density-Option monad" in {
     def points[D, A] = allOfType[A ⇒ ((Option[A] ⇒ D) ⇒ Option[A])]().length
 
-    //    def maps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
+    def maps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
 
     points[Int, String] shouldEqual 1
-    //    maps[Int, String, Boolean] shouldEqual 1
+    maps[Int, String, Boolean] shouldEqual 1
 
-    //    def flatmaps[D,A,B] = allOfType[ ((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
-    //
-    //    flatmaps[Int, String, Boolean] shouldEqual 1
+    // This takes a long time and a lot of GC...
+    /*    def flatmaps[D,A,B] = allOfType[ ((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
+
+        flatmaps[Int, String, Boolean] shouldEqual 1
+    */
   }
 
   it should "generate the examples in the tutorial" in {
@@ -198,5 +234,4 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     //      f(1)("abc") shouldEqual ((1, "abc", "abc"))
   }
-
 }

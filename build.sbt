@@ -24,7 +24,7 @@ lazy val curryhoward: Project = (project in file("."))
   .settings(common)
   .settings(
     organization := "io.chymyst",
-    version := "0.1.1",
+    version := "0.2.0",
 
     licenses := Seq("Apache License, Version 2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
     homepage := Some(url("https://github.com/Chymyst/curryhoward")),
@@ -52,7 +52,7 @@ lazy val curryhoward: Project = (project in file("."))
       "-target:jvm-1.8"
     ),
     scalacOptions ++= (
-      if (scalaBinaryVersion.value == "2.12") Seq(
+      if (scalaBinaryVersion.value != "2.11") Seq(
         "-target:jvm-1.8",
         "-opt:l:inline",
         "-Ypartial-unification",
@@ -65,8 +65,6 @@ lazy val curryhoward: Project = (project in file("."))
     wartremoverErrors in(Compile, compile) ++= errorsForWartRemover,
 
     libraryDependencies ++= Seq(
-      // We only need the Scala compiler if we want to debug macros.
-      "org.scala-lang" % "scala-compiler" % scalaVersion.value % Provided,
       // We need scala-reflect because we use macros.
       "org.scala-lang" % "scala-reflect" % scalaVersion.value
     )

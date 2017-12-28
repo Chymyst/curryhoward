@@ -85,12 +85,14 @@ object LJT {
 
     val fromIdAxiom: Seq[TermExpr[T]] = sequent.premiseVars
       .zip(sequent.premises)
-      .filter(_._2 == sequent.goal && sequent.goal.isAtomic)
+      // Find premises that are equal to the goal.
+      .filter(_._2 == sequent.goal) // && sequent.goal.isAtomic) // There is no harm in applying this rule also to non-atomic terms. No useful alternative proofs would be lost due to that.
       .map { case (premiseVar, _) ⇒
         // Generate a new term x1 ⇒ x2 ⇒ ... ⇒ xN ⇒ xK with fresh names. Here `xK` is one of the variables, selecting the premise that is equal to the goal.
         // At this iteration, we already selected the premise that is equal to the goal.
         sequent.constructResultTerm(premiseVar)
       }
+
     val fromTAxiom: Seq[TermExpr[T]] = sequent.goal match {
       case unitT: UnitT[T] ⇒ Seq(sequent.constructResultTerm(UnitE(unitT)))
       case _ ⇒ Seq()

@@ -12,7 +12,7 @@ sealed trait TypeExpr[+T] {
     case BasicT(name) ⇒ s"<c>$name" // well-known constant type such as Int
     case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"
-    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+    case NamedConjunctT(constructor, tParams, _, _) ⇒
       val typeSuffix = if (caseObjectName.isDefined) ".type" else ""
       s"$constructor${TypeExpr.tParamString(tParams)}$typeSuffix"
     case OtherT(name) ⇒ s"<oc>$name" // other constant type
@@ -44,6 +44,18 @@ sealed trait AtomicTypeExpr[T] {
 }
 
 object TypeExpr {
+  def substAll[T](typeExpr: TypeExpr[T], typeMap: Map[T, TypeExpr[T]]): TypeExpr[T] = {
+    typeExpr match {
+      case DisjunctT(constructor, tParams, terms) ⇒ DisjunctT(constructor, tParams, terms.map(substAll(_, typeMap)))
+      case ConjunctT(terms) ⇒ConjunctT( terms.map(substAll(_, typeMap)))
+      case #->(head, body) ⇒ #->(substAll(head, typeMap), substAll(body, typeMap))
+      case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
+        NamedConjunctT(constructor, tParams.map(substAll(_, typeMap)), accessors, wrapped.map(substAll(_, typeMap)))
+      case TP(name) ⇒ typeMap.getOrElse(name, typeExpr)
+      case _ ⇒ typeExpr
+    }
+  }
+
   private[ch] def tParamString[T](tParams: Seq[TypeExpr[T]]): String =
     if (tParams.isEmpty)
       ""
@@ -99,7 +111,9 @@ final case class BasicT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T] {
 final case class NamedConjunctT[+T](constructor: T, tParams: List[TypeExpr[T]], accessors: List[T], wrapped: List[TypeExpr[T]]) extends TypeExpr[T] with NonAtomicTypeExpr {
   override def map[U](f: T ⇒ U): NamedConjunctT[U] = NamedConjunctT(f(constructor), tParams map (_ map f), accessors map f, wrapped map (_ map f))
 
-  override def caseObjectName: Option[T] = if (tParams.isEmpty && accessors.isEmpty && wrapped.isEmpty) Some(constructor) else None
+  override def caseObjectName: Option[T] = if (isAtomic && wrapped.isEmpty) Some(constructor) else None
+
+  override def isAtomic: Boolean = tParams.isEmpty && accessors.isEmpty
 }
 
 // Since we do not know how to work with arbitrary type constructors, we treat them as atomic types.
