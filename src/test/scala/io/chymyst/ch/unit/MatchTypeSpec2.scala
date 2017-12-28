@@ -10,7 +10,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
   it should "get type with argument tuples" in {
     def result[A, B]: (String, String) = testType[A ⇒ ((A, B)) ⇒ A]
 
-    var r = result
+    val r = result
 
     r._2 shouldEqual "(<c>String, <c>String)"
     r._1 shouldEqual "A ⇒ (A, B) ⇒ A"
@@ -19,7 +19,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
   it should "get type with nested argument tuples" in {
     def result[A, B]: (String, String) = testType[(((A, B)) ⇒ A) ⇒ A]
 
-    var r = result
+    val r = result
 
     r._2 shouldEqual "(<c>String, <c>String)"
     r._1 shouldEqual "((A, B) ⇒ A) ⇒ A"
@@ -28,7 +28,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
   it should "get a complicated type with argument tuples" in {
     def result[S, A, B]: (String, String) = testType[(S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S))]
 
-    var r = result
+    val r = result
 
     r._2 shouldEqual "(<c>String, <c>String)"
     r._1 shouldEqual "(S ⇒ (A, S)) ⇒ ((A, S) ⇒ (B, S)) ⇒ S ⇒ (B, S)"

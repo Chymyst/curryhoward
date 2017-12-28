@@ -80,24 +80,24 @@ object LJT {
 
   private def omitPremise[C](indexedPremises: Seq[(C, Int)], index: Int): List[C] = indexedPremises.filterNot(_._2 == index).map(_._1).toList
 
-  private[ch] def followsFromAxioms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
+  private[ch] def followsFromAxioms[T](sequent: Sequent[T]): (Seq[ProofTerm[T]], Seq[ProofTerm[T]]) = {
     // The LJT calculus has three axioms. We use the Id axiom and the T axiom only, because the F axiom is not useful for code generation.
-
+    // We return the proof terms separately for each axiom.
     val fromIdAxiom: Seq[TermExpr[T]] = sequent.premiseVars
       .zip(sequent.premises)
       // Find premises that are equal to the goal.
-      .filter(_._2 == sequent.goal) // && sequent.goal.isAtomic) // There is no harm in applying this rule also to non-atomic terms. No useful alternative proofs would be lost due to that.
+      .filter(_._2 == sequent.goal)// && sequent.goal.isAtomic) // There is no harm in applying this rule also to non-atomic terms. No useful alternative proofs would be lost due to that.
       .map { case (premiseVar, _) ⇒
-        // Generate a new term x1 ⇒ x2 ⇒ ... ⇒ xN ⇒ xK with fresh names. Here `xK` is one of the variables, selecting the premise that is equal to the goal.
-        // At this iteration, we already selected the premise that is equal to the goal.
-        sequent.constructResultTerm(premiseVar)
-      }
+      // Generate a new term x1 ⇒ x2 ⇒ ... ⇒ xN ⇒ xK with fresh names. Here `xK` is one of the variables, selecting the premise that is equal to the goal.
+      // At this iteration, we already selected the premise that is equal to the goal.
+      sequent.constructResultTerm(premiseVar)
+    }
 
     val fromTAxiom: Seq[TermExpr[T]] = sequent.goal match {
       case unitT: UnitT[T] ⇒ Seq(sequent.constructResultTerm(UnitE(unitT)))
       case _ ⇒ Seq()
     }
-    fromIdAxiom ++ fromTAxiom
+    (fromIdAxiom, fromTAxiom)
   }
 
   // (G*, A + B) |- C when (G*, A) |- C and (G*, B) |- C  -- rule +L -- duplicates the context G*
@@ -115,7 +115,10 @@ object LJT {
           val oldPremisesWithoutI: List[PropE[T]] = omitPremise(sequent.premiseVars.zipWithIndex, i)
           val freshVarsAB = heads.map(PropE(sequent.freshVar(), _)).toList
           // Each part of the disjunction is matched with a function of the form fv ⇒ proofTerm(fv, other_premises).
-          val subTerms = proofTerms.zip(freshVarsAB).map { case (pt, fv) ⇒ CurriedE(List(fv), TermExpr.applyToVars(pt, fv :: oldPremisesWithoutI)) }
+          val subTerms = proofTerms.zip(freshVarsAB)
+            .map { case (pt, fv) ⇒ (fv.tExpr, CurriedE(List(fv), TermExpr.applyToVars(pt, fv :: oldPremisesWithoutI))) }
+            .sortBy(_._1.prettyPrint).map(_._2) // Sort the clauses by type expression.
+          // At this point, `subTerms` can be reordered at will since these are mutually exclusive and exhaustive cases in a disjunction.
           val result = MatchE(thePremiseVarAB, subTerms.toList)
           sequent.constructResultTerm(result)
         }
@@ -273,7 +276,7 @@ object LJT {
             // Wrapped Unit or wrapped single term.
             case _ if nct.caseObjectName.isDefined ⇒ NamedConjunctE(Nil, nct)
             case other ⇒
-//              println(s"debug: wrapping $other into type $nct")
+              //              println(s"debug: wrapping $other into type $nct")
               NamedConjunctE(Seq(other), nct)
           }
           sequent.constructResultTerm(result)

@@ -73,6 +73,8 @@ object TermExpr {
 }
 
 sealed trait TermExpr[+T] {
+  def informationLossScore: (Int, Int) = (unusedArgs.size + unusedTupleParts + unusedMatchClauseVars, argsMultiUseCount)
+
   def tExpr: TypeExpr[T]
 
   def prettyPrint: String = prettyRename.prettyPrintWithParentheses(0)
@@ -137,19 +139,32 @@ sealed trait TermExpr[+T] {
 
   def simplify(withEta: Boolean = false): TermExpr[T] = this
 
-  private[ch] def unusedArgs: Set[VarName] = Set()
-
-  private[ch] def unusedMatchClauseVars: Int = this match {
-    case PropE(_, _) ⇒ 0
-    case AppE(head, arg) ⇒ head.unusedMatchClauseVars + arg.unusedMatchClauseVars
-    case CurriedE(_, body) ⇒ body.unusedMatchClauseVars
-    case UnitE(_) ⇒ 0
-    case NamedConjunctE(terms, _) ⇒ terms.map(_.unusedMatchClauseVars).sum
-    case ConjunctE(terms) ⇒ terms.map(_.unusedMatchClauseVars).sum
-    case ProjectE(_, term) ⇒ term.unusedMatchClauseVars
-    case MatchE(_, cases) ⇒ cases.map(_.unusedArgs.size).sum
-    case DisjunctE(_, _, term, _) ⇒ term.unusedMatchClauseVars
+  private[ch] def unusedArgs: Set[VarName] = this match {
+    case PropE(name, tExpr) ⇒ Set()
+    case AppE(head, arg) ⇒ head.unusedArgs ++ arg.unusedArgs
+    case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVars) ++ body.unusedArgs
+    case UnitE(tExpr) ⇒ Set()
+    case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.unusedArgs).toSet
+    case ConjunctE(terms) ⇒ terms.flatMap(_.unusedArgs).toSet
+    case ProjectE(index, term) ⇒ term.unusedArgs
+    case m@MatchE(term, cases) ⇒ term.unusedArgs ++ cases.flatMap(_.unusedArgs).toSet
+    case DisjunctE(index, total, term, tExpr) ⇒ term.unusedArgs
   }
+
+  // Probably not needed any more, since we are counting this in unusedArgs.
+  private[ch] def unusedMatchClauseVars: Int = 0
+
+  //  private[ch] def unusedMatchClauseVars: Int = this match {
+  //    case PropE(_, _) ⇒ 0
+  //    case AppE(head, arg) ⇒ head.unusedMatchClauseVars + arg.unusedMatchClauseVars
+  //    case CurriedE(_, body) ⇒ body.unusedMatchClauseVars
+  //    case UnitE(_) ⇒ 0
+  //    case NamedConjunctE(terms, _) ⇒ terms.map(_.unusedMatchClauseVars).sum
+  //    case ConjunctE(terms) ⇒ terms.map(_.unusedMatchClauseVars).sum
+  //    case ProjectE(_, term) ⇒ term.unusedMatchClauseVars
+  //    case MatchE(_, cases) ⇒ cases.map(_.unusedArgs.size).sum
+  //    case DisjunctE(_, _, term, _) ⇒ term.unusedMatchClauseVars
+  //  }
 
   private[ch] lazy val unusedTupleParts: Int =
     usedTuplePartsSeq
@@ -289,8 +304,6 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
     }
   }
 
-  override def unusedArgs: Set[VarName] = heads.map(_.name).toSet -- body.freeVars
-
   override lazy val argsMultiUseCount: Int = heads.map(head ⇒ body.varCount(head.name)).sum
 }
 
@@ -375,16 +388,17 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
     case Nil ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
   }
 
-  override def simplify(withEta: Boolean): TermExpr[T] = term.simplify(withEta) match {
-    case DisjunctE(index, total, t, _) ⇒
-      if (total == cases.length) {
-        AppE(cases(index).simplify(withEta), t).simplify(withEta)
-      } else throw new Exception(s"Internal error: MatchE with ${cases.length} cases applied to DisjunctE with $total parts, but must be of equal size")
-    // Detect the identity pattern:
-    // MatchE(_, a: T1 ⇒ DisjunctE(i, total, NamedConjunctE(List(ProjectE(0, a), Project(1, a), ...), T1), ...), _)
-    case t ⇒
-      val casesSimplified = cases.map(_.simplify(withEta))
-      if (casesSimplified.zipWithIndex.forall {
+  override def simplify(withEta: Boolean): TermExpr[T] = {
+    lazy val casesSimplified = cases.map(_.simplify(withEta))
+    term.simplify(withEta) match {
+      case DisjunctE(index, total, t, _) ⇒
+        if (total == cases.length) {
+          AppE(cases(index).simplify(withEta), t).simplify(withEta)
+        } else throw new Exception(s"Internal error: MatchE with ${cases.length} cases applied to DisjunctE with $total parts, but must be of equal size")
+
+      // Detect the identity pattern:
+      // MatchE(_, a: T1 ⇒ DisjunctE(i, total, NamedConjunctE(List(ProjectE(0, a), Project(1, a), ...), T1), ...), _)
+      case _ if cases.nonEmpty && casesSimplified.zipWithIndex.forall {
         case (CurriedE(List(head@PropE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
           len == cases.length && ind == i && headT == conjT &&
             projectionTerms.zipWithIndex.forall {
@@ -392,13 +406,31 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
               case _ ⇒ false
             }
         case _ ⇒ false
-      })
-      // We detected an identity function of the form term match { case a => a; case b => b; etc.}
-      // so we can just replace that by `term`.
+      } ⇒
+        // We detected an identity function of the form term match { case a => a; case b => b; etc.}
+        // so we can just replace that by `term`.
         term
-      else
-        MatchE(t, casesSimplified)
+
+      // Detect the constant pattern:
+      // MatchE(_, {f, f, ..., f}) where each clause is the same expression `f`, up to equivalence, and ignores its argument.
+      // Then the entire term can be replaced by f.
+      case t ⇒
+        val bodyTerms: Set[Option[TermExpr[T]]] = casesSimplified.map {
+          case c@CurriedE(List(head@PropE(name, headT)), body) if c.unusedArgs contains name ⇒ Some(body)
+          case _ ⇒ None
+        }.toSet
+        bodyTerms.headOption match {
+          case Some(Some(body)) if bodyTerms.size == 1 ⇒ body
+          case _ ⇒
+            // We failed to detect the constant pattern.
+            // This is the default, catch-all case.
+            MatchE(t, casesSimplified)
+        }
+
+    }
+
   }
+
 }
 
 // Inject a value into the i-th part of the disjunction of type tExpr.

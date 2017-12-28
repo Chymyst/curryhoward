@@ -132,7 +132,8 @@ class LJTSpec2 extends FlatSpec with Matchers {
   behavior of "misc. proof terms"
 
   it should "select implementation by argument usage counts" in {
-    def f[A]: A ⇒ (A ⇒ A) ⇒ A = implement // Implement as b ⇒ a ⇒ a b rather than b ⇒ _ ⇒ b.
+    // Should implement as b ⇒ a ⇒ a b rather than b ⇒ _ ⇒ b.
+    def f[A]: A ⇒ (A ⇒ A) ⇒ A = implement
 
     f(123)(_ + 1) shouldEqual 124
 

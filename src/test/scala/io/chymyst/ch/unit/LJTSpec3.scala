@@ -54,7 +54,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
   }
 
   it should "generate code with case objects correctly" in {
-     def f: Wrap2 ⇒ Wrap2c.type = implement
+    def f: Wrap2 ⇒ Wrap2c.type = implement
   }
 
   it should "generate code for a sealed trait" in {
@@ -118,7 +118,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     def f3[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E]]
 
-    f3[Int, Int, Int, Int, Int].size shouldEqual 2
+    f3[Int, Int, Int, Int, Int].size shouldEqual 1
   }
 
   it should "generate methods for Continuation monad with no ambiguity" in {
@@ -154,7 +154,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     points[Int, String] shouldEqual 1
     maps[Int, String, Boolean] shouldEqual 1
-    flatmaps[Int, String, Boolean] shouldEqual 2
+    flatmaps[Int, String, Boolean] shouldEqual 1
   }
 
   it should "fail to generate join or contrajoin involving Option as argument" in {
@@ -167,19 +167,27 @@ class LJTSpec3 extends FlatSpec with Matchers {
   }
 
   it should "generate methods for the Density-Option monad" in {
-    def points[D, A] = allOfType[A ⇒ ((Option[A] ⇒ D) ⇒ Option[A])]().length
+    def points[D, A] = allOfType[A ⇒ ((Option[A] ⇒ D) ⇒ Option[A])]()
 
-    points[Int, String] shouldEqual 1
+    points[Int, String].length shouldEqual 1
+    points[Int, String].head("abc")(_ ⇒ 123) shouldEqual Some("abc")
 
-    def maps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
+    def maps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]()
 
-    maps[Int, String, Boolean] shouldEqual 1
+    maps[Int, String, String].length shouldEqual 1
+    // Should not be a trivial implementation.
+    val dString: (Option[String] ⇒ Int) ⇒ Option[String] = f ⇒ if (f(Some("abc")) > f(Some("ab"))) Some("abc") else None
+    val f: String ⇒ String = identity
+    val g: Option[String] ⇒ Int = os ⇒ if (os.contains("abc")) 10 else 0
+    maps[Int, String, String].head(dString)(f)(g) shouldEqual Some("abc")
 
-    // This takes a long time and a lot of GC...
-    /*    def flatmaps[D,A,B] = allOfType[ ((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
+    // This takes a longer time.
+    def flatmaps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
 
-        flatmaps[Int, String, Boolean] shouldEqual 1
-    */
+    flatmaps[Int, String, Boolean] shouldEqual 1
+
+    // However, we can still select the "best" implementation automatically.
+    def flatmap[D, A, B] = ofType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]()
   }
 
   it should "generate the examples in the tutorial" in {

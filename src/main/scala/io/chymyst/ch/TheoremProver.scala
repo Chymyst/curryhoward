@@ -5,8 +5,14 @@ import io.chymyst.ch.TermExpr.ProofTerm
 
 
 object TheoremProver {
-
   private def debug = Macros.options contains "prover"
+
+  private def debugTrace = Macros.options contains "trace"
+
+  // Heuristic to speed up the proof search: select the terms with the best scores and ignore others.
+  // The number of terms to take depends on the number of premises in the sequent.
+  // We will never take less than 64 = 2 << 6 and more than a million terms (2 << 20) at any step.
+  private def maxTermsToSelect[T](sequent: Sequent[T]): Int = 2 << math.min(6, math.max(20, 2 + sequent.premises.length))
 
   private[ch] def inhabitInternal[T](typeStructure: TypeExpr[T]): Either[String, (Option[String], TermExpr[T])] = {
     // TODO Check that there aren't repeated types among the curried arguments, print warning.
@@ -37,24 +43,25 @@ object TheoremProver {
 
   private[ch] val freshVar = new FreshIdents(prefix = "x")
 
+  private val maxTermsPrinted = 16
+
   private[ch] def findProofs[T](typeStructure: TypeExpr[T]): (List[TermExpr[T]], Seq[TermExpr[T]]) = {
+    val t0 = System.currentTimeMillis()
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
     val proofTerms = findProofTerms(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename)).distinct
-    if (debug) {
-      val prettyPT = proofTerms.map(p ⇒ (p.prettyPrint, p.unusedArgs.size, p.unusedTupleParts, p.unusedArgs, p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }))
-        .sortBy { case (_, s1, s2, _, _) ⇒ s1 + s2 }
-      val proofTermsMessage = if (prettyPT.isEmpty) "no proof terms." else s"proof terms:\n ${prettyPT.mkString(" ;\n ")} ."
-      println(s"DEBUG: for sequent $mainSequent, obtained $proofTermsMessage")
+    if (debug || debugTrace) {
+      val prettyPT = proofTerms.map(p ⇒ (p.informationLossScore, s"${p.prettyPrint}; ${p.unusedArgs.size} unused args: ${p.unusedArgs}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }}"))
+        .sortBy(_._1).map(_._2)
+      val proofTermsMessage = if (prettyPT.isEmpty) "no final proof terms." else s"${prettyPT.length} final proof terms:\n ${prettyPT.take(maxTermsPrinted).mkString(" ;\n ")} ."
+      println(s"DEBUG: for main sequent $mainSequent, obtained $proofTermsMessage This took ${System.currentTimeMillis() - t0} ms")
     }
     // Return the group of proofs that leave the smallest number of values unused, but has the smallest use count of those that are used.
     val chosenTerms = proofTerms
-      .map(proofTerm ⇒ (proofTerm, (proofTerm.unusedArgs.size + proofTerm.unusedTupleParts + proofTerm.unusedMatchClauseVars, proofTerm.argsMultiUseCount)))
-      .groupBy(_._2) // Map[Int, Seq[(ProofTerm[T], Int)]]
-      .mapValues(_.map(_._1)) // Map[Int, Seq[ProofTerm[T]]]
-      .toSeq.sortBy(_._1) // Seq[(Int, Seq[ProofTerm[T]])]
-      .headOption // Option[(Int, Seq[ProofTerm[T]])]
-      .map(_._2.toList) // Option[List[ProofTerm[T]]]
+      .groupBy(_.informationLossScore) // Map[score, Seq[ProofTerm[T]]]
+      .toSeq.sortBy(_._1) // Seq[(score, Seq[ProofTerm[T]])] sorted by increasing score
+      .headOption // Option[(score, Seq[ProofTerm[T]])] the first group of terms all having the lowest score
+      .map(_._2.toList) // Option[List[ProofTerm[T]]] discard the score value
       .getOrElse(List())
     (chosenTerms, proofTerms)
   }
@@ -63,24 +70,30 @@ object TheoremProver {
   // The main assumption is that the depth-first proof search terminates.
   // No loop checking is performed on sequents.
   private[ch] def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
+
     def concatProofs(ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
       if (debug) println(s"DEBUG: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents.map(_.toString).mkString("; ")}")
       // All the new sequents need to be proved before we can continue. They may have several proofs each.
       val newProofs: Seq[Seq[ProofTerm[T]]] = ruleResult.newSequents.map(findProofTerms)
       val explodedNewProofs: Seq[Seq[ProofTerm[T]]] = TheoremProver.explode(newProofs)
       val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
-      val result = transformedProofs.map(_.simplify()).distinct // Note: at this point, it is a mistake to do prettyRename, because we are calling this function recursively.
+      val t0 = System.currentTimeMillis()
+
+      val result = transformedProofs.map(_.simplify()).distinct.sortBy(_.informationLossScore).take(maxTermsToSelect(sequent))
+      // Note: at this point, it is a mistake to do prettyRename, because we are calling this function recursively.
       // We will call prettyRename() at the very end of the proof search.
       if (debug) {
-        println(s"DEBUG: for sequent $sequent, after rule ${ruleResult.ruleName}, transformed ${transformedProofs.length} proof terms:\n ${transformedProofs.mkString(" ;\n ")} ,\nafter simplifying:\n ${result.mkString(" ;\n ")} .")
-        //        println(s"debug: types of transformed proofs:\n ${transformedProofs.map(_.tExpr.prettyPrint).mkString(";\n ")},\nafter simplify:\n ${result.map(_.tExpr.prettyPrint).mkString(";\n ")}")
+        println(s"DEBUG: transformedProofs.map(_.simplify()).distinct took ${System.currentTimeMillis() - t0} ms and produced ${result.size} terms out of ${transformedProofs.size} back-transformed terms")
+        //        println(s"DEBUG: for sequent $sequent, after rule ${ruleResult.ruleName}, transformed ${transformedProofs.length} proof terms:\n ${transformedProofs.mkString(" ;\n ")} ,\nafter simplifying:\n ${result.mkString(" ;\n ")} .")
       }
       result
     }
 
     // Check whether the sequent follows directly from an axiom.
-    val fromAxioms: Seq[ProofTerm[T]] = followsFromAxioms(sequent) // This could be empty or non-empty.
-    // Even if the sequent follows directly from axioms, we should try applying rules in hopes of getting more proofs.
+    val (fromIdAxiom, fromTAxiom) = followsFromAxioms(sequent) // This could be empty or non-empty.
+    // If the sequent follows from Id axiom, we will ignore `fromTAxiom`, because this will most likely not yield a good solution.
+    // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
+    val fromAxioms = if (fromIdAxiom.nonEmpty) fromIdAxiom else fromTAxiom
 
     if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyPrint)}")
 
@@ -114,9 +127,14 @@ object TheoremProver {
           fromNoninvertibleRules ++ fromAxioms
         }
     }
-    val terms = fromRules.distinct
-    if (debug) {
-      val termsMessage = if (terms.nonEmpty) "terms:\n " + terms.map(_.prettyPrint).mkString(" ;\n ") + " ,\n" else "no terms"
+    val terms = fromRules.map(_.simplify()).distinct
+    if (debug || debugTrace) {
+      val termsMessage = terms.length match {
+        case 0 ⇒ "no terms"
+        case x ⇒
+          val messagePrefix = if (x > maxTermsPrinted) s"first $maxTermsPrinted out of " else ""
+          s"$messagePrefix$x terms:\n " + terms.take(maxTermsPrinted).map(_.prettyPrint).mkString(" ;\n ") + " ,\n"
+      }
       println(s"DEBUG: returning $termsMessage for sequent $sequent")
     }
     terms
