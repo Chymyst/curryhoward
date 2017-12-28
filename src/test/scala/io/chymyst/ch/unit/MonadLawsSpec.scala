@@ -173,6 +173,58 @@ class LawsSpec extends LawChecking {
 
   }
 
+  it should "check laws for Continuation monad" in {
+    case class Cont[X](c: (X ⇒ Int) ⇒ Int)
+
+    implicit def contEqual[A: Arbitrary](s1: Cont[A], s2: Cont[A])(implicit ai: Arbitrary[A ⇒ Int]): Assertion = fEqual(s1.c, s2.c)
+
+    implicit def genCaseClass[A: Arbitrary]: Arbitrary[Cont[A]] = Arbitrary {
+      for {
+        n <- arbitrary[(A ⇒ Int) ⇒ Int]
+      } yield Cont(n)
+    }
+
+    val pointS = new FPoint[Cont] {
+      override def f[A]: A => Cont[A] = implement
+    }
+
+    val fmapS = new FMap[Cont] {
+      override def f[A, B]: (A => B) => Cont[A] => Cont[B] = implement
+    }
+
+    val flatmapS = new FFlatMap[Cont] {
+      override def f[A, B]: (A => Cont[B]) => Cont[A] => Cont[B] = implement
+    }
+
+    checkMonadLaws[Int, Long, String, Cont](pointS, fmapS, flatmapS)
+  }
+
+  it should "check laws for Density monad" in {
+    case class Dens[X](c: (X ⇒ Int) ⇒ X)
+
+    implicit def contEqual[A: Arbitrary](s1: Dens[A], s2: Dens[A])(implicit ai: Arbitrary[A ⇒ Int]): Assertion = fEqual(s1.c, s2.c)
+
+    implicit def genCaseClass[A: Arbitrary]: Arbitrary[Dens[A]] = Arbitrary {
+      for {
+        n <- arbitrary[(A ⇒ Int) ⇒ A]
+      } yield Dens(n)
+    }
+
+    val pointS = new FPoint[Dens] {
+      override def f[A]: A => Dens[A] = implement
+    }
+
+    val fmapS = new FMap[Dens] {
+      override def f[A, B]: (A => B) => Dens[A] => Dens[B] = implement
+    }
+
+    val flatmapS = new FFlatMap[Dens] {
+      override def f[A, B]: (A => Dens[B]) => Dens[A] => Dens[B] = implement
+    }
+
+    checkMonadLaws[Int, Long, String, Dens](pointS, fmapS, flatmapS)
+  }
+
   it should "cannot implement Option[Option] monad due to ambiguities" in {
     case class OOption[A](x: Option[Option[A]])
 
@@ -182,6 +234,7 @@ class LawsSpec extends LawChecking {
 
     // Here we have 4 implementations, and there is no good heuristic to use so far that can choose the correct functor instance.
     def maps[A, B] = allOfType[(A => B) => OOption[A] => OOption[B]]
+
     // All implementations should transform a non-empty option correctly.
     val mapsIntString = maps[Int, String]
     mapsIntString.length shouldEqual 4
