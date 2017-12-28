@@ -1,7 +1,9 @@
 package io.chymyst.ch
 
-import io.chymyst.ch.LJT.{followsFromAxioms, invertibleRules, invertibleAmbiguousRules, nonInvertibleRulesForSequent}
+import io.chymyst.ch.LJT.{followsFromAxioms, invertibleAmbiguousRules, invertibleRules, nonInvertibleRulesForSequent}
 import io.chymyst.ch.TermExpr.ProofTerm
+
+import scala.collection.mutable
 
 
 object TheoremProver {
@@ -45,8 +47,11 @@ object TheoremProver {
 
   private val maxTermsPrinted = 16
 
+  private val sequentsSeen = mutable.Map[Sequent[_], Seq[TermExpr[_]]]()
+
   private[ch] def findProofs[T](typeStructure: TypeExpr[T]): (List[TermExpr[T]], Seq[TermExpr[T]]) = {
     val t0 = System.currentTimeMillis()
+    sequentsSeen.clear()
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
     val proofTerms = findProofTerms(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename)).distinct
@@ -55,6 +60,8 @@ object TheoremProver {
         .sortBy(_._1).map(_._2)
       val proofTermsMessage = if (prettyPT.isEmpty) "no final proof terms." else s"${prettyPT.length} final proof terms:\n ${prettyPT.take(maxTermsPrinted).mkString(" ;\n ")} ."
       println(s"DEBUG: for main sequent $mainSequent, obtained $proofTermsMessage This took ${System.currentTimeMillis() - t0} ms")
+//      val sequentsSeenMoreThanOnce = sequentsSeen.filter { case (_, v) ⇒ v.length > 1 }.mapValues(_.length)
+//      if (sequentsSeenMoreThanOnce.nonEmpty) println(s"DEBUG: sequents seen more than once are $sequentsSeenMoreThanOnce")
     }
     // Return the group of proofs that leave the smallest number of values unused, but has the smallest use count of those that are used.
     val chosenTerms = proofTerms
@@ -89,55 +96,64 @@ object TheoremProver {
       result
     }
 
-    // Check whether the sequent follows directly from an axiom.
-    val (fromIdAxiom, fromTAxiom) = followsFromAxioms(sequent) // This could be empty or non-empty.
-    // If the sequent follows from Id axiom, we will ignore `fromTAxiom`, because this will most likely not yield a good solution.
-    // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
-    val fromAxioms = if (fromIdAxiom.nonEmpty) fromIdAxiom else fromTAxiom
-
-    if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyPrint)}")
-
-    // Try each rule on sequent. If rule applies, obtain the next sequent.
-    // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
-
-    // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
-    // We should apply that invertible rule and proceed from there.
-    val fromRules: Seq[ProofTerm[T]] = invertibleRules[T].view.flatMap(_.applyTo(sequent)).headOption match {
-      case Some(ruleResult) ⇒ concatProofs(ruleResult) ++ fromAxioms
+    // Check whether we already saw this sequent.
+    sequentsSeen.get(sequent) match {
+      case Some(terms) ⇒ terms.asInstanceOf[Seq[TermExpr[T]]]
       case None ⇒
-        // Try invertible ambiguous rules. Each of these rules may generate more than one new sequent,
-        // and each of these sequents yields a proof if the original formula has a proof.
-        // We need to gather and concatenate all these proofs.
-        // We proceed to non-invertible rules only if no rules apply at this step.
-        val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
-          .flatMap(_.applyTo(sequent))
-          .flatMap(concatProofs)
-        if (fromInvertibleAmbiguousRules.nonEmpty)
-          fromInvertibleAmbiguousRules ++ fromAxioms
-        else {
-          // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
-          // Each non-invertible rule will generate some proofs or none.
-          // If a rule generates no proofs, another rule should be used.
-          // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
-          // If no more rules apply here, we return `fromAxioms`.
-          // Use flatMap to concatenate all results from all applicable non-invertible rules.
-          val fromNoninvertibleRules: Seq[ProofTerm[T]] = nonInvertibleRulesForSequent[T](sequent)
-            .flatMap(_.applyTo(sequent))
-            .flatMap(concatProofs)
-          fromNoninvertibleRules ++ fromAxioms
+
+        // Check whether the sequent follows directly from an axiom.
+        val (fromIdAxiom, fromTAxiom) = followsFromAxioms(sequent) // This could be empty or non-empty.
+      // If the sequent follows from Id axiom, we will ignore `fromTAxiom`, because this will most likely not yield a good solution.
+      // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
+      val fromAxioms = if (fromIdAxiom.nonEmpty) fromIdAxiom else fromTAxiom
+
+        if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyPrint)}")
+
+        // Try each rule on sequent. If rule applies, obtain the next sequent.
+        // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
+
+        // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
+        // We should apply that invertible rule and proceed from there.
+        val fromRules: Seq[ProofTerm[T]] = invertibleRules[T].view.flatMap(_.applyTo(sequent)).headOption match {
+          case Some(ruleResult) ⇒ concatProofs(ruleResult) ++ fromAxioms
+          case None ⇒
+            // Try invertible ambiguous rules. Each of these rules may generate more than one new sequent,
+            // and each of these sequents yields a proof if the original formula has a proof.
+            // We need to gather and concatenate all these proofs.
+            // We proceed to non-invertible rules only if no rules apply at this step.
+            val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
+              .flatMap(_.applyTo(sequent))
+              .flatMap(concatProofs)
+            if (fromInvertibleAmbiguousRules.nonEmpty)
+              fromInvertibleAmbiguousRules ++ fromAxioms
+            else {
+              // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
+              // Each non-invertible rule will generate some proofs or none.
+              // If a rule generates no proofs, another rule should be used.
+              // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
+              // If no more rules apply here, we return `fromAxioms`.
+              // Use flatMap to concatenate all results from all applicable non-invertible rules.
+              val fromNoninvertibleRules: Seq[ProofTerm[T]] = nonInvertibleRulesForSequent[T](sequent)
+                .flatMap(_.applyTo(sequent))
+                .flatMap(concatProofs)
+              fromNoninvertibleRules ++ fromAxioms
+            }
         }
+        val termsFound = fromRules.map(_.simplify()).distinct
+        if (debug || debugTrace) {
+          val termsMessage = termsFound.length match {
+            case 0 ⇒ "no terms"
+            case x ⇒
+              val messagePrefix = if (x > maxTermsPrinted) s"first $maxTermsPrinted out of " else ""
+              s"$messagePrefix$x terms:\n " + termsFound.take(maxTermsPrinted).map(_.prettyPrint).mkString(" ;\n ") + " ,\n"
+          }
+          println(s"DEBUG: returning $termsMessage for sequent $sequent")
+        }
+        // TODO: refactor this if there is a useful caching heuristic
+        sequentsSeen.update(sequent, termsFound)
+        termsFound
     }
-    val terms = fromRules.map(_.simplify()).distinct
-    if (debug || debugTrace) {
-      val termsMessage = terms.length match {
-        case 0 ⇒ "no terms"
-        case x ⇒
-          val messagePrefix = if (x > maxTermsPrinted) s"first $maxTermsPrinted out of " else ""
-          s"$messagePrefix$x terms:\n " + terms.take(maxTermsPrinted).map(_.prettyPrint).mkString(" ;\n ") + " ,\n"
-      }
-      println(s"DEBUG: returning $termsMessage for sequent $sequent")
-    }
-    terms
   }
+
 
 }
