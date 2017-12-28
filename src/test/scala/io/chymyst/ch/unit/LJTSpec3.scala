@@ -53,10 +53,11 @@ class LJTSpec3 extends FlatSpec with Matchers {
     f(GadtChoice2("abc", true)) shouldEqual true
   }
 
-  // TODO: make this work
-  //    def f: Wrap2 ⇒ Wrap2c.type = implement
+  it should "generate code with case objects correctly" in {
+     def f: Wrap2 ⇒ Wrap2c.type = implement
+  }
 
-  it should "generate code for sealed trait" in {
+  it should "generate code for a sealed trait" in {
     def f[A, B]: GadtChoice[A] ⇒ B = implement
 
     val r1 = f[String, Boolean](GadtChoice1(123, "abc", true))

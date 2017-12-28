@@ -268,22 +268,16 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
   def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr ->: prev }
 
   override def simplify(withEta: Boolean): TermExpr[T] = {
-//    println(s"DEBUG: called simplify(withEta=$withEta) in ${this.prettyPrint}")
     body.simplify(withEta) match {
-      // Check for inverse eta-conversion: simplify x ⇒ y ⇒ ... ⇒ z ⇒ a ⇒ f a into x ⇒ y ⇒ ... ⇒ z ⇒ f.
+      // Check for eta-contraction: simplify x ⇒ y ⇒ ... ⇒ z ⇒ a ⇒ f a into x ⇒ y ⇒ ... ⇒ z ⇒ f.
       // Here fHead = a and fBody = f; the last element of `heads` must be equal to `a`
       case AppE(fHead, fBody) if withEta && headsLength > 0 && heads(headsLength - 1) == fBody ⇒
-        val result = if (headsLength > 1)
+        if (headsLength > 1)
           CurriedE(heads.slice(0, headsLength - 1), fHead)
         else
-          fHead
-//        println(s"DEBUG: detected eta-expansion in ${this.prettyPrint}, return result=$result")
-        result
-      // TODO:  move this to the ordinary `simplify()`?
-//      case CurriedE(heads1, body1) ⇒ CurriedE(heads ++ heads1, body1)
-      case simplifiedBody ⇒
-//        if (withEta) println(s"DEBUG: no eta-expansion in ${this.prettyPrint}, simplifiedBody=$simplifiedBody")
-        this.copy(body = simplifiedBody)
+          fHead // no more function arguments left
+      case CurriedE(heads1, body1) ⇒ CurriedE(heads ++ heads1, body1)
+      case simplifiedBody ⇒ this.copy(body = simplifiedBody)
     }
   }
 
@@ -379,58 +373,20 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
         AppE(cases(index).simplify(withEta), t).simplify(withEta)
       } else throw new Exception(s"Internal error: MatchE with ${cases.length} cases applied to DisjunctE with $total parts, but must be of equal size")
     // Detect the identity pattern:
-    /*
-
-CurriedE(List(PropE(a,DisjunctT(Either,List(TP(A), TP(B)),List(NamedConjunctT(Left,List(TP(A), TP(B)),List(value),List(TP(A))), NamedConjunctT(Right,List(TP(A), TP(B)),List(value),List(TP(B))))))),
-
-MatchE(PropE(a,DisjunctT(Either,List(TP(A), TP(B)),List(NamedConjunctT(Left,List(TP(A), TP(B)),List(value),List(TP(A))), NamedConjunctT(Right,List(TP(A), TP(B)),List(value),List(TP(B)))))),
-
-List(
--- list of cases
-
-CurriedE(List(PropE(b,NamedConjunctT(Left,List(TP(A), TP(B)),List(value),List(TP(A))))),
- DisjunctE(0,2,
-   NamedConjunctE(
-     List(ProjectE(0,PropE(b,NamedConjunctT(Left,List(TP(A), TP(B)),List(value),List(TP(A)))))),
-       NamedConjunctT(Left,List(TP(A), TP(B)),List(value),List(TP(A)))),DisjunctT(Either,List(TP(A), TP(B)),List(NamedConjunctT(Left,List(TP(A), TP(B)),List(value),List(TP(A))), NamedConjunctT(Right,List(TP(A), TP(B)),List(value),List(TP(B))))))),
-
-
-CurriedE(List(PropE(c,NamedConjunctT(Right,List(TP(A), TP(B)),List(value),List(TP(B))))),
- DisjunctE(1,2,
-   NamedConjunctE(
-   List(ProjectE(0,PropE(c,NamedConjunctT(Right,List(TP(A), TP(B)),List(value),List(TP(B)))))),
-   NamedConjunctT(Right,List(TP(A), TP(B)),List(value),List(TP(B)))),
- DisjunctT(Either,List(TP(A), TP(B)),List(NamedConjunctT(Left,List(TP(A), TP(B)),List(value),List(TP(A))), NamedConjunctT(Right,List(TP(A), TP(B)),List(value),List(TP(B)))))))))) ;
-
-
-CurriedE(List(PropE(a,DisjunctT(Either,List(TP(A), TP(B)),List(NamedConjunctT(Left,List(TP(A), TP(B)),List(value),List(TP(A))), NamedConjunctT(Right,List(TP(A), TP(B)),List(value),List(TP(B))))))),PropE(a,DisjunctT(Either,List(TP(A), TP(B)),List(NamedConjunctT(Left,List(TP(A), TP(B)),List(value),List(TP(A))), NamedConjunctT(Right,List(TP(A), TP(B)),List(value),List(TP(B))))))) .
-  def f2f[A, B, C, D, E]: Either[A, B] ⇒ Either[A, B] = implement
-     */
-
-    // MatchE(_, a: T1 ⇒ DisjunctE(i, total, NamedConjunctE(ProjectE(i, a), T1), ...), _)
+    // MatchE(_, a: T1 ⇒ DisjunctE(i, total, NamedConjunctE(List(ProjectE(0, a), Project(1, a), ...), T1), ...), _)
     case t ⇒
       val casesSimplified = cases.map(_.simplify(withEta))
       if (casesSimplified.zipWithIndex.forall {
-        case (c@CurriedE(List(head@PropE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
-          val r  =
-            len == cases.length && ind == i &&
-            headT == conjT &&
+        case (CurriedE(List(head@PropE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
+          len == cases.length && ind == i && headT == conjT &&
             projectionTerms.zipWithIndex.forall {
-              case (p@ProjectE(k, head1), j)  ⇒
-                val r = k == j && head1 == head
-//                println(s"DEBUG: checking projection term ${p.prettyPrint}, head1=$head1, k=$k, j=$j, returning $r")
-                r
-              case (p, j) ⇒
-//                println(s"DEBUG: in projectionTerms, got unexpected term ${p.prettyPrint} at j=$j, return false")
-                false
+              case (ProjectE(k, head1), j) if k == j && head1 == head ⇒ true
+              case _ ⇒ false
             }
-//          println(s"DEBUG: simplifying ${this.prettyPrint}, term ${c.prettyPrint}\nmatching (head=$head, headT=${headT.prettyPrint}, i=$i, ind=$ind, cases.length=${cases.length}, len=$len, headequalconjt=${headT == conjT }, projectionTerms=$projectionTerms, conjT=${conjT.prettyPrint}) returning $r")
-
-          r
-        case (p, j) ⇒
-//          println(s"DEBUG: in cases check, this=${this.prettyPrint}, simpl.cases=[${casesSimplified.map(_.prettyPrint).mkString("; ")}], got unexpected term ${p.prettyPrint} at j=$j, return false")
-          false
+        case _ ⇒ false
       })
+      // We detected an identity function of the form term match { case a => a; case b => b; etc.}
+      // so we can just replace that by `term`.
         term
       else
         MatchE(t, casesSimplified)
