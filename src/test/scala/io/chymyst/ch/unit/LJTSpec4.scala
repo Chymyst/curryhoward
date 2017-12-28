@@ -9,6 +9,6 @@ class LJTSpec4 extends FlatSpec with Matchers {
   behavior of "misc. tests"
 
   it should "compile" in {
-    def flatmap[D, A, B] = ofType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]()
+
   }
 }

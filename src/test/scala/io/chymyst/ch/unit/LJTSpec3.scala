@@ -175,7 +175,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
     def maps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ B) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]()
 
     maps[Int, String, String].length shouldEqual 1
-    // Should not be a trivial implementation.
+    // Should not be a trivial implementation that always returns `None`.
     val dString: (Option[String] ⇒ Int) ⇒ Option[String] = f ⇒ if (f(Some("abc")) > f(Some("ab"))) Some("abc") else None
     val f: String ⇒ String = identity
     val g: Option[String] ⇒ Int = os ⇒ if (os.contains("abc")) 10 else 0

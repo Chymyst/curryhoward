@@ -48,13 +48,15 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
     result("abc") shouldEqual false
 
-    "def f2[A, B,C] = ofType[((A ⇒ B) ⇒ C) ⇒ A ⇒ B]" shouldNot compile
+    def notFound[A, B, C] = allOfType[((A ⇒ B) ⇒ C) ⇒ A ⇒ B].length
+
+    notFound[Int, String, Boolean] shouldEqual 0
   }
 
   it should "generate code for the 'Vorobieff lemma'" in {
-    "def fVorobieff1[A, B, C]: (((A ⇒ B) ⇒ C) ⇒ A ⇒ B) ⇒ (B ⇒ C) ⇒ (A ⇒ B) = implement" shouldNot compile
+    def fVorobieff1[A, B, C]: (((A ⇒ B) ⇒ C) ⇒ (A ⇒ B)) ⇒ (B ⇒ C) ⇒ (A ⇒ B) = implement
 
-    def fVorobieff2[A, B, C]: ((B ⇒ C) ⇒ (A ⇒ B)) ⇒ (((A ⇒ B) ⇒ C) ⇒ A ⇒ B) = implement
+    def fVorobieff2[A, B, C]: ((B ⇒ C) ⇒ (A ⇒ B)) ⇒ (((A ⇒ B) ⇒ C) ⇒ (A ⇒ B)) = implement
   }
 
   it should "deterministically rename variables in the proof terms before comparing" in {

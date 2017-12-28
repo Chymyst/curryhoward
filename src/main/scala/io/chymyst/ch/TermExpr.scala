@@ -294,11 +294,18 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
     body.simplify(withEta) match {
       // Check for eta-contraction: simplify x ⇒ y ⇒ ... ⇒ z ⇒ a ⇒ f a into x ⇒ y ⇒ ... ⇒ z ⇒ f.
       // Here fHead = a and fBody = f; the last element of `heads` must be equal to `a`
-      case AppE(fHead, fBody) if withEta && headsLength > 0 && heads(headsLength - 1) == fBody ⇒
+      case AppE(fHead, fBody) if withEta &&
+        headsLength > 0 && {
+        val lastHead = heads(headsLength - 1)
+        lastHead == fBody &&
+          !fHead.freeVars.contains(lastHead.name) // Cannot replace a ⇒ f(... a ... ) a by f (... a ...)!
+      } ⇒
         if (headsLength > 1)
           CurriedE(heads.slice(0, headsLength - 1), fHead)
         else
           fHead // no more function arguments left
+
+      // Simplify nested CurriedE(CurriedE()) into a flat CurriedE().
       case CurriedE(heads1, body1) ⇒ CurriedE(heads ++ heads1, body1)
       case simplifiedBody ⇒ this.copy(body = simplifiedBody)
     }

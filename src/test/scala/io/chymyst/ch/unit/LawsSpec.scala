@@ -88,14 +88,14 @@ class LawsSpec extends LawChecking {
     // Same check, using the helper methods.
     hofEqual((reader: Int ⇒ String) ⇒ mapReader(reader)(identity[String]), identity[Int ⇒ String])
 
-    "def flatMapReader[E, A, B]: (E ⇒ A) ⇒ (A ⇒ E ⇒ B) ⇒ (E ⇒ B) = implement" shouldNot compile
-/*
+    def flatMapReader[E, A, B]: (E ⇒ A) ⇒ (A ⇒ E ⇒ B) ⇒ (E ⇒ B) = implement
+
     // r.flatMap(pure) = r
     forAll { (reader: Int ⇒ String) ⇒
       val flatMap_pure = flatMapReader(reader)(pointReader)
       fEqual(flatMap_pure, reader)
     }
-    */
+
   }
 
   it should "check laws for State monad" in {
