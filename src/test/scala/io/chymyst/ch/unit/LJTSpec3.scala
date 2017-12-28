@@ -184,10 +184,10 @@ class LJTSpec3 extends FlatSpec with Matchers {
     // This takes a longer time.
     def flatmaps[D, A, B] = allOfType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]().length
 
-    flatmaps[Int, String, Boolean] shouldEqual 1
+    flatmaps[Int, String, Boolean] shouldEqual 19
 
-    // However, we can still select the "best" implementation automatically.
-    def flatmap[D, A, B] = ofType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]()
+    // We cannot select the "best" implementation automatically.
+    "def flatmaps1[D, A, B] = ofType[((Option[A] ⇒ D) ⇒ Option[A]) ⇒ (A ⇒ ((Option[B] ⇒ D) ⇒ Option[B])) ⇒ ((Option[B] ⇒ D) ⇒ Option[B])]()" shouldNot compile
   }
 
   it should "generate the examples in the tutorial" in {

@@ -73,7 +73,7 @@ object TermExpr {
 }
 
 sealed trait TermExpr[+T] {
-  def informationLossScore: (Int, Int) = (unusedArgs.size + unusedTupleParts + unusedMatchClauseVars, argsMultiUseCount)
+  def informationLossScore = (unusedArgs.size + unusedTupleParts + unusedMatchClauseVars, argsMultiUseCount)
 
   def tExpr: TypeExpr[T]
 
@@ -140,31 +140,34 @@ sealed trait TermExpr[+T] {
   def simplify(withEta: Boolean = false): TermExpr[T] = this
 
   private[ch] def unusedArgs: Set[VarName] = this match {
-    case PropE(name, tExpr) ⇒ Set()
+    case PropE(_, _) ⇒ Set()
     case AppE(head, arg) ⇒ head.unusedArgs ++ arg.unusedArgs
     case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVars) ++ body.unusedArgs
-    case UnitE(tExpr) ⇒ Set()
+    case UnitE(_) ⇒ Set()
     case NamedConjunctE(terms, tExpr) ⇒ terms.flatMap(_.unusedArgs).toSet
     case ConjunctE(terms) ⇒ terms.flatMap(_.unusedArgs).toSet
-    case ProjectE(index, term) ⇒ term.unusedArgs
-    case m@MatchE(term, cases) ⇒ term.unusedArgs ++ cases.flatMap(_.unusedArgs).toSet
-    case DisjunctE(index, total, term, tExpr) ⇒ term.unusedArgs
+    case ProjectE(_, term) ⇒ term.unusedArgs
+    case MatchE(term, cases) ⇒ term.unusedArgs ++ cases.flatMap {
+      case CurriedE(List(prop), body) ⇒ body.unusedArgs // the case arg is counted in unusedMatchClauseVars
+      case c ⇒ c.unusedArgs
+    }.toSet
+    case DisjunctE(_, _, term, _) ⇒ term.unusedArgs
   }
 
-  // Probably not needed any more, since we are counting this in unusedArgs.
-  private[ch] def unusedMatchClauseVars: Int = 0
-
-  //  private[ch] def unusedMatchClauseVars: Int = this match {
-  //    case PropE(_, _) ⇒ 0
-  //    case AppE(head, arg) ⇒ head.unusedMatchClauseVars + arg.unusedMatchClauseVars
-  //    case CurriedE(_, body) ⇒ body.unusedMatchClauseVars
-  //    case UnitE(_) ⇒ 0
-  //    case NamedConjunctE(terms, _) ⇒ terms.map(_.unusedMatchClauseVars).sum
-  //    case ConjunctE(terms) ⇒ terms.map(_.unusedMatchClauseVars).sum
-  //    case ProjectE(_, term) ⇒ term.unusedMatchClauseVars
-  //    case MatchE(_, cases) ⇒ cases.map(_.unusedArgs.size).sum
-  //    case DisjunctE(_, _, term, _) ⇒ term.unusedMatchClauseVars
-  //  }
+  private[ch] def unusedMatchClauseVars: Double = this match {
+    case PropE(_, _) ⇒ 0
+    case AppE(head, arg) ⇒ head.unusedMatchClauseVars + arg.unusedMatchClauseVars
+    case CurriedE(_, body) ⇒ body.unusedMatchClauseVars
+    case UnitE(_) ⇒ 0
+    case NamedConjunctE(terms, _) ⇒ terms.map(_.unusedMatchClauseVars).sum
+    case ConjunctE(terms) ⇒ terms.map(_.unusedMatchClauseVars).sum
+    case ProjectE(_, term) ⇒ term.unusedMatchClauseVars
+    case MatchE(_, cases) ⇒ cases.map{
+      case CurriedE(List(prop), body) ⇒ if (body.freeVars contains prop.name) 0.0 else 1.0
+      case c ⇒ c.unusedMatchClauseVars
+    }.sum / cases.length.toDouble
+    case DisjunctE(_, _, term, _) ⇒ term.unusedMatchClauseVars
+  }
 
   private[ch] lazy val unusedTupleParts: Int =
     usedTuplePartsSeq

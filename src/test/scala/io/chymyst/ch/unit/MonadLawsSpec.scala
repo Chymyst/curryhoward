@@ -37,7 +37,7 @@ trait LawChecking extends FlatSpec with Matchers with GeneratorDrivenPropertyChe
     checkFunctionEquality[F[A], F[A]](fmap.f(identity[A]), identity[F[A]])
   }
 
-  def fmapLawComposition[A: Arbitrary, B: Arbitrary, C: Arbitrary, F[_]](fmap: FMap[F])(implicit fResultsEqual: (F[C], F[C]) ⇒ Assertion, evA: Arbitrary[F[A]], evB: Arbitrary[F[B]], evAB: Arbitrary[A ⇒ B], evBC: Arbitrary[B ⇒ C]): Assertion = {
+  def fmapLawComposition[A: Arbitrary, B: Arbitrary, C: Arbitrary, F[_]](fmap: FMap[F])(implicit fResultsEqual: (F[C], F[C]) ⇒ Assertion, evA: Arbitrary[F[A]], evAB: Arbitrary[A ⇒ B], evBC: Arbitrary[B ⇒ C]): Assertion = {
     forAll { (f: A ⇒ B, g: B ⇒ C) ⇒
       checkFunctionEquality[F[A], F[C]](fmap.f(f) andThen fmap.f(g), fmap.f(f andThen g))
     }
@@ -54,7 +54,7 @@ trait LawChecking extends FlatSpec with Matchers with GeneratorDrivenPropertyChe
     checkFunctionEquality(point.f andThen flatmap.f(f), f)
   }
 
-  def flatmapAssocLaw[A: Arbitrary, B: Arbitrary, C: Arbitrary, F[_]](fflatMap: FFlatMap[F])(implicit fResultsEqual: (F[C], F[C]) ⇒ Assertion, evFA: Arbitrary[F[A]], evFB: Arbitrary[F[B]], evAB: Arbitrary[A ⇒ F[B]], evBC: Arbitrary[B ⇒ F[C]]): Assertion = forAll { (f: A ⇒ F[B], g: B ⇒ F[C]) ⇒
+  def flatmapAssocLaw[A: Arbitrary, B: Arbitrary, C: Arbitrary, F[_]](fflatMap: FFlatMap[F])(implicit fResultsEqual: (F[C], F[C]) ⇒ Assertion, evFA: Arbitrary[F[A]], evAB: Arbitrary[A ⇒ F[B]], evBC: Arbitrary[B ⇒ F[C]]): Assertion = forAll { (f: A ⇒ F[B], g: B ⇒ F[C]) ⇒
     val x = fflatMap.f(f) andThen fflatMap.f(g)
     val y = fflatMap.f((x: A) ⇒ fflatMap.f(g)(f(x)))
     checkFunctionEquality[F[A], F[C]](x, y)
@@ -84,21 +84,6 @@ class LawsSpec extends LawChecking {
 
     implicit def readersEqual[A](r1: Reader[A], r2: Reader[A]): Assertion = forAll { x: Int ⇒ r1(x) shouldEqual r2(x) }
 
-    val fmapR = new FMap[Reader] {
-      override def f[A, B]: (A ⇒ B) ⇒ (Reader[A]) ⇒ Reader[B] = fmapReader[Int, A, B]
-    }
-
-    val pointR = new FPoint[Reader] {
-      override def f[A]: A => Reader[A] = pointReader[Int, A]
-    }
-
-    // Check identity law with E = Int and A = String.
-    fmapLawIdentity[String, Reader](fmapR)
-
-    fmapLawComposition[Boolean, Long, String, Reader](fmapR)
-
-    fmapPointLaw[Long, String, Reader](pointR, fmapR)
-
     // Same check, using the helper methods.
     hofEqual((reader: Int ⇒ String) ⇒ mapReader(reader)(identity[String]), identity[Int ⇒ String])
 
@@ -110,13 +95,34 @@ class LawsSpec extends LawChecking {
       fEqual(flatMap_pure, reader)
     }
 
+    // Same checks using the universal helper method.
+
+    val fmapR = new FMap[Reader] {
+      override def f[A, B]: (A ⇒ B) ⇒ (Reader[A]) ⇒ Reader[B] = fmapReader[Int, A, B]
+    }
+
+    val pointR = new FPoint[Reader] {
+      override def f[A]: A => Reader[A] = pointReader[Int, A]
+    }
+
     val flatmapR = new FFlatMap[Reader] {
       override def f[A, B]: (A => Reader[B]) => (Reader[A]) => Reader[B] = flip(flatMapReader[Int, A, B])
     }
 
-    flatmapPointLaw[Long, String, Reader](pointR, flatmapR)
+    checkMonadLaws[Int, Long, String, Reader](pointR, fmapR, flatmapR)
+  }
 
-    flatmapAssocLaw[Long, String, Int, Reader](flatmapR)
+  def checkMonadLaws[A: Arbitrary, B: Arbitrary, C: Arbitrary, F[_]](pointS: FPoint[F], fmapS: FMap[F], flatmapS: FFlatMap[F])(implicit frec: (F[C], F[C]) ⇒ Assertion, fab: Arbitrary[A ⇒ B], fac: Arbitrary[A ⇒ C], fa: Arbitrary[F[A]], fc: Arbitrary[F[C]], evBC: Arbitrary[B ⇒ C], evAfC: Arbitrary[A ⇒ F[C]], evAfB: Arbitrary[A ⇒ F[B]], evBfC: Arbitrary[B ⇒ F[C]]): Assertion = {
+
+    fmapLawIdentity[C, F](fmapS)
+
+    fmapLawComposition[A, B, C, F](fmapS)
+
+    fmapPointLaw[A, C, F](pointS, fmapS)
+
+    flatmapPointLaw[A, C, F](pointS, flatmapS)
+
+    flatmapAssocLaw[A, B, C, F](flatmapS)
   }
 
   it should "check laws for State monad" in {
@@ -132,6 +138,7 @@ class LawsSpec extends LawChecking {
       } yield IntState(State(n))
     }
 
+
     val pointS = new FPoint[IntState] {
       override def f[A]: A => IntState[A] = implement
     }
@@ -144,15 +151,59 @@ class LawsSpec extends LawChecking {
       override def f[A, B]: (A => IntState[B]) => IntState[A] => IntState[B] = implement
     }
 
-    fmapLawIdentity[String, IntState](fmapS)
-
-    fmapLawComposition[Boolean, Long, String, IntState](fmapS)
-
-    fmapPointLaw[Long, String, IntState](pointS, fmapS)
-
-    flatmapPointLaw[Long, String, IntState](pointS, flatmapS)
-
-    flatmapAssocLaw[Long, String, Int, IntState](flatmapS)
+    checkMonadLaws[Int, Long, String, IntState](pointS, fmapS, flatmapS)
   }
 
+  it should "check laws for Option monad" in {
+    implicit def optionEqual[A](s1: Option[A], s2: Option[A]): Assertion = s1 shouldEqual s2
+
+    val pointS = new FPoint[Option] {
+      override def f[A]: A => Option[A] = implement
+    }
+
+    val fmapS = new FMap[Option] {
+      override def f[A, B]: (A => B) => Option[A] => Option[B] = implement
+    }
+
+    val flatmapS = new FFlatMap[Option] {
+      override def f[A, B]: (A => Option[B]) => Option[A] => Option[B] = implement
+    }
+
+    checkMonadLaws[Int, Long, String, Option](pointS, fmapS, flatmapS)
+
+  }
+
+  it should "cannot implement Option[Option] monad due to ambiguities" in {
+    case class OOption[A](x: Option[Option[A]])
+
+    val pointS = new FPoint[OOption] {
+      override def f[A]: A => OOption[A] = implement // This works.
+    }
+/*
+    // Here we have 4 implementations, and there is no good heuristic to use so far that can choose the correct functor instance.
+    def maps[A, B] = allOfType[(A => B) => OOption[A] => OOption[B]]
+    // All implementations should transform a non-empty option correctly.
+    val mapsIntString = maps[Int, String]
+    mapsIntString.length shouldEqual 4
+    mapsIntString.foreach { m ⇒
+      m(_.toString + "abc")(OOption(Some(Some(123)))) shouldEqual OOption(Some(Some("123abc")))
+    }
+
+    def flatmaps[A, B] = allOfType[(A => OOption[B]) => OOption[A] => OOption[B]]
+
+    val flatmapsIntString = flatmaps[Int, String]
+    flatmapsIntString.length shouldEqual 4
+*/
+
+    /*    val fmapS = new FMap[OOption] {
+          override def f[A, B]: (A => B) => OOption[A] => OOption[B] = implement
+        }
+
+        val flatmapS = new FFlatMap[OOption] {
+          override def f[A, B]: (A => OOption[B]) => OOption[A] => OOption[B] = implement
+        }
+
+        checkMonadLaws[Int, Long, String, OOption](pointS, fmapS, flatmapS)
+    */
+  }
 }

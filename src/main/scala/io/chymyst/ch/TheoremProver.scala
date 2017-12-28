@@ -56,7 +56,7 @@ object TheoremProver {
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
     val proofTerms = findProofTerms(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename)).distinct
     if (debug || debugTrace) {
-      val prettyPT = proofTerms.map(p ⇒ (p.informationLossScore, s"${p.prettyPrint}; ${p.unusedArgs.size} unused args: ${p.unusedArgs}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }}"))
+      val prettyPT = proofTerms.map(p ⇒ (p.informationLossScore, s"${p.prettyPrint}; score = ${p.informationLossScore}: ${p.unusedArgs.size} unused args: ${p.unusedArgs}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }}"))
         .sortBy(_._1).map(_._2)
       val proofTermsMessage = if (prettyPT.isEmpty) "no final proof terms." else s"${prettyPT.length} final proof terms:\n ${prettyPT.take(maxTermsPrinted).mkString(" ;\n ")} ."
       println(s"DEBUG: for main sequent $mainSequent, obtained $proofTermsMessage This took ${System.currentTimeMillis() - t0} ms")
