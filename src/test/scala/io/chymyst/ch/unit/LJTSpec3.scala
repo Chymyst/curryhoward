@@ -247,4 +247,18 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     //      f(1)("abc") shouldEqual ((1, "abc", "abc"))
   }
+
+  it should "check miscellaneous logic identities" in {
+    def f1[A, B, C] = ofType[(A ⇒ B) ⇒ (B ⇒ C) ⇒ (A ⇒ C)]
+
+    def f2[A, B, C] = ofType[(A ⇒ B ⇒ C) ⇒ (B ⇒ A ⇒ C)]
+
+    def f3[A, B] = allOfType[((A ⇒ B) ⇒ B) ⇒ (B ⇒ A) ⇒ A].length
+
+    f3[String, Int] shouldEqual 0
+
+    def f4[A, B] = ofType[((A ⇒ B) ⇒ B ⇒ A) ⇒ B ⇒ A]
+
+  }
+
 }
