@@ -58,7 +58,7 @@ scala> case class User[N, I](name: N, id: I)
 defined class User
 
 scala> def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
-<console>:17: Returning term: a ⇒ b ⇒ User(a, b a) userName userIdGenerator
+<console>:17: Returning term: (a ⇒ b ⇒ User(a, b a)) userName userIdGenerator
        def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
                                                                              ^
 makeUser: [N, I](userName: N, userIdGenerator: N => I)User[N,I]
@@ -122,7 +122,7 @@ Here is the applicative `map2` function for the Reader monad:
 
 ```scala
 scala> def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
-<console>:15: Returning term: b ⇒ d ⇒ a ⇒ c ⇒ a (b c) (d c) readerA readerB f
+<console>:15: Returning term: (b ⇒ d ⇒ a ⇒ c ⇒ a (b c) (d c)) readerA readerB f
        def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
                                                                                    ^
 map2: [E, A, B, C](readerA: E => A, readerB: E => B, f: A => (B => C))E => C
@@ -152,7 +152,7 @@ we now write
 
 ```scala
 scala> ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
-<console>:18: Returning term: a ⇒ b ⇒ User(a, b a) arg1 arg2
+<console>:18: Returning term: (a ⇒ b ⇒ User(a, b a)) arg1 arg2
        ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
                                 ^
 res3: User[Int,String] = User(123,id:12300)
@@ -189,11 +189,11 @@ As an example, consider the `map` function for the State monad:
 ```scala
 scala> def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
 <console>:15: warning: type (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ S ⇒ (B, S) has 2 implementations (laws need checking?):
- b ⇒ a ⇒ c ⇒ (a (b c)._1, (b c)._2) ;
- b ⇒ a ⇒ c ⇒ (a (b c)._1, c) .
+ b ⇒ a ⇒ c ⇒ (a b c._1, b c._2) ;
+ b ⇒ a ⇒ c ⇒ (a b c._1, c) .
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
-<console>:15: Returning term: b ⇒ a ⇒ c ⇒ (a (b c)._1, (b c)._2)
+<console>:15: Returning term: b ⇒ a ⇒ c ⇒ (a b c._1, b c._2)
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
 map: [S, A, B]=> (S => (A, S)) => ((A => B) => (S => (B, S)))
