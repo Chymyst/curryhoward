@@ -21,7 +21,7 @@ This imports all the necessary symbols such as `implement`, `ofType`, `allOfType
 System.setProperty("curryhoward.log", "terms")
 ```
 
-This will enable logging of the generated terms.
+This will enable a more verbose logging of the generated terms.
 Compared with other logging options (`"macros"` and `"prover"`), this will give a small amount of debugging output that will be useful in the tutorial.
 
 # First examples
@@ -65,7 +65,7 @@ scala> case class User[N, I](name: N, id: I)
 defined class User
 
 scala> def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
-<console>:17: Returning term: User(userName, userIdGenerator userName)
+<console>:17: Returning term: ((\((a:N) ⇒ (b:N ⇒ I) ⇒ User(a, (b a))) userName) userIdGenerator)
        def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
                                                                              ^
 makeUser: [N, I](userName: N, userIdGenerator: N => I)User[N,I]
@@ -86,7 +86,7 @@ The `curryhoward` library, of course, works with _curried_ functions as well:
 
 ```scala
 scala> def const[A, B]: A ⇒ B ⇒ A = implement
-<console>:15: Returning term: (a ⇒ b ⇒ a)
+<console>:15: Returning term: \((a:A) ⇒ (b:B) ⇒ a)
        def const[A, B]: A ⇒ B ⇒ A = implement
                                     ^
 const: [A, B]=> A => (B => A)
@@ -104,7 +104,7 @@ Here is a more complicated example that automatically implements the `fmap` func
 
 ```scala
 scala> def fmap[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
-<console>:15: Returning term: (a ⇒ b ⇒ c ⇒ a (b c))
+<console>:15: Returning term: \((a:A ⇒ B) ⇒ (b:E ⇒ A) ⇒ (c:E) ⇒ (a (b c)))
        def fmap[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
                                                         ^
 fmap: [E, A, B]=> (A => B) => ((E => A) => (E => B))
@@ -129,7 +129,7 @@ Here is the applicative `map2` function for the Reader monad:
 
 ```scala
 scala> def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
-<console>:15: Returning term: (c ⇒ f (readerA c) (readerB c))
+<console>:15: Returning term: (((\((b:E ⇒ A) ⇒ (d:E ⇒ B) ⇒ (a:A ⇒ B ⇒ C) ⇒ (c:E) ⇒ ((a (b c)) (d c))) readerA) readerB) f)
        def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
                                                                                    ^
 map2: [E, A, B, C](readerA: E => A, readerB: E => B, f: A => (B => C))E => C
@@ -159,7 +159,7 @@ we now write
 
 ```scala
 scala> ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
-<console>:18: Returning term: User(arg1, arg2 arg1)
+<console>:18: Returning term: ((\((a:<c>Int) ⇒ (b:<c>Int ⇒ <c>String) ⇒ User(a, (b a))) arg1) arg2)
        ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
                                 ^
 res4: User[Int,String] = User(123,id:12300)
@@ -196,11 +196,11 @@ As an example, consider the `map` function for the State monad:
 ```scala
 scala> def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
 <console>:15: warning: type (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ S ⇒ (B, S) has 2 implementations (laws need checking?):
- (b ⇒ a ⇒ c ⇒ (a (b c)._1, (b c)._2)) ;
- (b ⇒ a ⇒ c ⇒ (a (b c)._1, c)) .
+ b ⇒ a ⇒ c ⇒ (a (b c)._1, (b c)._2) ;
+ b ⇒ a ⇒ c ⇒ (a (b c)._1, c) .
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
-<console>:15: Returning term: (b ⇒ a ⇒ c ⇒ (a (b c)._1, (b c)._2))
+<console>:15: Returning term: \((b:S ⇒ (A, S)) ⇒ (a:A ⇒ B) ⇒ (c:S) ⇒ ((a (b c)._1), (b c)._2))
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
 map: [S, A, B]=> (S => (A, S)) => ((A => B) => (S => (B, S)))
@@ -214,7 +214,7 @@ The first implementation is the correct functor instance for the State monad.
 The second implementation "loses information" because the transformed value of type `S` has been computed and ignored.
 
 It appears that information-losing functions are less likely to be useful in practice.
-The implementation that is the least information-losing will be more likely, for instance, to satisfy applicable algebraic laws.
+The implementation that is the lowest level of information loss will be more likely, for instance, to satisfy applicable algebraic laws.
 
 In the hopes of producing a sensible and useful answer, the algorithm in `curryhoward` will choose the implementation that loses the least amount of information.
 If there are several such implementations, no sensible choice is possible, and the macro will generate a compile-time error:
@@ -222,12 +222,39 @@ If there are several such implementations, no sensible choice is possible, and t
 
 ```scala
 scala> def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
-<console>:15: error: type A ⇒ A ⇒ (A ⇒ B) ⇒ B can be implemented in 2 equivalent ways:
- (c ⇒ b ⇒ a ⇒ a b) ;
- (b ⇒ c ⇒ a ⇒ a b) .
+<console>:15: error: type A ⇒ A ⇒ (A ⇒ B) ⇒ B can be implemented in 2 inequivalent ways:
+ c ⇒ b ⇒ a ⇒ a b ;
+ b ⇒ c ⇒ a ⇒ a b .
        def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
                                            ^
 ```
+
+In this case, `allOfType[]()` might be useful.
+
+# Using `allOfType`
+
+The macro `allOfType` will find the the implementations that have the lowest information loss, and return a sequence of these implementations.
+User's code can then examine each of them and check laws or other properties, selecting the implementation with the desired properties.
+
+As a simple example, consider a function that maps `Option[Int]` to `Option[Option[Int]]`: 
+
+```scala
+scala> val fs = allOfType[Option[Int] => Option[Option[Int]]]
+<console>:15: Returning term: \((a:Option[<c>Int]{None.type + Some[<c>Int]}) ⇒ (a match { \((b:None.type) ⇒ (<co>None() + 0)); \((c:Some[<c>Int]) ⇒ (0 + Some((0 + Some(c.value)))))}))
+       val fs = allOfType[Option[Int] => Option[Option[Int]]]
+                         ^
+<console>:15: Returning term: \((a:Option[<c>Int]{None.type + Some[<c>Int]}) ⇒ (a match { \((b:None.type) ⇒ (0 + Some((<co>None() + 0)))); \((c:Some[<c>Int]) ⇒ (0 + Some((0 + Some(c.value)))))}))
+       val fs = allOfType[Option[Int] => Option[Option[Int]]]
+                         ^
+fs: Seq[Option[Int] => Option[Option[Int]]] = List(<function1>, <function1>)
+
+scala> fs.map(f => f(Some(123)))
+res5: Seq[Option[Option[Int]]] = List(Some(Some(123)), Some(Some(123)))
+
+scala> fs.map(f => f(None))
+res6: Seq[Option[Option[Int]]] = List(None, Some(None))
+```
+
 
 
 # Debugging and logging

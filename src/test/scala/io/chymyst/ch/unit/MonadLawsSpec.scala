@@ -268,53 +268,12 @@ class LawsSpec extends LawChecking {
     final case class Message[A](code: Int, message: String) extends Data2[A]
     final case class Value[A](x: A) extends Data2[A]
 
-    def fmap[A, B](f: A ⇒ B): Data[A] ⇒ Data[B] = {
-      case Data(Some((valueA, data2))) ⇒
-        val newValueA = f(valueA)
-        val newData2 = data2 match {
-          case Message(code, message) ⇒ Message[B](code, message)
-          case Value(x) ⇒ Value(f(x))
-        }
-        Data(Some((newValueA, newData2)))
-      case Data(None) ⇒ Data(None)
-
+    val fmap: FMap[Data] = new FMap[Data] {
+      override def f[A, B]: (A => B) => Data[A] => Data[B] = implement
     }
 
-    def fmapAuto[A, B] = allOfType[(A ⇒ B) ⇒ Data[A] ⇒ Data[B]]
+    def fmaps[A, B] = allOfType[(A ⇒ B) ⇒ Data[A] ⇒ Data[B]]
 
-    fmapAuto.length shouldEqual 1 // Why 1? When we run `ofType` with the same type, the message is that there are 9 implementations.
-  }
-
-  it should "check functor laws for worked example 2.1 from chapter 4, part 1" in {
-    final case class Data2[X, Y, A](g: X ⇒ Y ⇒ A, da: A)
-
-    // Notice that Data[A] is the same as an Either[..., ...]
-    final case class Data[A](d: Either[Data2[String, Int, A], Data2[Boolean, Double, A]])
-
-    def fmap[A, B](f: A ⇒ B) = allOfType[Data[A] ⇒ Data[B]](f)
-
-    fmap[Int, String](_.toString).length shouldEqual 4
-  }
-
-  it should "generate functor instance on wrapped Reader" in {
-    final case class Data[A, B](ab: (A ⇒ Int) ⇒ B)
-
-    def fmapA[A, B, C](f: A ⇒ C): Data[A, B] ⇒ Data[C, B] = implement
-
-    def fmapB[A, B, C](f: B ⇒ C): Data[A, B] ⇒ Data[A, C] = implement
-  }
-
-  it should "generate functor instance on wrapped Either" in {
-    final case class Data[A, B](ab: Either[A, B])
-
-    def fmap[A, B, C](f: B ⇒ C): Data[A, B] ⇒ Data[A, C] = implement
-  }
-
-  it should "check an example that failed in live demo in chapter 4" in {
-    final case class Data[A, B](ab: Either[A, B], d: (A ⇒ Int) ⇒ B)
-
-    def fmapB[Z, B, C](f: B ⇒ C): Data[Z, B] ⇒ Data[Z, C] = implement
-
-    def fmap[X, Y, B](f: X ⇒ Y): Data[X, B] ⇒ Data[Y, B] = implement
+    fmaps.length shouldEqual 1
   }
 }

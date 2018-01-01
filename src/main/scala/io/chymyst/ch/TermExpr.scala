@@ -89,7 +89,7 @@ sealed trait TermExpr[+T] {
       val prefix = if (tExpr.isAtomic) "<co>" else ""
       s"$prefix${tExpr.constructor.toString}(${terms.map(_.toString).mkString(", ")})"
     case ProjectE(index, term) ⇒ term.toString + "." + term.accessor(index)
-    case MatchE(term, cases) ⇒ "(" + term.toString + " match " + cases.map(_.toString).mkString("; ") + ")"
+    case MatchE(term, cases) ⇒ "(" + term.toString + " match { " + cases.map(_.toString).mkString("; ") + "})"
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
       val leftZerosString = if (leftZeros.isEmpty) "" else " + "
@@ -365,7 +365,7 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
       MatchE(t, cases.map {
         case CurriedE(List(propE), body) ⇒
           CurriedE(List(propE), ProjectE(index, body).simplify(withEta))
-        case wrongTerm ⇒ throw new Exception("Internal error: MatchE contains $wrongTerm instead of CurriedE with a single argument")
+        case wrongTerm ⇒ throw new Exception(s"Internal error: MatchE contains $wrongTerm instead of CurriedE with a single argument")
       })
     case t ⇒ this.copy(term = t)
   }

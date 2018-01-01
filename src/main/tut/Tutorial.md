@@ -21,7 +21,7 @@ This imports all the necessary symbols such as `implement`, `ofType`, `allOfType
 System.setProperty("curryhoward.log", "terms")
 ```
 
-This will enable logging of the generated terms.
+This will enable a more verbose logging of the generated terms.
 Compared with other logging options (`"macros"` and `"prover"`), this will give a small amount of debugging output that will be useful in the tutorial.
 
 # First examples
@@ -168,7 +168,7 @@ The first implementation is the correct functor instance for the State monad.
 The second implementation "loses information" because the transformed value of type `S` has been computed and ignored.
 
 It appears that information-losing functions are less likely to be useful in practice.
-The implementation that is the least information-losing will be more likely, for instance, to satisfy applicable algebraic laws.
+The implementation that is the lowest level of information loss will be more likely, for instance, to satisfy applicable algebraic laws.
 
 In the hopes of producing a sensible and useful answer, the algorithm in `curryhoward` will choose the implementation that loses the least amount of information.
 If there are several such implementations, no sensible choice is possible, and the macro will generate a compile-time error:
@@ -177,6 +177,22 @@ If there are several such implementations, no sensible choice is possible, and t
 ```tut:fail
 def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
 ```
+
+In this case, `allOfType[]()` might be useful.
+
+# Using `allOfType`
+
+The macro `allOfType` will find the the implementations that have the lowest information loss, and return a sequence of these implementations.
+User's code can then examine each of them and check laws or other properties, selecting the implementation with the desired properties.
+
+As a simple example, consider a function that maps `Option[Int]` to `Option[Option[Int]]`: 
+
+```tut
+val fs = allOfType[Option[Int] => Option[Option[Int]]]
+fs.map(f => f(Some(123)))
+fs.map(f => f(None))
+```
+
 
 
 # Debugging and logging

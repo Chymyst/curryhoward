@@ -10,7 +10,5 @@ class LJTSpec4 extends FlatSpec with Matchers {
 
   it should "work" in {
 
-    def f[A, B]: (A => Option[B]) => Option[A] => Option[B] = implement
-
   }
 }
