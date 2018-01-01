@@ -296,7 +296,21 @@ class LawsSpec extends LawChecking {
     fmap[Int, String](_.toString).length shouldEqual 4
   }
 
-  it should "check an example that failed in live demo" in {
+  it should "generate functor instance on wrapped Reader" in {
+    final case class Data[A, B](ab: (A ⇒ Int) ⇒ B)
+
+    def fmapA[A, B, C](f: A ⇒ C): Data[A, B] ⇒ Data[C, B] = implement
+
+    def fmapB[A, B, C](f: B ⇒ C): Data[A, B] ⇒ Data[A, C] = implement
+  }
+
+  it should "generate functor instance on wrapped Either" in {
+    final case class Data[A, B](ab: Either[A, B])
+
+    def fmap[A, B, C](f: B ⇒ C): Data[A, B] ⇒ Data[A, C] = implement
+  }
+
+  it should "check an example that failed in live demo in chapter 4" in {
     final case class Data[A, B](ab: Either[A, B], d: (A ⇒ Int) ⇒ B)
 
     def fmapB[Z, B, C](f: B ⇒ C): Data[Z, B] ⇒ Data[Z, C] = implement

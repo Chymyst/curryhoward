@@ -86,7 +86,7 @@ object LJT {
     val fromIdAxiom: Seq[TermExpr[T]] = sequent.premiseVars
       .zip(sequent.premises)
       // Find premises that are equal to the goal.
-      .filter(_._2 == sequent.goal)// && sequent.goal.isAtomic) // There is no harm in applying this rule also to non-atomic terms. No useful alternative proofs would be lost due to that.
+      .filter(_._2 == sequent.goal) // && sequent.goal.isAtomic) // There is no harm in applying this rule also to non-atomic terms. No useful alternative proofs would be lost due to that.
       .map { case (premiseVar, _) ⇒
       // Generate a new term x1 ⇒ x2 ⇒ ... ⇒ xN ⇒ xK with fresh names. Here `xK` is one of the variables, selecting the premise that is equal to the goal.
       // At this iteration, we already selected the premise that is equal to the goal.
@@ -118,8 +118,8 @@ object LJT {
           val subTerms = proofTerms.zip(freshVarsAB)
             .map { case (pt, fv) ⇒ (fv.tExpr, CurriedE(List(fv), TermExpr.applyToVars(pt, fv :: oldPremisesWithoutI))) }
             .sortBy(_._1.prettyPrint).map(_._2) // Sort the clauses by type expression.
-          // At this point, `subTerms` can be reordered at will since these are mutually exclusive and exhaustive cases in a disjunction.
-          val result = MatchE(thePremiseVarAB, subTerms.toList)
+        // At this point, `subTerms` can be reordered at will since these are mutually exclusive and exhaustive cases in a disjunction.
+        val result = MatchE(thePremiseVarAB, subTerms.toList)
           sequent.constructResultTerm(result)
         }
         )
@@ -270,16 +270,15 @@ object LJT {
         Seq(RuleResult("_&R", Seq(sequent.copy(goal = unwrapped)), { proofTerms ⇒
           // This rule takes one proof term.
           val proofTerm = proofTerms.head
-          val result = sequent.substituteInto(proofTerm) match {
-            // Wrapped conjunction having more than one part.
-            case ConjunctE(terms) ⇒ NamedConjunctE(terms, nct)
+          val resultTerms: Seq[TermExpr[T]] = sequent.substituteInto(proofTerm) match {
             // Wrapped Unit or wrapped single term.
-            case _ if nct.caseObjectName.isDefined ⇒ NamedConjunctE(Nil, nct)
-            case other ⇒
-              //              println(s"debug: wrapping $other into type $nct")
-              NamedConjunctE(Seq(other), nct)
+            case _ if nct.caseObjectName.isDefined ⇒ Nil
+//            case term if nct.accessors.length == 1 ⇒ Seq(term) // This breaks several things, since we are not creating a ProjectE().
+            // Wrapped conjunction having at least one part.
+            // The term will eventually evaluate to a conjunction.
+            case term ⇒ nct.accessors.indices.map { i ⇒ ProjectE(i, term) }
           }
-          sequent.constructResultTerm(result)
+          sequent.constructResultTerm(NamedConjunctE(resultTerms, nct))
         })
         )
       case _ ⇒ Seq()
