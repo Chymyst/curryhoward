@@ -26,7 +26,8 @@ package object ch {
     */
   def implement[U]: U = macro Macros.inhabitImpl[U]
 
-  /** Automatically implement an expression of a given type, and return all possible inequivalent implementations.
+  /** Automatically implement an expression of a given type, and return all inequivalent implementations
+    * that have the lowest information loss score.
     * The type parameter `U` _must_ be specified.
     *
     * @tparam U Type of the expression to be implemented.
@@ -34,7 +35,8 @@ package object ch {
     */
   def allOfType[U]: Seq[U] = macro Macros.allOfTypeImpl[U]
 
-  /** Automatically implement an expression of a given type using given values, and return all possible inequivalent implementations.
+  /** Automatically implement an expression of a given type using given values, and return all inequivalent implementations
+    * that have the lowest information loss score.
     * The type parameter `U` _must_ be specified.
     *
     * @tparam U Type of the expression to be implemented.

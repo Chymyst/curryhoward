@@ -17,13 +17,6 @@ import io.chymyst.ch._
 
 This imports all the necessary symbols such as `implement`, `ofType`, `allOfType` and so on.
 
-```scala
-System.setProperty("curryhoward.log", "terms")
-```
-
-This will enable logging of the generated terms.
-Compared with other logging options (`"macros"` and `"prover"`), this will give a small amount of debugging output that will be useful in the tutorial.
-
 # First examples
 
 The `curryhoward` library is a compile-time code generator that implements pure functions given their types.
@@ -65,13 +58,13 @@ scala> case class User[N, I](name: N, id: I)
 defined class User
 
 scala> def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
-<console>:17: Returning term: User(userName, userIdGenerator userName)
+<console>:17: Returning term: (a ⇒ b ⇒ User(a, b a)) userName userIdGenerator
        def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
                                                                              ^
 makeUser: [N, I](userName: N, userIdGenerator: N => I)User[N,I]
 
 scala> makeUser(123, (n: Int) ⇒ "id:" + (n * 100).toString)
-res1: User[Int,String] = User(123,id:12300)
+res0: User[Int,String] = User(123,id:12300)
 ```
 
 The library always prints the lambda-calculus term corresponding to the generated code.
@@ -86,7 +79,7 @@ The `curryhoward` library, of course, works with _curried_ functions as well:
 
 ```scala
 scala> def const[A, B]: A ⇒ B ⇒ A = implement
-<console>:15: Returning term: (a ⇒ b ⇒ a)
+<console>:15: Returning term: a ⇒ b ⇒ a
        def const[A, B]: A ⇒ B ⇒ A = implement
                                     ^
 const: [A, B]=> A => (B => A)
@@ -95,7 +88,7 @@ scala> val f: String ⇒ Int = const(10)
 f: String => Int = <function1>
 
 scala> f("abc")
-res2: Int = 10
+res1: Int = 10
 ```
 
 The returned lambda-calculus term is `(a ⇒ b ⇒ a)`.
@@ -104,7 +97,7 @@ Here is a more complicated example that automatically implements the `fmap` func
 
 ```scala
 scala> def fmap[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
-<console>:15: Returning term: (a ⇒ b ⇒ c ⇒ a (b c))
+<console>:15: Returning term: a ⇒ b ⇒ c ⇒ a (b c)
        def fmap[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
                                                         ^
 fmap: [E, A, B]=> (A => B) => ((E => A) => (E => B))
@@ -119,7 +112,7 @@ scala> val ea: Double ⇒ Int = x ⇒ (x + 0.5).toInt
 ea: Double => Int = <function1>
 
 scala> eaeb(ea)(1.9)
-res3: Int = 12
+res2: Int = 12
 ```
 
 In this example, the returned lambda-calculus term is `(a ⇒ b ⇒ c ⇒ a (b c))`.
@@ -129,7 +122,7 @@ Here is the applicative `map2` function for the Reader monad:
 
 ```scala
 scala> def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
-<console>:15: Returning term: (c ⇒ f (readerA c) (readerB c))
+<console>:15: Returning term: (b ⇒ d ⇒ a ⇒ c ⇒ a (b c) (d c)) readerA readerB f
        def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
                                                                                    ^
 map2: [E, A, B, C](readerA: E => A, readerB: E => B, f: A => (B => C))E => C
@@ -159,10 +152,10 @@ we now write
 
 ```scala
 scala> ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
-<console>:18: Returning term: User(arg1, arg2 arg1)
+<console>:18: Returning term: (a ⇒ b ⇒ User(a, b a)) arg1 arg2
        ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
                                 ^
-res4: User[Int,String] = User(123,id:12300)
+res3: User[Int,String] = User(123,id:12300)
 ```
 
 The macro `ofType[T](x, y, ..., z)` generates an expression of type `T` built up from the given values `x`, `y`, ..., `z`.
@@ -196,11 +189,11 @@ As an example, consider the `map` function for the State monad:
 ```scala
 scala> def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
 <console>:15: warning: type (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ S ⇒ (B, S) has 2 implementations (laws need checking?):
- (b ⇒ a ⇒ c ⇒ (a (b c)._1, (b c)._2)) ;
- (b ⇒ a ⇒ c ⇒ (a (b c)._1, c)) .
+ b ⇒ a ⇒ c ⇒ (a b c._1, b c._2) ;
+ b ⇒ a ⇒ c ⇒ (a b c._1, c) .
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
-<console>:15: Returning term: (b ⇒ a ⇒ c ⇒ (a (b c)._1, (b c)._2))
+<console>:15: Returning term: b ⇒ a ⇒ c ⇒ (a b c._1, b c._2)
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
 map: [S, A, B]=> (S => (A, S)) => ((A => B) => (S => (B, S)))
@@ -214,7 +207,7 @@ The first implementation is the correct functor instance for the State monad.
 The second implementation "loses information" because the transformed value of type `S` has been computed and ignored.
 
 It appears that information-losing functions are less likely to be useful in practice.
-The implementation that is the least information-losing will be more likely, for instance, to satisfy applicable algebraic laws.
+The implementation that is the lowest level of information loss will be more likely, for instance, to satisfy applicable algebraic laws.
 
 In the hopes of producing a sensible and useful answer, the algorithm in `curryhoward` will choose the implementation that loses the least amount of information.
 If there are several such implementations, no sensible choice is possible, and the macro will generate a compile-time error:
@@ -222,12 +215,47 @@ If there are several such implementations, no sensible choice is possible, and t
 
 ```scala
 scala> def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
-<console>:15: error: type A ⇒ A ⇒ (A ⇒ B) ⇒ B can be implemented in 2 equivalent ways:
- (c ⇒ b ⇒ a ⇒ a b) ;
- (b ⇒ c ⇒ a ⇒ a b) .
+<console>:15: error: type A ⇒ A ⇒ (A ⇒ B) ⇒ B can be implemented in 2 inequivalent ways:
+ c ⇒ b ⇒ a ⇒ a b ;
+ b ⇒ c ⇒ a ⇒ a b .
        def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
                                            ^
 ```
+
+In this case, `allOfType[]()` might be useful.
+
+# Using `allOfType`
+
+The macro `allOfType` will find the the implementations that have the lowest information loss, and return a sequence of these implementations.
+User's code can then examine each of them and check laws or other properties, selecting the implementation with the desired properties.
+
+As a simple example, consider a function that maps `Option[Int]` to `Option[Option[Int]]`: 
+
+```scala
+scala> val fs = allOfType[Option[Int] => Option[Option[Int]]]
+<console>:15: Returning term: a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some((0 + Some(c.value)))) }
+       val fs = allOfType[Option[Int] => Option[Option[Int]]]
+                         ^
+<console>:15: Returning term: a ⇒ a match { b ⇒ (0 + Some((None() + 0))); c ⇒ (0 + Some((0 + Some(c.value)))) }
+       val fs = allOfType[Option[Int] => Option[Option[Int]]]
+                         ^
+fs: Seq[Option[Int] => Option[Option[Int]]] = List(<function1>, <function1>)
+
+scala> fs.map(f => f(Some(123)))
+res4: Seq[Option[Option[Int]]] = List(Some(Some(123)), Some(Some(123)))
+
+scala> fs.map(f => f(None))
+res5: Seq[Option[Option[Int]]] = List(None, Some(None))
+```
+
+The list `fs` contains the two chosen implementations that have the smallest information loss.
+These two implementations differ on how they transform a `None` value: the first implementation returns `None`, the second `Some(None)`.
+This is clear by looking at the function code printed above.
+When given a `None` value, the first implementation returns the term `(None() + 0)`, while the second returns `(0 + Some((None() + 0)))`.  
+
+Both implementations could be desirable desired in different circumstances: the first is an `Option#map` on the function `Some.apply`, while the second one is `Some[Option[Int]].apply`.   
+
+User code can be written to examine all available implementations and to select a desired one (at run time).
 
 
 # Debugging and logging
@@ -239,3 +267,8 @@ The full logging is switched on by putting `-Dcurryhoward.log=macros,terms,prove
 The `macros` logging option will print the code that the macro functions generate.
 The `prover` logging option will print the steps in the proof search, including the new sequents generated by each applied rule.
 The `terms` logging option will print the terms generated, in the short notation. 
+
+With none of these options given, only minimal diagnostic messages are printed, with terms in a short notation:
+
+- information message when a term is returned
+- warning message when several implementations are found with the same (lowest) information loss

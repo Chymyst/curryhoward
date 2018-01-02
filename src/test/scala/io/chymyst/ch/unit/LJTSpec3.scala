@@ -2,7 +2,6 @@ package io.chymyst.ch.unit
 
 import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
-
 case class Wrap1[A, B](x: Int, a: A, b: B)
 
 sealed trait SimpleChoice[A]
@@ -247,4 +246,31 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     //      f(1)("abc") shouldEqual ((1, "abc", "abc"))
   }
+
+  it should "check miscellaneous logic identities" in {
+    def f1[A, B, C] = ofType[(A ⇒ B) ⇒ (B ⇒ C) ⇒ (A ⇒ C)]
+
+    def f2[A, B, C] = ofType[(A ⇒ B ⇒ C) ⇒ (B ⇒ A ⇒ C)]
+
+    def f3[A, B] = allOfType[((A ⇒ B) ⇒ B) ⇒ (B ⇒ A) ⇒ A].length
+
+    f3[String, Int] shouldEqual 0
+
+    def f4[A, B] = ofType[((A ⇒ B) ⇒ B ⇒ A) ⇒ B ⇒ A]
+
+    def f5[A, B] = ofType[Either[A, B] ⇒ (A ⇒ B) ⇒ B]
+
+    def f6[A, B] = allOfType[A ⇒ B ⇒ Either[A, B]].length
+
+    f6[Int, String] shouldEqual 2
+
+    def f7[A, B, C] = allOfType[(((A ⇒ B, B ⇒ A)) ⇒ C) ⇒ C].length
+
+    f7[Int, String, Boolean] shouldEqual 0
+
+    def f8[A, B, C] = allOfType[(((A ⇒ B, B ⇒ A)) ⇒ A) ⇒ A].length
+
+    f8[Int, String, Boolean] shouldEqual 0
+  }
+
 }

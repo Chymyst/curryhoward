@@ -44,7 +44,7 @@ class Macros(val c: whitebox.Context) {
     * This function performs further reflection steps recursively in order to detect sealed traits / case classes
     * or other nested types.
     *
-    * @param t A `Type` value obtained via reflection.
+    * @param t    A `Type` value obtained via reflection.
     * @param tMap A map of known substitutions for type parameters.
     * @return Type expression corresponding to the type `t`, with correctly assigned type parameters.
     */
@@ -54,8 +54,8 @@ class Macros(val c: whitebox.Context) {
     // `finalResultType` seems to help here.
     val matchedTypeArgs = t.finalResultType.typeArgs.map(s ⇒ tMap.getOrElse(s.typeSymbol.name.decodedName.toString, matchType(s)))
     // Very verbose.
-//        if (debug) println(s"DEBUG: matchType on $t with $tMap obtained args = ${t.finalResultType.typeArgs}")
-//        if (debug) println(s" DEBUG: matchType obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint)}")
+    //        if (debug) println(s"DEBUG: matchType on $t with $tMap obtained args = ${t.finalResultType.typeArgs}")
+    //        if (debug) println(s" DEBUG: matchType obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint)}")
 
     //    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
     //    val valParamLists = t.paramLists // typeU.paramLists(0)(0).name.decodedName is "x" as TermName; also typeU.finalResultType
@@ -74,7 +74,8 @@ class Macros(val c: whitebox.Context) {
           .map(_.name.decodedName.toString)
           .zip(matchedTypeArgs)
           .toMap
-        if (debug) println(s" DEBUG: matchType on $t with $tMap obtained typeMap = ${typeMap.mapValues(_.prettyPrint)}")
+        // Very verbose.
+        //        if (debug) println(s" DEBUG: matchType on $t with $tMap obtained typeMap = ${typeMap.mapValues(_.prettyPrint)}")
 
         if (t.typeSymbol.asClass.isModuleClass) { // `case object` is a "module class", but also a "case class".
           NamedConjunctT(fullName, Nil, Nil, Nil)
@@ -89,7 +90,7 @@ class Macros(val c: whitebox.Context) {
             .collect { case s: MethodSymbol if s.isCaseAccessor ⇒
               val accessorType = matchType(s.typeSignature.resultType)
               val substitutedType = TypeExpr.substAll(accessorType, typeMap)
-//              if (debug) println(s"  DEBUG: matchType on $t with $tMap obtained substitutedType = ${substitutedType.prettyPrint} from accessorType = ${accessorType.prettyPrint}")
+              //              if (debug) println(s"  DEBUG: matchType on $t with $tMap obtained substitutedType = ${substitutedType.prettyPrint} from accessorType = ${accessorType.prettyPrint}")
 
               (s.name.decodedName.toString, substitutedType)
             }
@@ -123,7 +124,7 @@ class Macros(val c: whitebox.Context) {
             subclasses.map(s ⇒ matchType(s.asType.toType, typeMap)) match {
               case part :: Nil ⇒ part // A single case class implementing a trait.
               case parts ⇒
-//                if (debug) println(s"  DEBUG: matchType on $t with $tMap returning DisjunctT($fullName, ${matchedTypeArgs.map(_.prettyPrint)}), parts=${parts.map(_.prettyPrint)}")
+                //                if (debug) println(s"  DEBUG: matchType on $t with $tMap returning DisjunctT($fullName, ${matchedTypeArgs.map(_.prettyPrint)}), parts=${parts.map(_.prettyPrint)}")
                 DisjunctT(fullName, matchedTypeArgs, parts) // Several case classes implementing a trait.
             }
           } else if (matchedTypeArgs.isEmpty) OtherT(fullName)
@@ -179,45 +180,48 @@ class Macros(val c: whitebox.Context) {
       param
   }
 
-  private def reifyTerm(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree], givenTerms: Map[PropE[String], c.Tree]): c.Tree = {
-    def reifyT(termExpr: TermExpr[String]): c.Tree = reifyTerm(termExpr, paramTerms, givenTerms)
+  private def reifyTerm(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree], givenArgs: Map[PropE[String], c.Tree]): c.Tree = {
+    // Shortcut for calling this function recursively with all the same arguments.
+    def reifyTermShort(termExpr: TermExpr[String]): c.Tree = reifyTerm(termExpr, paramTerms, givenArgs)
 
     termExpr match {
-      case p@PropE(name, _) ⇒ givenTerms.getOrElse(p, q"${TermName(name.toString)}")
+      case p@PropE(name, _) ⇒ givenArgs.getOrElse(p, q"${TermName(name.toString)}")
 
-      case AppE(head, arg) ⇒ q"${reifyT(head)}(${reifyT(arg)})"
+      case AppE(head, arg) ⇒ q"${reifyTermShort(head)}(${reifyTermShort(arg)})"
 
       // If `heads` = List(x, y, z) and `body` = b then the code must be x => y => z => b
-      case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyT(body)) { case (prevTree, paramE) ⇒
+      case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyTermShort(body)) { case (prevTree, paramE) ⇒
         val param = paramTerms(paramE) // Look up the parameter in the precomputed table.
         q"($param ⇒ $prevTree)"
       }
       case UnitE(_) ⇒ q"()"
-      case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyT(t))})"
+      case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTermShort(t))})"
       case NamedConjunctE(terms, tExpr) ⇒
         val constructorE = q"${TermName(tExpr.constructor)}[..${tExpr.tParams.map(reifyType)}]"
         if (tExpr.isAtomic)
           constructorE // avoid spurious parameter lists for case objects
         else
-          q"$constructorE(..${terms.map(t ⇒ reifyT(t))})"
+          q"$constructorE(..${terms.map(t ⇒ reifyTermShort(t))})"
       case ProjectE(index, term) ⇒
         val accessor = TermName(term.accessor(index))
-        q"${reifyT(term)}.$accessor"
-      case DisjunctE(_, _, term, _) ⇒ q"${reifyT(term)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
+        q"${reifyTermShort(term)}.$accessor"
+      case DisjunctE(_, _, term, _) ⇒ q"${reifyTermShort(term)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
       case MatchE(term, cases) ⇒
         // Each term within `cases` is always a CurriedE because it is of the form fv ⇒ proofTerm(fv, other_premises).
         val casesTrees: Seq[c.Tree] = cases.map {
-          case CurriedE(PropE(fvName, fvType) :: _, body) ⇒
+          // However, at this point a MatchE() could contain a CurriedE() with multiple arguments,
+          // as a result of possibly simplifying nested CurriedE().
+          case CurriedE(PropE(fvName, fvType) :: rest, body) ⇒
             // cq"$pat => $expr" where pat = pq"Constructor(..$varNames)"
             val pat = fvType.caseObjectName match {
               case Some(constructor) ⇒ pq"_ : ${TermName(constructor)}.type"
               case None ⇒ pq"${TermName(fvName)} : ${reifyType(fvType)}"
             }
-            cq"$pat => ${reifyT(body)}"
+            cq"$pat => ${reifyTermShort(if (rest.isEmpty) body else CurriedE(rest, body))}"
           case cc ⇒ throw new Exception(s"Internal error: `case` term ${cc.prettyPrint} must be a function")
         }
 
-        q"${reifyT(term)} match { case ..$casesTrees }"
+        q"${reifyTermShort(term)} match { case ..$casesTrees }"
     }
   }
 
@@ -262,46 +266,47 @@ class Macros(val c: whitebox.Context) {
     c.Expr[TypeExpr[String]](q"$result")
   }
 
-  def testReifyTermsImpl[U: c.WeakTypeTag]: c.Tree = {
-    val typeU: c.Type = c.weakTypeOf[U]
-    val result = TheoremProver.findProofs(matchType(typeU.resultType))._1
+  /* Not used now.
+    def testReifyTermsImpl[U: c.WeakTypeTag]: c.Tree = {
+      val typeU: c.Type = c.weakTypeOf[U]
+      val result = TheoremProver.findProofs(matchType(typeU.resultType))._1
 
-    implicit def liftedNamedConjuct: Liftable[NamedConjunctT[String]] = Liftable[NamedConjunctT[String]] {
-      case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, Seq(..$tParams), Seq(..$accessors), $wrapped)"
+      implicit def liftedNamedConjuct: Liftable[NamedConjunctT[String]] = Liftable[NamedConjunctT[String]] {
+        case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, Seq(..$tParams), Seq(..$accessors), $wrapped)"
+      }
+
+      implicit def liftedPropE: Liftable[PropE[String]] = Liftable[PropE[String]] {
+        case PropE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.PropE($name, $tExpr)"
+      }
+
+      implicit def liftedTypeExpr: Liftable[TypeExpr[String]] = Liftable[TypeExpr[String]] {
+        case DisjunctT(constructor, tParams, terms) ⇒ q"_root_.io.chymyst.ch.DisjunctT($constructor, Seq(..$tParams), Seq(..$terms))"
+        case ConjunctT(terms) ⇒ q"_root_.io.chymyst.ch.ConjunctT(Seq(..$terms))"
+        case #->(head, body) ⇒ q"_root_.io.chymyst.ch.#->($head, $body)"
+        case NothingT(name) ⇒ q"_root_.io.chymyst.ch.NothingT($name)"
+        case UnitT(name) ⇒ q"_root_.io.chymyst.ch.UnitT($name)"
+        case TP(name) ⇒ q"_root_.io.chymyst.ch.TP($name)"
+        case OtherT(name) ⇒ q"_root_.io.chymyst.ch.OtherT($name)"
+        case BasicT(name) ⇒ q"_root_.io.chymyst.ch.BasicT($name)"
+        case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, List(..$tParams), List(..$accessors), $wrapped)"
+        case ConstructorT(name) ⇒ q"_root_.io.chymyst.ch.ConstructorT($name)"
+      }
+
+      implicit def liftedTermExpr: Liftable[TermExpr[String]] = Liftable[TermExpr[String]] {
+        case PropE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.PropE($name, $tExpr)"
+        case AppE(head, arg) ⇒ q"_root_.io.chymyst.ch.AppE($head, $arg)"
+        case CurriedE(heads, body) ⇒ q"_root_.io.chymyst.ch.CurriedE(List(..$heads), $body)"
+        case UnitE(tExpr) ⇒ q"_root_.io.chymyst.ch.UnitE($tExpr)"
+        case NamedConjunctE(terms, tExpr) ⇒ q"_root_.io.chymyst.ch.NamedConjunctE(Seq(..$terms), $tExpr)"
+        case ConjunctE(terms) ⇒ q"_root_.io.chymyst.ch.ConjunctE(Seq(..$terms))"
+        case ProjectE(index, term) ⇒ q"_root_.io.chymyst.ch.ProjectE($index, $term)"
+        case MatchE(term, cases) ⇒ q"_root_.io.chymyst.ch.MatchE($term, List(..$cases))"
+        case DisjunctE(index, total, term, tExpr) ⇒ q"_root_.io.chymyst.ch.DisjunctE($index, $total, $term, $tExpr)"
+      }
+
+      q"$result"
     }
-
-    implicit def liftedPropE: Liftable[PropE[String]] = Liftable[PropE[String]] {
-      case PropE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.PropE($name, $tExpr)"
-    }
-
-    implicit def liftedTypeExpr: Liftable[TypeExpr[String]] = Liftable[TypeExpr[String]] {
-      case DisjunctT(constructor, tParams, terms) ⇒ q"_root_.io.chymyst.ch.DisjunctT($constructor, Seq(..$tParams), Seq(..$terms))"
-      case ConjunctT(terms) ⇒ q"_root_.io.chymyst.ch.ConjunctT(Seq(..$terms))"
-      case #->(head, body) ⇒ q"_root_.io.chymyst.ch.#->($head, $body)"
-      case NothingT(name) ⇒ q"_root_.io.chymyst.ch.NothingT($name)"
-      case UnitT(name) ⇒ q"_root_.io.chymyst.ch.UnitT($name)"
-      case TP(name) ⇒ q"_root_.io.chymyst.ch.TP($name)"
-      case OtherT(name) ⇒ q"_root_.io.chymyst.ch.OtherT($name)"
-      case BasicT(name) ⇒ q"_root_.io.chymyst.ch.BasicT($name)"
-      case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, List(..$tParams), List(..$accessors), $wrapped)"
-      case ConstructorT(name) ⇒ q"_root_.io.chymyst.ch.ConstructorT($name)"
-    }
-
-    implicit def liftedTermExpr: Liftable[TermExpr[String]] = Liftable[TermExpr[String]] {
-      case PropE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.PropE($name, $tExpr)"
-      case AppE(head, arg) ⇒ q"_root_.io.chymyst.ch.AppE($head, $arg)"
-      case CurriedE(heads, body) ⇒ q"_root_.io.chymyst.ch.CurriedE(List(..$heads), $body)"
-      case UnitE(tExpr) ⇒ q"_root_.io.chymyst.ch.UnitE($tExpr)"
-      case NamedConjunctE(terms, tExpr) ⇒ q"_root_.io.chymyst.ch.NamedConjunctE(Seq(..$terms), $tExpr)"
-      case ConjunctE(terms) ⇒ q"_root_.io.chymyst.ch.ConjunctE(Seq(..$terms))"
-      case ProjectE(index, term) ⇒ q"_root_.io.chymyst.ch.ProjectE($index, $term)"
-      case MatchE(term, cases) ⇒ q"_root_.io.chymyst.ch.MatchE($term, List(..$cases))"
-      case DisjunctE(index, total, term, tExpr) ⇒ q"_root_.io.chymyst.ch.DisjunctE($index, $total, $term, $tExpr)"
-    }
-
-    q"$result"
-  }
-
+  */
   def testTypeImpl[T: c.WeakTypeTag]: c.Expr[(String, String)] = {
     val typeT: c.Type = c.weakTypeOf[T]
     val enclosingType = c.internal.enclosingOwner.typeSignature
@@ -322,7 +327,7 @@ class Macros(val c: whitebox.Context) {
         val givenVars = lists.flatten.map(s ⇒ PropE(s.name.decodedName.toString, matchType(s.typeSignature)))
         val resultType = matchType(typeU.finalResultType)
         val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.tExpr ->: prev }
-        inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify() }
+        inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
     }
     result
   }
@@ -339,19 +344,16 @@ class Macros(val c: whitebox.Context) {
     // TODO: decide if we can still use `ofType` with auto-detection of left-hand side values.
     // If so, we can stop using two different names for these use cases.
     // This does not seem to work in a macro with arguments! (But it might for the version of `ofTypeImpl` without arguments.)
-    //    match {
-    //      case NothingT(_) ⇒
-    //        val typeU = c.internal.enclosingOwner.typeSignature.finalResultType
-    //        matchType(typeU)
-    //      case t ⇒ t
-    //    }
+    // TODO: Perhaps we can support `implement` with a specified type argument and no auto-detection of enclosing owner's type.
 
     // We need to obtain the actual type of the given terms, rather than the `Any` type as specified in the type signature.
     val givenVars: Seq[(PropE[String], c.Tree)] = values.zipWithIndex
+      // The given values will be marked as arguments with name `arg1`, `arg2`, etc.,
+      // so that they do not mix with automatic variables in the generated closed term.
       .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", matchType(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
     val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
-    inhabitOneInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify() }
+    inhabitOneInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
   }
 
   def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = allOfTypeImplWithValues[U]()
@@ -363,7 +365,7 @@ class Macros(val c: whitebox.Context) {
       .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", matchType(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
     val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
-    inhabitAllInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }.simplify() }
+    inhabitAllInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
   }
 
   /** Construct a Scala code tree that implements a type expression tree.
@@ -383,14 +385,9 @@ class Macros(val c: whitebox.Context) {
     transform: TermExpr[String] ⇒ TermExpr[String] = identity
   ): c.Tree = {
     TheoremProver.inhabitInternal(typeStructure) match {
-      case Right((messageOpt, t)) ⇒
+      case Right((messageOpt, foundTerm)) ⇒
         messageOpt.foreach(message ⇒ c.warning(c.enclosingPosition, message))
-        val termFound = transform(t)
-        if (showReturningTerm) c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrintWithParentheses(0)}", force = true)
-        val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).map(p ⇒ p → reifyParam(p)).toMap
-        val result = reifyTerm(termFound, paramTerms, givenArgs)
-        if (debug) c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = true)
-        result
+        returnTerm(transform(foundTerm), givenArgs)
       case Left(errorMessage) ⇒
         c.error(c.enclosingPosition, errorMessage)
         q"null"
@@ -398,20 +395,24 @@ class Macros(val c: whitebox.Context) {
 
   }
 
+  private def returnTerm(termFound: TermExpr[String], givenArgs: Map[PropE[String], c.Tree]): c.Tree = {
+    val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
+    c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
+    val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).map(p ⇒ p → reifyParam(p)).toMap
+    val result = reifyTerm(termFound, paramTerms, givenArgs)
+    if (debug) c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = true)
+
+    result
+  }
+
   private def inhabitAllInternal(
     typeStructure: TypeExpr[String],
-    givenTerms: Map[PropE[String], c.Tree]
+    givenArgs: Map[PropE[String], c.Tree]
   )(
     transform: TermExpr[String] ⇒ TermExpr[String]
   ): c.Tree = {
-    val terms = TheoremProver.findProofs(typeStructure)._1.map { term ⇒
-      val termFound = transform(term)
-      if (showReturningTerm) c.info(c.enclosingPosition, s"Returning term: ${termFound.prettyPrint}", force = true)
-      val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).map(p ⇒ p → reifyParam(p)).toMap
-      val result = reifyTerm(termFound, paramTerms, givenTerms)
-      if (debug) c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = true)
-
-      result
+    val terms = TheoremProver.findProofs(typeStructure)._1.map { foundTerm ⇒
+      returnTerm(transform(foundTerm), givenArgs)
     }
     q"Seq(..$terms)"
   }
@@ -431,5 +432,6 @@ object Macros {
 
   private[ch] def testReifyType[U]: TypeExpr[String] = macro Macros.testReifyTypeImpl[U]
 
-  private[ch] def testReifyTerm[U]: List[TermExpr[String]] = macro Macros.testReifyTermsImpl[U]
+  // Not used.
+  //  private[ch] def testReifyTerm[U]: List[TermExpr[String]] = macro Macros.testReifyTermsImpl[U]
 }

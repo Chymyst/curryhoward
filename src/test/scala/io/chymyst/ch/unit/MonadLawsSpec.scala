@@ -259,4 +259,21 @@ class LawsSpec extends LawChecking {
         checkMonadLaws[Int, Long, String, OOption](pointS, fmapS, flatmapS)
     */
   }
+
+  it should "check functor laws for the worked example 1.3 from chapter 4, part 1" in {
+    // Data[A] ≡ 1 + A × (Int × String + A)
+    final case class Data[A](d: Option[(A, Data2[A])]) //  1 + A × Data2[A]
+
+    sealed trait Data2[+A]
+    final case class Message[A](code: Int, message: String) extends Data2[A]
+    final case class Value[A](x: A) extends Data2[A]
+
+    val fmap: FMap[Data] = new FMap[Data] {
+      override def f[A, B]: (A => B) => Data[A] => Data[B] = implement
+    }
+
+    def fmaps[A, B] = allOfType[(A ⇒ B) ⇒ Data[A] ⇒ Data[B]]
+
+    fmaps.length shouldEqual 1
+  }
 }

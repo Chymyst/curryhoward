@@ -224,3 +224,6 @@ There are two possible implementations of the type `Option[X] ⇒ Option[X]`: th
 The "trivial" implementation is rejected by the algorithm because it ignores the information given in the original data.
 
 Generally, the algorithm prefers implementations that use more parts of the disjunction.
+
+In some cases, there are several inequivalent implementations that all have the same level of "information loss."
+The function `allOfType` returns all these implementations.

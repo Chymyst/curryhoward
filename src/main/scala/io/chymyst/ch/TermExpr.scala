@@ -89,7 +89,7 @@ sealed trait TermExpr[+T] {
       val prefix = if (tExpr.isAtomic) "<co>" else ""
       s"$prefix${tExpr.constructor.toString}(${terms.map(_.toString).mkString(", ")})"
     case ProjectE(index, term) ⇒ term.toString + "." + term.accessor(index)
-    case MatchE(term, cases) ⇒ "(" + term.toString + " match " + cases.map(_.toString).mkString("; ") + ")"
+    case MatchE(term, cases) ⇒ "(" + term.toString + " match { " + cases.map(_.toString).mkString("; ") + "})"
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
       val leftZerosString = if (leftZeros.isEmpty) "" else " + "
@@ -101,14 +101,19 @@ sealed trait TermExpr[+T] {
   private[ch] def prettyPrintWithParentheses(level: Int): String = this match {
     case PropE(name, _) ⇒ s"$name"
     case AppE(head, arg) ⇒
-      val r = s"${head.prettyPrintWithParentheses(0)} ${arg.prettyPrintWithParentheses(1)}"
-      if (level == 1) s"($r)" else r
-    case CurriedE(heads, body) ⇒ s"(${heads.map(_.prettyPrintWithParentheses(0)).mkString(" ⇒ ")} ⇒ ${body.prettyPrintWithParentheses(0)})"
+      val h = head.prettyPrintWithParentheses(1)
+      val b = arg.prettyPrintWithParentheses(2)
+      if (level > 1) s"($h $b)" else s"$h $b"
+    case CurriedE(heads, body) ⇒
+      val r = s"${heads.map(_.prettyPrintWithParentheses(0)).mkString(" ⇒ ")} ⇒ ${body.prettyPrintWithParentheses(0)}"
+      if (level > 0) s"($r)" else r
     case UnitE(_) ⇒ "1"
     case ConjunctE(terms) ⇒ "(" + terms.map(_.prettyPrintWithParentheses(0)).mkString(", ") + ")"
     case NamedConjunctE(terms, tExpr) ⇒ s"${tExpr.constructor.toString}(${terms.map(_.prettyPrintWithParentheses(0)).mkString(", ")})"
     case ProjectE(index, term) ⇒ term.prettyPrintWithParentheses(1) + "." + term.accessor(index)
-    case MatchE(term, cases) ⇒ "(" + term.prettyPrintWithParentheses(1) + " match " + cases.map(_.prettyPrintWithParentheses(0)).mkString("; ") + ")"
+    case MatchE(term, cases) ⇒
+      val r = term.prettyPrintWithParentheses(1) + " match { " + cases.map(_.prettyPrintWithParentheses(0)).mkString("; ") + " }"
+      if (level > 0) s"($r)" else r
     case DisjunctE(index, total, term, _) ⇒
       val leftZeros = Seq.fill(index)("0")
       val leftZerosString = if (leftZeros.isEmpty) "" else " + "
@@ -162,7 +167,7 @@ sealed trait TermExpr[+T] {
     case NamedConjunctE(terms, _) ⇒ terms.map(_.unusedMatchClauseVars).sum
     case ConjunctE(terms) ⇒ terms.map(_.unusedMatchClauseVars).sum
     case ProjectE(_, term) ⇒ term.unusedMatchClauseVars
-    case MatchE(_, cases) ⇒ cases.map{
+    case MatchE(_, cases) ⇒ cases.map {
       case CurriedE(List(prop), body) ⇒ if (body.freeVars contains prop.name) 0.0 else 1.0
       case c ⇒ c.unusedMatchClauseVars
     }.sum / cases.length.toDouble
@@ -357,6 +362,12 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
 
   override def simplify(withEta: Boolean): TermExpr[T] = term.simplify(withEta) match {
     case ConjunctE(terms) ⇒ terms(index).simplify(withEta)
+    case MatchE(t, cases) ⇒
+      MatchE(t, cases.map {
+        case CurriedE(List(propE), body) ⇒
+          CurriedE(List(propE), ProjectE(index, body).simplify(withEta))
+        case wrongTerm ⇒ throw new Exception(s"Internal error: MatchE contains $wrongTerm instead of CurriedE with a single argument")
+      })
     case t ⇒ this.copy(term = t)
   }
 }
@@ -376,8 +387,8 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
   *
   * @param term  Term to be matched. Must be of disjunction type.
   * @param cases List of "case functions" of types A1 ⇒ Z, ..., An ⇒ Z.
-  *              Each "case function" must be a function of the form CurriedE(List(PropE(_)), _),
-  *              that is, with exactly one argument of the correct type.
+  *              Each "case function" must be a function of the form CurriedE(PropE(_) :: _, _),
+  *              that is, with at least one argument.
   * @tparam T Type of the internal representation of the term names.
   */
 final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends TermExpr[T] {
@@ -393,6 +404,8 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
           else
             tpe
 
+        // TODO: this will throw an exception if we try to evaluate tExpr after simplifying,
+        // when simplifying will bring together several arguments into a single CurriedE().
         case _ ⇒ throw new Exception(s"Internal error: `case` expression for $this must contain functions of one argument")
       }
     case Nil ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
@@ -408,35 +421,38 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
 
       // Detect the identity pattern:
       // MatchE(_, a: T1 ⇒ DisjunctE(i, total, NamedConjunctE(List(ProjectE(0, a), Project(1, a), ...), T1), ...), _)
-      case _ if cases.nonEmpty && casesSimplified.zipWithIndex.forall {
-        case (CurriedE(List(head@PropE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
-          len == cases.length && ind == i && headT == conjT &&
-            projectionTerms.zipWithIndex.forall {
-              case (ProjectE(k, head1), j) if k == j && head1 == head ⇒ true
-              case _ ⇒ false
-            }
-        case _ ⇒ false
-      } ⇒
-        // We detected an identity function of the form term match { case a => a; case b => b; etc.}
-        // so we can just replace that by `term`.
-        term
-
-      // Detect the constant pattern:
-      // MatchE(_, {f, f, ..., f}) where each clause is the same expression `f`, up to equivalence, and ignores its argument.
-      // Then the entire term can be replaced by f.
       case t ⇒
-        val bodyTerms: Set[Option[TermExpr[T]]] = casesSimplified.map {
-          case c@CurriedE(List(PropE(name, _)), body) if c.unusedArgs contains name ⇒ Some(body)
-          case _ ⇒ None
-        }.toSet
-        bodyTerms.headOption match {
-          case Some(Some(body)) if bodyTerms.size == 1 ⇒ body
-          case _ ⇒
-            // We failed to detect the constant pattern.
-            // This is the default, catch-all case.
-            MatchE(t, casesSimplified)
+        if (cases.nonEmpty && {
+          casesSimplified.zipWithIndex.forall {
+            case (CurriedE(List(head@PropE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
+              val result = len == cases.length && ind == i && headT == conjT &&
+                projectionTerms.zipWithIndex.forall {
+                  case (ProjectE(k, head1), j) if k == j && head1 == head ⇒ true
+                  case _ ⇒ false
+                }
+              result
+            case _ ⇒ false
+          }
+        }) {
+          // We detected an identity function of the form term match { case a => a; case b => b; etc.}
+          // so we can just replace that by `term`.
+          term
+        } else {
+          // Detect the constant pattern:
+          // MatchE(_, {f, f, ..., f}) where each clause is the same expression `f`, up to equivalence, and ignores its argument.
+          // Then the entire term can be replaced by f.
+          val bodyTerms: Set[Option[TermExpr[T]]] = casesSimplified.map {
+            case c@CurriedE(List(PropE(name, _)), body) if c.unusedArgs contains name ⇒ Some(body)
+            case _ ⇒ None
+          }.toSet
+          bodyTerms.headOption match { // Are all elements of the initial sequence the same and equal to Some(body) ?
+            case Some(Some(body)) if bodyTerms.size == 1 ⇒ body
+            case _ ⇒
+              // We failed to detect the constant pattern.
+              // This is the default, catch-all case.
+              MatchE(t, casesSimplified)
+          }
         }
-
     }
 
   }
