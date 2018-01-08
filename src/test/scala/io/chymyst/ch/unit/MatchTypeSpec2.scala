@@ -1,7 +1,7 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
-import io.chymyst.ch.Macros.testType
+import io.chymyst.ch.Macros._
 import org.scalatest.{FlatSpec, Matchers}
 
 class MatchTypeSpec2 extends FlatSpec with Matchers {
@@ -41,7 +41,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     case class User[T](t: T)
     case class Data[U, V](u: User[U], v: V)
 
-    def r[A, B] = Macros.testReifyType[Data[A, B]]
+    def r[A, B] = testReifyType[Data[A, B]]
 
     val A = TP("A")
     val B = TP("B")
@@ -55,7 +55,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
   }
 
   it should "match type with nested type parameters" in {
-    def r[U, V] = Macros.testReifyType[Option[U] ⇒ Option[Option[V]]]
+    def r[U, V] = testReifyType[Option[U] ⇒ Option[Option[V]]]
 
     r.prettyPrint shouldEqual "Option[U]{None.type + Some[U]} ⇒ Option[Option[V]{None.type + Some[V]}]{None.type + Some[Option[V]{None.type + Some[V]}]}"
 
@@ -66,7 +66,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
 
     case class OOption[A](x: Option[Option[A]])
 
-    def r2[B] = Macros.testReifyType[OOption[B]]
+    def r2[B] = testReifyType[OOption[B]]
 
     r2 shouldEqual NamedConjunctT("OOption", List(TP(B)), List(x), List(DisjunctT("Option", List(DisjunctT("Option", List(TP(B)), List(NamedConjunctT("None", List(), List(), List()), NamedConjunctT("Some", List(TP(B)), List(value), List(TP(B)))))), List(NamedConjunctT("None", List(), List(), List()), NamedConjunctT("Some", List(DisjunctT("Option", List(TP(B)), List(NamedConjunctT("None", List(), List(), List()), NamedConjunctT("Some", List(TP(B)), List(value), List(TP(B)))))), List(value), List(DisjunctT("Option", List(TP(B)), List(NamedConjunctT("None", List(), List(), List()), NamedConjunctT("Some", List(TP(B)), List(value), List(TP(B)))))))))))
   }
@@ -90,6 +90,16 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     r._1 shouldEqual "A ⇒ List[A]{::[B] + Nil.type}"
     r._2 shouldEqual "<tc>[A](x: List[A])(String, String)"
   }
+  
+  it should "process List[A] ⇒ List[A]" in {
+    testReifyType[List[Int] ⇒ List[Int]] shouldEqual #->(DisjunctT("List",List(BasicT("Int")),List(NamedConjunctT("::",List(TP("B")),List("head", "tl$access$1"),List(TP("B"), RecurseT("List"))), NamedConjunctT("Nil",List(),List(),List()))),DisjunctT("List",List(BasicT("Int")),List(NamedConjunctT("::",List(TP("B")),List("head", "tl$access$1"),List(TP("B"), RecurseT("List"))), NamedConjunctT("Nil",List(),List(),List()))))
+
+
+    def f[P] = testReifyType[List[P] ⇒ List[P]]
+
+    f[Int] shouldEqual #->(DisjunctT("List",List(TP("P")),List(NamedConjunctT("::",List(TP("B")),List("head", "tl$access$1"),List(TP("B"), RecurseT("List"))), NamedConjunctT("Nil",List(),List(),List()))),DisjunctT("List",List(TP("P")),List(NamedConjunctT("::",List(TP("B")),List("head", "tl$access$1"),List(TP("B"), RecurseT("List"))), NamedConjunctT("Nil",List(),List(),List()))))
+
+  }
 
   it should "process case classes containing List" in {
 
@@ -112,7 +122,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
 
   it should "process a recursive case class (infinite product)" in {
     final case class InfiniteProduct(x: Int, p: InfiniteProduct)
-    val r = Macros.testReifyType[InfiniteProduct]
+    val r = testReifyType[InfiniteProduct]
     r shouldEqual NamedConjunctT("InfiniteProduct",List(),List("x", "p"),List(BasicT("Int"), RecurseT("InfiniteProduct")))
   }
 
@@ -127,13 +137,13 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     final case class B1[S1](a1: A[S1]) extends B[S1]
     final case class B2[S2](b2: B[S2]) extends B[S2]
 
-    def result[Z] = Macros.testReifyType[Z ⇒ Either[A[Z], Option[B[Z]]]]
+    def result[Z] = testReifyType[Z ⇒ Either[A[Z], Option[B[Z]]]]
 
     val r = result[Int]
     r.prettyPrint shouldEqual "Z ⇒ Either[A[Z]{A1[R1] + A2[R2]},Option[B[Z]{B1[S1] + B2[S2]}]{None.type + Some[B[Z]{B1[S1] + B2[S2]}]}]{Left[A[Z]{A1[R1] + A2[R2]},Option[B[Z]{B1[S1] + B2[S2]}]{None.type + Some[B[Z]{B1[S1] + B2[S2]}]}] + Right[A[Z]{A1[R1] + A2[R2]},Option[B[Z]{B1[S1] + B2[S2]}]{None.type + Some[B[Z]{B1[S1] + B2[S2]}]}]}"
 
     // TODO: fix type parameter names - we should not have any S1 or R1 in these type expressions!
-    Macros.testReifyType[A[Int]] shouldEqual DisjunctT("A",List(BasicT("Int")),List(NamedConjunctT("A1",List(TP("R1")),List("b1"),List(DisjunctT("B",List(TP("R1")),List(NamedConjunctT("B1",List(TP("S1")),List("a1"),List(RecurseT("A"))), NamedConjunctT("B2",List(TP("S2")),List("b2"),List(RecurseT("B"))))))), NamedConjunctT("A2",List(TP("R2")),List("a2"),List(RecurseT("A")))))
+    testReifyType[A[Int]] shouldEqual DisjunctT("A",List(BasicT("Int")),List(NamedConjunctT("A1",List(TP("R1")),List("b1"),List(DisjunctT("B",List(TP("R1")),List(NamedConjunctT("B1",List(TP("S1")),List("a1"),List(RecurseT("A"))), NamedConjunctT("B2",List(TP("S2")),List("b2"),List(RecurseT("B"))))))), NamedConjunctT("A2",List(TP("R2")),List("a2"),List(RecurseT("A")))))
 
   }
 
