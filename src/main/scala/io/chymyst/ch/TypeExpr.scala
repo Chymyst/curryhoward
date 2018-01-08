@@ -16,7 +16,7 @@ sealed trait TypeExpr[+T] {
 //      val termString = "(" + wrapped.map(_.prettyPrint).mkString(",") + ")" // Too verbose.
       val typeSuffix = if (caseObjectName.isDefined) ".type" else ""
       s"$constructor${TypeExpr.tParamString(tParams)}$typeSuffix"
-    case RecurseT(name) ⇒ s"<rec>$name" // other constant type
+    case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams)}" // other constant type
     case NothingT(_) ⇒ "0"
     case UnitT(name) ⇒ s"$name"
   }
@@ -82,7 +82,7 @@ final case class UnitT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T]
 // Type parameter. Use a short name for convenience.
 final case class TP[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T]
 
-final case class RecurseT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T]
+final case class RecurseT[T](name: T, tParams: Seq[TypeExpr[T]]) extends TypeExpr[T] with AtomicTypeExpr[T]
 
 final case class BasicT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T]
 

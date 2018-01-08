@@ -73,7 +73,7 @@ class Macros(val c: whitebox.Context) {
       case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
       case _ if matchedTypeArgs.isEmpty && t.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(t.toString)
       //      case fullName if t.typeSymbol.isType && t.typeSymbol.asType.isAliasType ⇒ ??? // Not sure `isAliasType()` ever helps.
-      case _ if typesSeen contains typeName ⇒ RecurseT(typeName)
+      case _ if typesSeen contains typeName ⇒ RecurseT(typeName, matchedTypeArgs)
       case _ if t.typeSymbol.isClass ⇒
         // A type constructor, a case class, a sealed trait / abstract class with case classes, or other class.
         val typeMap: Map[String, TypeExpr[String]] = t.typeSymbol.asClass.typeParams
@@ -153,7 +153,13 @@ class Macros(val c: whitebox.Context) {
       case head #-> body ⇒ tq"(${reifyType(head)}) ⇒ ${reifyType(body)}"
       case TP(nameT) ⇒ makeTypeName(nameT)
       case BasicT(nameT) ⇒ makeTypeName(nameT)
-      case RecurseT(nameT) ⇒ makeTypeName(nameT)
+      case RecurseT(nameT, tParams) ⇒
+        val constructorT = makeTypeName(nameT)
+        val constructorWithTypeParams = if (tParams.isEmpty) constructorT else {
+          val tParamsTrees = tParams.map(reifyType)
+          tq"$constructorT[..$tParamsTrees]"
+        }
+        constructorWithTypeParams
       case NamedConjunctT(constructor, tParams, _, _) ⇒
         val constructorT = makeTypeName(constructor)
         val constructorWithTypeParams = if (tParams.isEmpty) constructorT else {
@@ -254,7 +260,7 @@ class Macros(val c: whitebox.Context) {
       case NothingT(name) ⇒ q"_root_.io.chymyst.ch.NothingT($name)"
       case UnitT(name) ⇒ q"_root_.io.chymyst.ch.UnitT($name)"
       case TP(name) ⇒ q"_root_.io.chymyst.ch.TP($name)"
-      case RecurseT(name) ⇒ q"_root_.io.chymyst.ch.RecurseT($name)"
+      case RecurseT(name, tParams) ⇒ q"_root_.io.chymyst.ch.RecurseT($name, List(..$tParams))"
       case BasicT(name) ⇒ q"_root_.io.chymyst.ch.BasicT($name)"
       case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, List(..$tParams), List(..$accessors), $wrapped)"
       case ConstructorT(name) ⇒ q"_root_.io.chymyst.ch.ConstructorT($name)"
