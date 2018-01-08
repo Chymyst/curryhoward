@@ -1,6 +1,5 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.Macros
 import io.chymyst.ch.Macros.testType
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -89,10 +88,12 @@ class MatchTypeSpec extends FlatSpec with Matchers {
     result._1 shouldEqual "(A, B) ⇒ C"
   }
 
+  val basicTypes = List("Int", "String", "Boolean", "Float", "Double", "Long", "Symbol", "Char")
+
   it should "get printable representation of tuple of basic types" in {
     def result[A, B, C]: (String, String) = testType[(Int, String, Boolean, Float, Double, Long, Symbol, Char)]
 
-    result._1 shouldEqual "(" + Macros.basicTypes.map("<c>" + _).mkString(", ") + ")"
+    result._1 shouldEqual "(" + basicTypes.map("<c>" + _).mkString(", ") + ")"
   }
 
   it should "get printable representation of single case class" in {

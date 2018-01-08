@@ -80,4 +80,61 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     r._1 shouldEqual "A ⇒ C"
     r._2 shouldEqual "<tc>[A, B, C](x: A, y: B)(z: (C, C))(implicit t: Int)(String, String)"
   }
+
+  behavior of "recursive types"
+
+  it should "not hang on List type" in {
+    def result[A](x: List[A]): (String, String) = testType[A ⇒ List[A]]
+
+    val r = result(List(0))
+    r._1 shouldEqual "A ⇒ List[A]{::[B] + Nil.type}"
+    r._2 shouldEqual "<tc>[A](x: List[A])(String, String)"
+  }
+
+  it should "process case classes containing List" in {
+
+    final case class Data[Q](f: List[(Q, Q, Int)], g: Int)
+
+    def result[A](x: Data[A]): (String, String) = testType[A ⇒ Data[A]]
+
+    val r = result(Data(List((0, 0, 1)), 123))
+    r._1 shouldEqual "A ⇒ Data[A]"
+    r._2 shouldEqual "<tc>[A](x: Data[A])(String, String)"
+  }
+
+  it should "process Either containing List" in {
+    def result[P](): (String, String) = testType[P ⇒ Either[List[P], Option[P]]]
+
+    val r = result()
+    // TODO: fix type parameters - should be P and not B
+    r._1 shouldEqual "P ⇒ Either[List[P]{::[B] + Nil.type},Option[P]{None.type + Some[P]}]{Left[List[P]{::[B] + Nil.type},Option[P]{None.type + Some[P]}] + Right[List[P]{::[B] + Nil.type},Option[P]{None.type + Some[P]}]}"
+  }
+
+  it should "process a recursive case class (infinite product)" in {
+    final case class InfiniteProduct(x: Int, p: InfiniteProduct)
+    val r = Macros.testReifyType[InfiniteProduct]
+    r shouldEqual NamedConjunctT("InfiniteProduct",List(),List("x", "p"),List(BasicT("Int"), RecurseT("InfiniteProduct")))
+  }
+
+  it should "process mutually recursive disjunctions" in {
+
+    sealed trait A[T]
+    sealed trait B[U]
+
+    final case class A1[R1](b1: B[R1]) extends A[R1]
+    final case class A2[R2](a2: A[R2]) extends A[R2]
+
+    final case class B1[S1](a1: A[S1]) extends B[S1]
+    final case class B2[S2](b2: B[S2]) extends B[S2]
+
+    def result[Z] = Macros.testReifyType[Z ⇒ Either[A[Z], Option[B[Z]]]]
+
+    val r = result[Int]
+    r.prettyPrint shouldEqual "Z ⇒ Either[A[Z]{A1[R1] + A2[R2]},Option[B[Z]{B1[S1] + B2[S2]}]{None.type + Some[B[Z]{B1[S1] + B2[S2]}]}]{Left[A[Z]{A1[R1] + A2[R2]},Option[B[Z]{B1[S1] + B2[S2]}]{None.type + Some[B[Z]{B1[S1] + B2[S2]}]}] + Right[A[Z]{A1[R1] + A2[R2]},Option[B[Z]{B1[S1] + B2[S2]}]{None.type + Some[B[Z]{B1[S1] + B2[S2]}]}]}"
+
+    // TODO: fix type parameter names - we should not have any S1 or R1 in these type expressions!
+    Macros.testReifyType[A[Int]] shouldEqual DisjunctT("A",List(BasicT("Int")),List(NamedConjunctT("A1",List(TP("R1")),List("b1"),List(DisjunctT("B",List(TP("R1")),List(NamedConjunctT("B1",List(TP("S1")),List("a1"),List(RecurseT("A"))), NamedConjunctT("B2",List(TP("S2")),List("b2"),List(RecurseT("B"))))))), NamedConjunctT("A2",List(TP("R2")),List("a2"),List(RecurseT("A")))))
+
+  }
+
 }

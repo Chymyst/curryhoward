@@ -10,10 +10,10 @@ class TheoremProverSpec extends FlatSpec with Matchers {
   behavior of "constant types"
 
   it should "treat constant types as unique type variables" in {
-    val sequent = Sequent(List(OtherT(1), BasicT(2)), OtherT(1), freshVar)
+    val sequent = Sequent(List(BasicT(1), BasicT(2)), BasicT(1), freshVar)
     val terms = TheoremProver.findProofTerms(sequent)
     terms.length shouldEqual 1
-    TermExpr.equiv(terms.head, CurriedE(List(PropE("a", OtherT(1)), PropE("b", BasicT(2))), PropE("a", OtherT(1)))) shouldEqual true
+    TermExpr.equiv(terms.head, CurriedE(List(PropE("a", BasicT(1)), PropE("b", BasicT(2))), PropE("a", BasicT(1)))) shouldEqual true
   }
 
   it should "treat constant types as unique type variables and obtain two implementations" in {
