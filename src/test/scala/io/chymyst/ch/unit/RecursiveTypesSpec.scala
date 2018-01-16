@@ -27,7 +27,7 @@ class RecursiveTypesSpec extends FlatSpec with Matchers {
     isT("abc") shouldEqual Element("abc")
   }
 
-  it should "generate a pointed instance for infinite sum despite different type parameter names" in {
+  it should "generate a pointed instance for infinite sum using different type parameter names" in {
     sealed trait InfiniteSum[T]
     final case class Element[U](t: U) extends InfiniteSum[U]
     final case class RecursiveSum[V](s: InfiniteSum[V]) extends InfiniteSum[V]

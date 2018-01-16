@@ -44,6 +44,11 @@ class Macros(val c: whitebox.Context) {
     * This function performs further reflection steps recursively in order to detect sealed traits / case classes
     * or other nested types.
     *
+    * There are two cases when this function is called: 1) to build a TypeExpr from a given Scala type expression,
+    * 2) recursively, to build a TypeExpr from c.Type information obtained via reflection - this is used for case class
+    * accessors as well as for case classes discovered by reflection on a trait. In the second case, we may need to rename
+    * some type parameters or replace them by other type expressions.
+    *
     * @param t         A `Type` value obtained via reflection.
     * @param tMap      A map of known substitutions for type parameters.
     * @param typesSeen Types of case classes or sealed traits that are possibly being recursed on.
@@ -139,6 +144,7 @@ class Macros(val c: whitebox.Context) {
               if (subclassType.typeParams.nonEmpty) {
                 // Discover the type parameters actually used when this subclass extends the parent trait.
                 val baseType = s.typeSignature.baseType(t.typeSymbol.asClass)
+                // Substitute these type parameter names with the actual types used by the parent trait (as given by typeMap).
                 val substMap: Map[String, TypeExpr[String]] = baseType.typeArgs.map(_.typeSymbol.name.decodedName.toString).zip(typeMap.map(_._2)).toMap
                 //                println(s"DEBUG: baseType = ${baseType.typeSymbol.name.decodedName.toString}, baseType.typeParams = ${baseType.typeArgs.map(_.typeSymbol.name.decodedName.toString)}, substMap = ${substMap.mapValues(_.prettyPrint)}")
                 TypeExpr.substNames(subclassType, substMap)

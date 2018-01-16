@@ -106,10 +106,9 @@ The generated code is purely functional and assumes that all given values and ty
 
 # Known bugs
 
-- Recursive case classes (including `List`) are not supported
+- Limited support for recursive case classes (including `List`): generated code cannot contain recursive functions
 - Type aliases `type MyType[T] = (Int, T)` will silently generate incorrect code
 - No support for the conventional Java-style function types with multiple arguments, e.g. `(T, U) ⇒ T`; tuple types need to be used instead, e.g. `((T, U)) ⇒ T`
-- The type parameters must be named the same in the sealed trait and in each case class, otherwise the code will fail
 
 # Examples of working functionality
 
