@@ -60,8 +60,8 @@ class Macros(val c: whitebox.Context) {
     val matchedTypeArgs = t.finalResultType.typeArgs
       .map(s ⇒ tMap.toMap.getOrElse(s.typeSymbol.name.decodedName.toString, buildTypeExpr(s, Seq(), typesSeen))) // `typesSeen` prevents infinite loops when  a type parameter is the same as the recursive type.
     // Very verbose; enable only when debugging the renaming of type parameters.
-            if (debug) println(s"DEBUG: buildTypeExpr on $t with $tMap obtained args = ${t.finalResultType.typeArgs.mkString("; ")}")
-            if (debug) println(s" DEBUG: buildTypeExpr obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint).mkString("; ")}")
+    //    if (debug) println(s"DEBUG: buildTypeExpr on $t with $tMap obtained args = ${t.finalResultType.typeArgs.mkString("; ")}")
+    //    if (debug) println(s" DEBUG: buildTypeExpr obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint).mkString("; ")}")
 
     //    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
     //    val valParamLists = t.paramLists // typeU.paramLists(0)(0).name.decodedName is "x" as TermName; also typeU.finalResultType
@@ -85,13 +85,13 @@ class Macros(val c: whitebox.Context) {
         // t.tpeCache.baseTypeSeqCache contains BTS(... BaseClass[U] ...)
         // t.typeSymbol.asClass.knownDirectSubclasses.toList(0).typeSignature.baseType(t.typeSymbol.asClass.knownDirectSubclasses.toList(0).typeSignature.baseClasses(5)) is BaseClass[U]
         // Very verbose; enable only when debugging the renaming of type parameters.
-                if (debug) println(s" DEBUG: buildTypeExpr on $t with $tMap obtained typeMap = ${typeMap.map(_._2.prettyPrint).mkString("; ")}")
+        //        if (debug) println(s" DEBUG: buildTypeExpr on $t with $tMap obtained typeMap = ${typeMap.map(_._2.prettyPrint).mkString("; ")}")
 
         if (t.typeSymbol.asClass.isModuleClass) { // `case object` is a "module class", but also a "case class".
           NamedConjunctT(typeName, Nil, Nil, Nil) // This represents a case object.
         } else if (t.typeSymbol.asClass.isCaseClass) {
 
-          // Case class with zero or more accessors.
+          // Detected a case class with zero or more accessors.
 
           // Need to assign type parameters to the accessors.
 
@@ -100,7 +100,7 @@ class Macros(val c: whitebox.Context) {
           val (accessors, typeExprs) = t.decls
             .collect { case s: MethodSymbol if s.isCaseAccessor ⇒
               val accessorType = buildTypeExpr(s.typeSignature.resultType, Seq(), typesSeenNow)
-              val substitutedType = TypeExpr.substAll(accessorType, typeMap.toMap)
+              val substitutedType = TypeExpr.substNames(accessorType, typeMap.toMap)
               //              if (debug) println(s"  DEBUG: buildTypeExpr on $t with $tMap obtained substitutedType = ${substitutedType.prettyPrint} from accessorType = ${accessorType.prettyPrint}")
 
               (s.name.decodedName.toString, substitutedType)
@@ -113,7 +113,7 @@ class Macros(val c: whitebox.Context) {
           }
           NamedConjunctT(typeName, matchedTypeArgs, accessors, wrapped)
         } else {
-          // Possibly a disjunction type.
+          // Not a single case class or case object. Possibly a disjunction (trait extended with case classes).
 
           // Note: `Either` is a "type" rather than a class, even though isClass() returns true.
           // traits / case classes are classes, but knownDirectSubclasses does not work for both cases.
@@ -130,11 +130,21 @@ class Macros(val c: whitebox.Context) {
               resultClass.isCaseClass || resultClass.isModuleClass // `case object` is a "module class".
             }
           ) {
-            // Detected a trait with case classes.
+            // Detected a trait extended with one or more case classes.
 
             // Note: s.typeSignature does not work correctly here! Need s.asType.toType
-            subclasses.map(s ⇒ buildTypeExpr(s.asType.toType, typeMap, typesSeenNow)) match {
-              case part :: Nil ⇒ part // A single case class implementing a trait.
+            subclasses.map { s ⇒
+              val subclassType = buildTypeExpr(s.asType.toType, Seq(), typesSeenNow)
+              // The type of the subclass maybe a type-Lambda, in which case we need to discover the correct variable substitution and perform it.
+              if (subclassType.typeParams.nonEmpty) {
+                // Discover the type parameters actually used when this subclass extends the parent trait.
+                val baseType = s.typeSignature.baseType(t.typeSymbol.asClass)
+                val substMap: Map[String, TypeExpr[String]] = baseType.typeArgs.map(_.typeSymbol.name.decodedName.toString).zip(typeMap.map(_._2)).toMap
+                //                println(s"DEBUG: baseType = ${baseType.typeSymbol.name.decodedName.toString}, baseType.typeParams = ${baseType.typeArgs.map(_.typeSymbol.name.decodedName.toString)}, substMap = ${substMap.mapValues(_.prettyPrint)}")
+                TypeExpr.substNames(subclassType, substMap)
+              } else subclassType
+            } match {
+              case part :: Nil ⇒ part // A single case class implementing a trait. This is not a disjunction.
               case parts ⇒
                 //                if (debug) println(s"  DEBUG: buildTypeExpr on $t with $tMap returning DisjunctT($fullName, ${matchedTypeArgs.map(_.prettyPrint)}), parts=${parts.map(_.prettyPrint)}")
                 DisjunctT(typeName, matchedTypeArgs, parts) // Several case classes implementing a trait.

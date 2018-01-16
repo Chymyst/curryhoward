@@ -31,25 +31,24 @@ class RecursiveTypesSpec extends FlatSpec with Matchers {
     sealed trait InfiniteSum[T]
     final case class Element[U](t: U) extends InfiniteSum[U]
     final case class RecursiveSum[V](s: InfiniteSum[V]) extends InfiniteSum[V]
-    /*
-        val is = ofType[Int ⇒ InfiniteSum[Int]]
 
-        is(123) should matchPattern { case Element(_) => }
+    val is = ofType[Int ⇒ InfiniteSum[Int]]
 
-        def isT[A] = ofType[A ⇒ InfiniteSum[A]]
+    is(123) should matchPattern { case Element(_) => }
 
-        isT("abc") shouldEqual Element("abc")
-    */
+    def isT[A] = ofType[A ⇒ InfiniteSum[A]]
+
+    isT("abc") shouldEqual Element("abc")
   }
 
   it should "generate an empty List" in {
-        val is = ofType[Unit ⇒ List[Int]]
+    val is = ofType[Unit ⇒ List[Int]]
 
-        is(()) shouldEqual Nil
+    is(()) shouldEqual Nil
 
-        def isT[A] = ofType[Unit ⇒ List[A]]
+    def isT[A] = ofType[Unit ⇒ List[A]]
 
-        isT(()) shouldEqual Nil
+    isT(()) shouldEqual Nil
   }
 
 }

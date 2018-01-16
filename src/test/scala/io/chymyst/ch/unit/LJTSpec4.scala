@@ -13,9 +13,8 @@ class LJTSpec4 extends FlatSpec with Matchers {
     final case class Element[U](t: U) extends InfiniteSum[U]
     final case class RecursiveSum[V](s: InfiniteSum[V]) extends InfiniteSum[V]
 
-
     Macros.testReifyType[InfiniteSum[Int]]
-/*
+
         val is = ofType[Int ⇒ InfiniteSum[Int]]
 
         is(123) should matchPattern { case Element(_) => }
@@ -23,7 +22,7 @@ class LJTSpec4 extends FlatSpec with Matchers {
         def isT[A] = ofType[A ⇒ InfiniteSum[A]]
 
         isT("abc") shouldEqual Element("abc")
-*/
+
   }
   it should "work" in {
 

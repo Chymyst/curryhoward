@@ -13,7 +13,7 @@ sealed trait TypeExpr[+T] {
     case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"
     case NamedConjunctT(constructor, tParams, _, wrapped) ⇒
-//      val termString = "(" + wrapped.map(_.prettyPrint).mkString(",") + ")" // Too verbose.
+      //      val termString = "(" + wrapped.map(_.prettyPrint).mkString(",") + ")" // Too verbose.
       val typeSuffix = if (caseObjectName.isDefined) ".type" else ""
       s"$constructor${TypeExpr.tParamString(tParams)}$typeSuffix"
     case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams)}" // other constant type
@@ -30,6 +30,8 @@ sealed trait TypeExpr[+T] {
   def caseObjectName: Option[T] = None
 
   def isAtomic: Boolean
+
+  def typeParams: Seq[TypeExpr[T]] = Seq()
 }
 
 sealed trait NonAtomicTypeExpr {
@@ -43,14 +45,18 @@ sealed trait AtomicTypeExpr[T] {
 }
 
 object TypeExpr {
-  def substAll[T](typeExpr: TypeExpr[T], typeMap: Map[T, TypeExpr[T]]): TypeExpr[T] = {
+  def substNames[T](typeExpr: TypeExpr[T], typeMap: Map[T, TypeExpr[T]]): TypeExpr[T] = {
+
+    def subst(typeExpr: TypeExpr[T]): TypeExpr[T] = substNames(typeExpr, typeMap)
+
     typeExpr match {
-      case DisjunctT(constructor, tParams, terms) ⇒ DisjunctT(constructor, tParams.map(substAll(_, typeMap)), terms.map(substAll(_, typeMap)))
-      case ConjunctT(terms) ⇒ ConjunctT(terms.map(substAll(_, typeMap)))
-      case #->(head, body) ⇒ #->(substAll(head, typeMap), substAll(body, typeMap))
+      case DisjunctT(constructor, tParams, terms) ⇒ DisjunctT(constructor, tParams.map(subst), terms.map(subst))
+      case ConjunctT(terms) ⇒ ConjunctT(terms.map(subst))
+      case #->(head, body) ⇒ #->(subst(head), subst(body))
       case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
-        NamedConjunctT(constructor, tParams.map(substAll(_, typeMap)), accessors, wrapped.map(substAll(_, typeMap)))
+        NamedConjunctT(constructor, tParams.map(subst), accessors, wrapped.map(subst))
       case TP(name) ⇒ typeMap.getOrElse(name, typeExpr)
+      case RecurseT(name, tParams) ⇒ RecurseT(name, tParams.map(subst))
       case _ ⇒ typeExpr
     }
   }
@@ -69,7 +75,9 @@ object TypeExpr {
 
 }
 
-final case class DisjunctT[T](constructor: T, tParams: Seq[TypeExpr[T]], terms: Seq[TypeExpr[T]]) extends TypeExpr[T] with NonAtomicTypeExpr
+final case class DisjunctT[T](constructor: T, tParams: Seq[TypeExpr[T]], terms: Seq[TypeExpr[T]]) extends TypeExpr[T] with NonAtomicTypeExpr {
+  override def typeParams: Seq[TypeExpr[T]] = tParams
+}
 
 final case class ConjunctT[T](terms: Seq[TypeExpr[T]]) extends TypeExpr[T] with NonAtomicTypeExpr
 
@@ -82,7 +90,9 @@ final case class UnitT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T]
 // Type parameter. Use a short name for convenience.
 final case class TP[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T]
 
-final case class RecurseT[T](name: T, tParams: Seq[TypeExpr[T]]) extends TypeExpr[T] with AtomicTypeExpr[T]
+final case class RecurseT[T](name: T, tParams: Seq[TypeExpr[T]]) extends TypeExpr[T] with AtomicTypeExpr[T] {
+  override def typeParams: Seq[TypeExpr[T]] = tParams
+}
 
 final case class BasicT[T](name: T) extends TypeExpr[T] with AtomicTypeExpr[T]
 
@@ -95,6 +105,8 @@ final case class NamedConjunctT[+T](constructor: T, tParams: List[TypeExpr[T]], 
   override def caseObjectName: Option[T] = if (isAtomic && wrapped.isEmpty) Some(constructor) else None
 
   override def isAtomic: Boolean = tParams.isEmpty && accessors.isEmpty
+
+  override def typeParams: Seq[TypeExpr[T]] = tParams
 }
 
 // Since we do not know how to work with arbitrary type constructors, we treat them as atomic types.

@@ -87,17 +87,17 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     def result[A](x: List[A]): (String, String) = testType[A ⇒ List[A]]
 
     val r = result(List(0))
-    r._1 shouldEqual "A ⇒ List[A]{::[B] + Nil.type}"
+    r._1 shouldEqual "A ⇒ List[A]{::[A] + Nil.type}"
     r._2 shouldEqual "<tc>[A](x: List[A])(String, String)"
   }
 
   it should "process List[A] ⇒ List[A]" in {
-    testReifyType[List[Int] ⇒ List[Int]] shouldEqual #->(DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(TP("B")), List("head", "tl$access$1"), List(TP("B"), RecurseT("List", List(TP("B"))))), NamedConjunctT("Nil", List(), List(), List()))), DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(TP("B")), List("head", "tl$access$1"), List(TP("B"), RecurseT("List", List(TP("B"))))), NamedConjunctT("Nil", List(), List(), List()))))
+    testReifyType[List[Int] ⇒ List[Int]] shouldEqual #->(DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(BasicT("Int")), List("head", "tl$access$1"), List(BasicT("Int"), RecurseT("List", List(BasicT("Int"))))), NamedConjunctT("Nil", List(), List(), List()))), DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(BasicT("Int")), List("head", "tl$access$1"), List(BasicT("Int"), RecurseT("List", List(BasicT("Int"))))), NamedConjunctT("Nil", List(), List(), List()))))
 
 
     def f[P] = testReifyType[List[P] ⇒ List[P]]
 
-    f[Int] shouldEqual #->(DisjunctT("List", List(TP("P")), List(NamedConjunctT("::", List(TP("B")), List("head", "tl$access$1"), List(TP("B"), RecurseT("List", List(TP("B"))))), NamedConjunctT("Nil", List(), List(), List()))), DisjunctT("List", List(TP("P")), List(NamedConjunctT("::", List(TP("B")), List("head", "tl$access$1"), List(TP("B"), RecurseT("List", List(TP("B"))))), NamedConjunctT("Nil", List(), List(), List()))))
+    f[Int] shouldEqual #->(DisjunctT("List", List(TP("P")), List(NamedConjunctT("::", List(TP("P")), List("head", "tl$access$1"), List(TP("P"), RecurseT("List", List(TP("P"))))), NamedConjunctT("Nil", List(), List(), List()))), DisjunctT("List", List(TP("P")), List(NamedConjunctT("::", List(TP("P")), List("head", "tl$access$1"), List(TP("P"), RecurseT("List", List(TP("P"))))), NamedConjunctT("Nil", List(), List(), List()))))
 
   }
 
@@ -117,7 +117,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
 
     val r = result()
     // TODO: fix type parameters - should be P and not B
-    r._1 shouldEqual "P ⇒ Either[List[P]{::[B] + Nil.type},Option[P]{None.type + Some[P]}]{Left[List[P]{::[B] + Nil.type},Option[P]{None.type + Some[P]}] + Right[List[P]{::[B] + Nil.type},Option[P]{None.type + Some[P]}]}"
+    r._1 shouldEqual "P ⇒ Either[List[P]{::[P] + Nil.type},Option[P]{None.type + Some[P]}]{Left[List[P]{::[P] + Nil.type},Option[P]{None.type + Some[P]}] + Right[List[P]{::[P] + Nil.type},Option[P]{None.type + Some[P]}]}"
   }
 
   it should "process a recursive case class (infinite product)" in {
@@ -140,9 +140,9 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     final case class RecursiveSum[V](s: InfiniteSum[V]) extends InfiniteSum[V]
 
     val r = testReifyType[InfiniteSum[Int]]
-    r shouldEqual DisjunctT("InfiniteSum", List(BasicT("Int")), List(NamedConjunctT("Element", List(TP("U")), List("t"), List(TP("U"))), NamedConjunctT("RecursiveSum", List(TP("V")), List("s"), List(RecurseT("InfiniteSum", List(TP("V")))))))
+    r shouldEqual DisjunctT("InfiniteSum", List(BasicT("Int")), List(NamedConjunctT("Element", List(BasicT("Int")), List("t"), List(BasicT("Int"))), NamedConjunctT("RecursiveSum", List(BasicT("Int")), List("s"), List(RecurseT("InfiniteSum", List(BasicT("Int")))))))
 
-    r.prettyPrint shouldEqual "InfiniteSum[<c>Int]{Element[U] + RecursiveSum[V]}"
+    r.prettyPrint shouldEqual "InfiniteSum[<c>Int]{Element[<c>Int] + RecursiveSum[<c>Int]}"
 
     RecurseT("Abc", List(TP("A"))).prettyPrint shouldEqual "<rec>Abc[A]"
     RecurseT("Abc", Nil).caseObjectName shouldEqual None
@@ -153,7 +153,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
 
     val r = testReifyType[InfImplication[Int]]
 
-    r shouldEqual NamedConjunctT("InfImplication", List(BasicT("Int")), List("i"), List(#->(BasicT("Int"),RecurseT("InfImplication", List(TP("T"))))))
+    r shouldEqual NamedConjunctT("InfImplication", List(BasicT("Int")), List("i"), List(#->(BasicT("Int"),RecurseT("InfImplication", List(BasicT("Int"))))))
 
     r.prettyPrint shouldEqual "InfImplication[<c>Int]"
   }
@@ -172,12 +172,12 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     def result[Z] = testReifyType[Z ⇒ Either[A[Z], Option[B[Z]]]]
 
     val r = result[Int]
-    r.prettyPrint shouldEqual "Z ⇒ Either[A[Z]{A1[R1] + A2[R2]},Option[B[Z]{B1[S1] + B2[S2]}]{None.type + Some[B[Z]{B1[S1] + B2[S2]}]}]{Left[A[Z]{A1[R1] + A2[R2]},Option[B[Z]{B1[S1] + B2[S2]}]{None.type + Some[B[Z]{B1[S1] + B2[S2]}]}] + Right[A[Z]{A1[R1] + A2[R2]},Option[B[Z]{B1[S1] + B2[S2]}]{None.type + Some[B[Z]{B1[S1] + B2[S2]}]}]}"
+    r.prettyPrint shouldEqual "Z ⇒ Either[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]{Left[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}] + Right[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]}"
 
     // TODO: fix type parameter names - we should not have any S1 or R1 in these type expressions!
     val typeAInt = testReifyType[A[Int]]
-    typeAInt shouldEqual DisjunctT("A", List(BasicT("Int")), List(NamedConjunctT("A1", List(TP("R1")), List("b1"), List(DisjunctT("B", List(TP("R1")), List(NamedConjunctT("B1", List(TP("S1")), List("a1"), List(RecurseT("A", List(TP("S1"))))), NamedConjunctT("B2", List(TP("S2")), List("b2"), List(RecurseT("B", List(TP("S2"))))))))), NamedConjunctT("A2", List(TP("R2")), List("a2"), List(RecurseT("A", List(TP("R2")))))))
-    typeAInt.prettyPrint shouldEqual "A[<c>Int]{A1[R1] + A2[R2]}"
+    typeAInt shouldEqual DisjunctT("A", List(BasicT("Int")), List(NamedConjunctT("A1", List(BasicT("Int")), List("b1"), List(DisjunctT("B", List(BasicT("Int")), List(NamedConjunctT("B1", List(BasicT("Int")), List("a1"), List(RecurseT("A", List(BasicT("Int"))))), NamedConjunctT("B2", List(BasicT("Int")), List("b2"), List(RecurseT("B", List(BasicT("Int"))))))))), NamedConjunctT("A2", List(BasicT("Int")), List("a2"), List(RecurseT("A", List(BasicT("Int")))))))
+    typeAInt.prettyPrint shouldEqual "A[<c>Int]{A1[<c>Int] + A2[<c>Int]}"
   }
 
 }
