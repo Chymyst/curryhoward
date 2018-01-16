@@ -51,4 +51,14 @@ class RecursiveTypesSpec extends FlatSpec with Matchers {
     isT(()) shouldEqual Nil
   }
 
+  it should "generate a one-element List" in {
+    val is = ofType[Int ⇒ List[Int]]
+
+    is(1) shouldEqual List()
+
+    def isT[A] = ofType[A ⇒ List[A]]
+
+    isT("abc") shouldEqual List()
+  }
+
 }
