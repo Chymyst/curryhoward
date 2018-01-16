@@ -116,7 +116,7 @@ object TheoremProver {
           // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
           val fromAxioms = if (fromIdAxiom.nonEmpty) fromIdAxiom else fromTAxiom
 
-          if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyPrint)}")
+          if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyPrint).mkString("; ")}")
 
           // Try each rule on sequent. If rule applies, obtain the next sequent.
           // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.

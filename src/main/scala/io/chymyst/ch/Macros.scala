@@ -19,10 +19,12 @@ Run the remote­debug config in idea. That will connect it to your running sbt. 
 note: to re­run compile after a successful compile you need either to clean or change some code
  */
 
-// TODO:
 /*  Priority is given in parentheses.
 - use c.Type and c.Tree instead of String for correct code generation (3)?? Probably impossible since we can't reify types directly from reflection results, - need to use names.
 - probably can simplify data structures by eliminating [T], VarName, and ProofTerm
+- make sure the alpha-conversion is correct on type parameters! This seems to be a deeper problem.
+- think about supporting recursive types beyond the palliative measures implemented currently
+- conjunction / disjunction with permuted order of results should be disfavored, prefer original order. This should help Option[Option[T]] or (T, T)
 - use blackbox macros instead of whitebox if possible (5) ?? Seems to prevent the " = implement" and "= ofType[]" syntax from working.
 - implement uncurried functions and multiple argument lists (6)?? Not sure this helps. We can already do this with `implement`.
 - use a special subclass of Function1 that also carries symbolic information about the lambda-term (6)
@@ -47,7 +49,7 @@ class Macros(val c: whitebox.Context) {
     * @param typesSeen Types of case classes or sealed traits that are possibly being recursed on.
     * @return Type expression corresponding to the type `t`, with correctly assigned type parameters.
     */
-  private def matchType(t: c.Type, tMap: Map[String, TypeExpr[String]] = Map(), typesSeen: Set[String] = Set()): TypeExpr[String] = {
+  private def buildTypeExpr(t: c.Type, tMap: Seq[(String, TypeExpr[String])] = Seq(), typesSeen: Set[String] = Set()): TypeExpr[String] = {
 
     val typeName = t.typeSymbol.name.decodedName.toString
 
@@ -56,10 +58,10 @@ class Macros(val c: whitebox.Context) {
     // Could be the weird type [X, Y] => (type expression).
     // `finalResultType` seems to help here.
     val matchedTypeArgs = t.finalResultType.typeArgs
-      .map(s ⇒ tMap.getOrElse(s.typeSymbol.name.decodedName.toString, matchType(s, Map(), typesSeen)))
+      .map(s ⇒ tMap.toMap.getOrElse(s.typeSymbol.name.decodedName.toString, buildTypeExpr(s, Seq(), typesSeen))) // `typesSeen` prevents infinite loops when  a type parameter is the same as the recursive type.
     // Very verbose; enable only when debugging the renaming of type parameters.
-    //        if (debug) println(s"DEBUG: matchType on $t with $tMap obtained args = ${t.finalResultType.typeArgs}")
-    //        if (debug) println(s" DEBUG: matchType obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint)}")
+            if (debug) println(s"DEBUG: buildTypeExpr on $t with $tMap obtained args = ${t.finalResultType.typeArgs.mkString("; ")}")
+            if (debug) println(s" DEBUG: buildTypeExpr obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint).mkString("; ")}")
 
     //    val typeParams = t.typeParams // This is nonempty only for the weird types mentioned above.
     //    val valParamLists = t.paramLists // typeU.paramLists(0)(0).name.decodedName is "x" as TermName; also typeU.finalResultType
@@ -72,20 +74,23 @@ class Macros(val c: whitebox.Context) {
       case "scala.Nothing" | "Nothing" ⇒ NothingT("Nothing")
       case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
       case _ if matchedTypeArgs.isEmpty && t.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(t.toString)
-      //      case fullName if t.typeSymbol.isType && t.typeSymbol.asType.isAliasType ⇒ ??? // Not sure `isAliasType()` ever helps.
+      //      case fullName if t.typeSymbol.isType && t.typeSymbol.asType.isAliasType ⇒ ??? // Not sure `isAliasType()` ever helps. Use .dealias() on a Type?
       case _ if typesSeen contains typeName ⇒ RecurseT(typeName, matchedTypeArgs)
       case _ if t.typeSymbol.isClass ⇒
         // A type constructor, a case class, a sealed trait / abstract class with case classes, or other class.
-        val typeMap: Map[String, TypeExpr[String]] = t.typeSymbol.asClass.typeParams
+        val typeMap: Seq[(String, TypeExpr[String])] = t.typeSymbol.asClass.typeParams
           .map(_.name.decodedName.toString)
           .zip(matchedTypeArgs)
-          .toMap
+
+        // t.tpeCache.baseTypeSeqCache contains BTS(... BaseClass[U] ...)
+        // t.typeSymbol.asClass.knownDirectSubclasses.toList(0).typeSignature.baseType(t.typeSymbol.asClass.knownDirectSubclasses.toList(0).typeSignature.baseClasses(5)) is BaseClass[U]
         // Very verbose; enable only when debugging the renaming of type parameters.
-        //        if (debug) println(s" DEBUG: matchType on $t with $tMap obtained typeMap = ${typeMap.mapValues(_.prettyPrint)}")
+                if (debug) println(s" DEBUG: buildTypeExpr on $t with $tMap obtained typeMap = ${typeMap.map(_._2.prettyPrint).mkString("; ")}")
 
         if (t.typeSymbol.asClass.isModuleClass) { // `case object` is a "module class", but also a "case class".
           NamedConjunctT(typeName, Nil, Nil, Nil) // This represents a case object.
         } else if (t.typeSymbol.asClass.isCaseClass) {
+
           // Case class with zero or more accessors.
 
           // Need to assign type parameters to the accessors.
@@ -94,9 +99,9 @@ class Macros(val c: whitebox.Context) {
           /* t.typeSymbol.asClass.typeParams gives List(A, B)*/
           val (accessors, typeExprs) = t.decls
             .collect { case s: MethodSymbol if s.isCaseAccessor ⇒
-              val accessorType = matchType(s.typeSignature.resultType, Map(), typesSeenNow)
-              val substitutedType = TypeExpr.substAll(accessorType, typeMap)
-              //              if (debug) println(s"  DEBUG: matchType on $t with $tMap obtained substitutedType = ${substitutedType.prettyPrint} from accessorType = ${accessorType.prettyPrint}")
+              val accessorType = buildTypeExpr(s.typeSignature.resultType, Seq(), typesSeenNow)
+              val substitutedType = TypeExpr.substAll(accessorType, typeMap.toMap)
+              //              if (debug) println(s"  DEBUG: buildTypeExpr on $t with $tMap obtained substitutedType = ${substitutedType.prettyPrint} from accessorType = ${accessorType.prettyPrint}")
 
               (s.name.decodedName.toString, substitutedType)
             }
@@ -128,10 +133,10 @@ class Macros(val c: whitebox.Context) {
             // Detected a trait with case classes.
 
             // Note: s.typeSignature does not work correctly here! Need s.asType.toType
-            subclasses.map(s ⇒ matchType(s.asType.toType, typeMap, typesSeenNow)) match {
+            subclasses.map(s ⇒ buildTypeExpr(s.asType.toType, typeMap, typesSeenNow)) match {
               case part :: Nil ⇒ part // A single case class implementing a trait.
               case parts ⇒
-                //                if (debug) println(s"  DEBUG: matchType on $t with $tMap returning DisjunctT($fullName, ${matchedTypeArgs.map(_.prettyPrint)}), parts=${parts.map(_.prettyPrint)}")
+                //                if (debug) println(s"  DEBUG: buildTypeExpr on $t with $tMap returning DisjunctT($fullName, ${matchedTypeArgs.map(_.prettyPrint)}), parts=${parts.map(_.prettyPrint)}")
                 DisjunctT(typeName, matchedTypeArgs, parts) // Several case classes implementing a trait.
             }
           } else if (matchedTypeArgs.isEmpty) BasicT(typeName)
@@ -242,7 +247,7 @@ class Macros(val c: whitebox.Context) {
   // This function is for testing only.
   def testReifyTypeImpl[U: c.WeakTypeTag]: c.Expr[TypeExpr[String]] = {
     val typeU: c.Type = c.weakTypeOf[U]
-    val result = matchType(typeU.resultType)
+    val result = buildTypeExpr(typeU.resultType)
     if (debug) c.info(c.enclosingPosition, s"Recognized type from type $typeU is ${result.prettyPrint}", force = true)
 
     implicit def liftedNamedConjuct: Liftable[NamedConjunctT[String]] = Liftable[NamedConjunctT[String]] {
@@ -284,7 +289,7 @@ class Macros(val c: whitebox.Context) {
   /* Not used now.
     def testReifyTermsImpl[U: c.WeakTypeTag]: c.Tree = {
       val typeU: c.Type = c.weakTypeOf[U]
-      val result = TheoremProver.findProofs(matchType(typeU.resultType))._1
+      val result = TheoremProver.findProofs(buildTypeExpr(typeU.resultType))._1
 
       implicit def liftedNamedConjuct: Liftable[NamedConjunctT[String]] = Liftable[NamedConjunctT[String]] {
         case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, Seq(..$tParams), Seq(..$accessors), $wrapped)"
@@ -322,13 +327,13 @@ class Macros(val c: whitebox.Context) {
       q"$result"
     }
   */
-  // This function is for testing matchType().
+  // This function is for testing buildTypeExpr().
   def testTypeImpl[T: c.WeakTypeTag]: c.Expr[(String, String)] = {
     val typeT: c.Type = c.weakTypeOf[T]
     val enclosingType = c.internal.enclosingOwner.typeSignature
 
-    val s1 = matchType(typeT.resultType).prettyPrint
-    val s2 = matchType(enclosingType).prettyPrint
+    val s1 = buildTypeExpr(typeT.resultType).prettyPrint
+    val s2 = buildTypeExpr(enclosingType).prettyPrint
 
     c.Expr[(String, String)](q"($s1,$s2)")
   }
@@ -338,10 +343,10 @@ class Macros(val c: whitebox.Context) {
     val typeU = c.internal.enclosingOwner.typeSignature
     // Detect whether we are given a function with arguments.
     val result = typeU.resultType.paramLists match {
-      case Nil ⇒ inhabitOneInternal(matchType(typeU))()
+      case Nil ⇒ inhabitOneInternal(buildTypeExpr(typeU))()
       case lists ⇒
-        val givenVars = lists.flatten.map(s ⇒ PropE(s.name.decodedName.toString, matchType(s.typeSignature)))
-        val resultType = matchType(typeU.finalResultType)
+        val givenVars = lists.flatten.map(s ⇒ PropE(s.name.decodedName.toString, buildTypeExpr(s.typeSignature)))
+        val resultType = buildTypeExpr(typeU.finalResultType)
         val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.tExpr ->: prev }
         inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
     }
@@ -355,7 +360,7 @@ class Macros(val c: whitebox.Context) {
 
   def ofTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
     val typeUGiven: c.Type = c.weakTypeOf[U]
-    val typeUT = matchType(typeUGiven)
+    val typeUT = buildTypeExpr(typeUGiven)
 
     // TODO: decide if we can still use `ofType` with auto-detection of left-hand side values.
     // If so, we can stop using two different names for these use cases.
@@ -366,7 +371,7 @@ class Macros(val c: whitebox.Context) {
     val givenVars: Seq[(PropE[String], c.Tree)] = values.zipWithIndex
       // The given values will be marked as arguments with name `arg1`, `arg2`, etc.,
       // so that they do not mix with automatic variables in the generated closed term.
-      .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", matchType(v.actualType)), v.tree) }
+      .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
     val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
     inhabitOneInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
@@ -376,9 +381,9 @@ class Macros(val c: whitebox.Context) {
 
   def allOfTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
     val typeU: c.Type = c.weakTypeOf[U]
-    val typeUT: TypeExpr[String] = matchType(typeU)
+    val typeUT: TypeExpr[String] = buildTypeExpr(typeU)
     val givenVars: Seq[(PropE[String], c.Tree)] = values.zipWithIndex
-      .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", matchType(v.actualType)), v.tree) }
+      .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
     val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
     inhabitAllInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
