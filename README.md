@@ -25,12 +25,19 @@ The code is generated at compile time. A compile-time error occurs when there ar
 
 See the [youtube presentation](https://youtu.be/cESdgot_ZxY) and the [tutorial](docs/Tutorial.md) for more details.
 
+# Quotation
+
+_These are all interesting examples, but is there a practical side to Curry-Howard isomorphism? Probably not in everyday programming._ -- Bartosz Milewski (2015), [Category Theory for Programmers, Chapter 9: Function types.](https://bartoszmilewski.com/2015/03/13/function-types/)
+
+The `curryhoward` library is an example of how we can use the Curry-Howard isomorphism for practical applications.
 
 # How it works
 
+The macro examines the type expression via reflection (at compile time), 
+
 The current implementation uses an IPL theorem prover based on the sequent calculus called LJT as presented in:
 
-[D. Galmiche , D. Larchey-Wendling. _Formulae-as-Resources Management for an Intuitionistic Theorem Prover_ (1998)](http://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.35.2618). 	In 5th Workshop on Logic, Language, Information and Computation, WoLLIC'98, Sao Paulo.
+[D. Galmiche, D. Larchey-Wendling. _Formulae-as-Resources Management for an Intuitionistic Theorem Prover_ (1998)](http://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.35.2618). 	In 5th Workshop on Logic, Language, Information and Computation, WoLLIC'98, Sao Paulo.
 
 The original presentation of LJT is found in:
 
@@ -95,14 +102,13 @@ The generated code is purely functional and assumes that all given values and ty
 
 - generate a custom subclass of `Function1` that also carries symbolic information about the lambda-term
 - add an API that exposes the `TermExpr` structures generated from type
-- add facilities to reason about terms at run time (e.g. check the laws)
+- add facilities to reason about terms at run time (e.g. check the laws) using `TermExpr` structures
 
 # Known bugs
 
-- Recursive case classes (including `List`!) cause stack overflow
+- Limited support for recursive case classes (including `List`): generated code cannot contain recursive functions
 - Type aliases `type MyType[T] = (Int, T)` will silently generate incorrect code
 - No support for the conventional Java-style function types with multiple arguments, e.g. `(T, U) ⇒ T`; tuple types need to be used instead, e.g. `((T, U)) ⇒ T`
-- The type parameters must be named the same in the sealed trait and in each case class, otherwise the code may fail
 
 # Examples of working functionality
 

@@ -139,9 +139,16 @@ class ApiSpec extends LawChecking {
   }
 
   it should "run the example in the tutorial" in {
-    val fs = allOfType[Option[Int] => Option[Option[Int]]]
-    fs.map(f => f(Some(123))) shouldEqual List(Some(Some(123)), Some(Some(123)))
-    fs.map(f => f(None)) shouldEqual List(None, Some(None))
+    val fs = allOfType[Option[Int] ⇒ Option[Option[Int]]]
+    fs.map(f ⇒ f(Some(123))) shouldEqual List(Some(Some(123)), Some(Some(123)))
+    fs.map(f ⇒ f(None)) shouldEqual List(None, Some(None))
 
+  }
+
+  it should "find implementation of tuple with identity functions" in {
+    val f = ofType[(Int ⇒ Int, String ⇒ String)]
+
+    f._1(123) shouldEqual 123
+    f._2("abc") shouldEqual "abc"
   }
 }

@@ -1,6 +1,5 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.Macros
 import io.chymyst.ch.Macros.testType
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -11,7 +10,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
     def result[A, B, C]: (String, String) = testType[_ ⇒ B]
 
     val res = result._1
-    res shouldEqual "<oc>_ ⇒ B"
+    res shouldEqual "<c>_ ⇒ B"
   }
 
   it should "get printable representation of enclosing owner's type" in {
@@ -54,7 +53,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
     def result[P, Q, R]: (String, String) = testType[Option[_] ⇒ Q]
 
     val res = result._1
-    res shouldEqual "Option[<oc>_]{None.type + Some[<oc>_]} ⇒ Q"
+    res shouldEqual "Option[<c>_]{None.type + Some[<c>_]} ⇒ Q"
   }
 
   it should "get printable representation of Option types" in {
@@ -66,7 +65,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of Any, Unit, and Nothing types" in {
     def result[A, B, C]: (String, String) = testType[Any ⇒ Nothing ⇒ Unit]
 
-    result._1 shouldEqual "<oc>_ ⇒ 0 ⇒ Unit"
+    result._1 shouldEqual "<c>_ ⇒ 0 ⇒ Unit"
   }
 
   it should "not confuse a type parameter with a type inheriting from Any" in {
@@ -74,13 +73,13 @@ class MatchTypeSpec extends FlatSpec with Matchers {
 
     def result[A, B, C]: (String, String) = testType[A ⇒ Q]
 
-    result._1 shouldEqual "A ⇒ <oc>Q"
+    result._1 shouldEqual "A ⇒ <c>Q"
   }
 
   it should "get printable representation of tuple types" in {
     def result[A, B, C]: (String, String) = testType[(Any, Nothing, Unit, A, B, C)]
 
-    result._1 shouldEqual "(<oc>_, 0, Unit, A, B, C)"
+    result._1 shouldEqual "(<c>_, 0, Unit, A, B, C)"
   }
 
   it should "get printable representation of tuple as function argument" in {
@@ -89,10 +88,12 @@ class MatchTypeSpec extends FlatSpec with Matchers {
     result._1 shouldEqual "(A, B) ⇒ C"
   }
 
+  val basicTypes = List("Int", "String", "Boolean", "Float", "Double", "Long", "Symbol", "Char")
+
   it should "get printable representation of tuple of basic types" in {
     def result[A, B, C]: (String, String) = testType[(Int, String, Boolean, Float, Double, Long, Symbol, Char)]
 
-    result._1 shouldEqual "(" + Macros.basicTypes.map("<c>" + _).mkString(", ") + ")"
+    result._1 shouldEqual "(" + basicTypes.map("<c>" + _).mkString(", ") + ")"
   }
 
   it should "get printable representation of single case class" in {

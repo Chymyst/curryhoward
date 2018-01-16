@@ -140,8 +140,6 @@ sealed trait TermExpr[+T] {
     case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : ${tExpr.prettyPrint} because its type is not a conjunction")
   }
 
-  def map[U](f: T ⇒ U): TermExpr[U]
-
   def simplify(withEta: Boolean = false): TermExpr[T] = this
 
   private[ch] def unusedArgs: Set[VarName] = this match {
@@ -258,12 +256,9 @@ sealed trait TermExpr[+T] {
   }
 }
 
-final case class PropE[T](name: VarName, tExpr: TypeExpr[T]) extends TermExpr[T] {
-  override def map[U](f: T ⇒ U): PropE[U] = PropE(name, tExpr map f)
-}
+final case class PropE[T](name: VarName, tExpr: TypeExpr[T]) extends TermExpr[T]
 
 final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T] {
-  override def map[U](f: T ⇒ U): TermExpr[U] = AppE(head map f, arg map f)
 
   // The type of AppE is computed from the types of its arguments.
   // Make this a `val` to catch bugs early.
@@ -293,8 +288,6 @@ final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T
 final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends TermExpr[T] {
   private val headsLength = heads.length
 
-  override def map[U](f: T ⇒ U): TermExpr[U] = CurriedE(heads map (_ map f), body map f)
-
   // The type is t1 -> t2 -> t3 -> b; here `heads` = List(t1, t2, t3).
   def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr ->: prev }
 
@@ -322,19 +315,13 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
   override lazy val argsMultiUseCount: Int = heads.map(head ⇒ body.varCount(head.name)).sum
 }
 
-final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T] {
-  override def map[U](f: T ⇒ U): TermExpr[U] = UnitE(tExpr map f)
-}
+final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T]
 
 final case class NamedConjunctE[T](terms: Seq[TermExpr[T]], tExpr: NamedConjunctT[T]) extends TermExpr[T] {
-  override def map[U](f: T ⇒ U): TermExpr[U] = NamedConjunctE(terms map (_ map f), tExpr map f)
-
   override def simplify(withEta: Boolean): TermExpr[T] = this.copy(terms = terms.map(_.simplify(withEta)))
 }
 
 final case class ConjunctE[T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
-  override def map[U](f: T ⇒ U): TermExpr[U] = ConjunctE(terms.map(_.map(f)))
-
   def tExpr: TypeExpr[T] = ConjunctT(terms.map(_.tExpr))
 
   override def simplify(withEta: Boolean): TermExpr[T] = this.copy(terms = terms.map(_.simplify(withEta)))
@@ -342,8 +329,6 @@ final case class ConjunctE[T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
 
 // The `term` should be a ConjunctT or a NamedConjunctT
 final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] {
-  override def map[U](f: T ⇒ U): TermExpr[U] = ProjectE(index, term map f)
-
   def getProjection: Option[TermExpr[T]] = term match {
     case c: ConjunctE[T] ⇒ Some(c.terms(index))
     case _ ⇒ None
@@ -392,8 +377,6 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
   * @tparam T Type of the internal representation of the term names.
   */
 final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends TermExpr[T] {
-  override def map[U](f: T ⇒ U): TermExpr[U] = MatchE(term map f, cases map (_.map(f)))
-
   override def tExpr: TypeExpr[T] = cases match {
     case te :: tail ⇒
       te match {
@@ -406,6 +389,7 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
 
         // TODO: this will throw an exception if we try to evaluate tExpr after simplifying,
         // when simplifying will bring together several arguments into a single CurriedE().
+        // Instead of throwing an exception, we need to do something reasonable in this case.
         case _ ⇒ throw new Exception(s"Internal error: `case` expression for $this must contain functions of one argument")
       }
     case Nil ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
@@ -461,7 +445,5 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
 
 // Inject a value into the i-th part of the disjunction of type tExpr.
 final case class DisjunctE[T](index: Int, total: Int, term: TermExpr[T], tExpr: TypeExpr[T]) extends TermExpr[T] {
-  override def map[U](f: T ⇒ U): TermExpr[U] = DisjunctE(index, total, term map f, tExpr map f)
-
   override def simplify(withEta: Boolean): TermExpr[T] = this.copy(term = term.simplify(withEta))
 }

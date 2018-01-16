@@ -47,11 +47,14 @@ object TheoremProver {
 
   private val maxTermsPrinted = 16
 
-  private val sequentsSeen = mutable.Map[Sequent[_], Seq[TermExpr[_]]]()
+  private val sequentsAlreadyProved = mutable.Map[Sequent[_], Seq[TermExpr[_]]]()
+  private val sequentsAlreadyRequested = mutable.Set[Sequent[_]]()
 
+  // This is the main API for proof search. This method is not recursive.
   private[ch] def findProofs[T](typeStructure: TypeExpr[T]): (List[TermExpr[T]], Seq[TermExpr[T]]) = {
     val t0 = System.currentTimeMillis()
-    sequentsSeen.clear()
+    sequentsAlreadyProved.clear()
+    sequentsAlreadyRequested.clear()
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
     val proofTerms = findProofTerms(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename)).distinct
@@ -75,7 +78,7 @@ object TheoremProver {
 
   // Main recursive function that computes the list of available proofs for a sequent.
   // The main assumption is that the depth-first proof search terminates.
-  // No loop checking is performed on sequents.
+  // Loop checking is performed on sequents by looking up in `sequentsAlreadyRequested`.
   private[ch] def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
 
     def concatProofs(ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
@@ -96,64 +99,70 @@ object TheoremProver {
       result
     }
 
-    // Check whether we already saw this sequent.
-    sequentsSeen.get(sequent) match {
+    // Check whether we already saw this sequent. We may already have proved it, or we may not yet proved it but already saw it.
+    sequentsAlreadyProved.get(sequent) match {
       case Some(terms) ⇒ terms.asInstanceOf[Seq[TermExpr[T]]]
       case None ⇒
 
-        // Check whether the sequent follows directly from an axiom.
-        val (fromIdAxiom, fromTAxiom) = followsFromAxioms(sequent) // This could be empty or non-empty.
-      // If the sequent follows from Id axiom, we will ignore `fromTAxiom`, because this will most likely not yield a good solution.
-      // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
-      val fromAxioms = if (fromIdAxiom.nonEmpty) fromIdAxiom else fromTAxiom
+        if (sequentsAlreadyRequested contains sequent) {
+          if (debug) println(s"DEBUG: sequent $sequent is looping; will return an empty sequence of proof terms")
+          Seq()
+        } else {
+          sequentsAlreadyRequested.add(sequent)
 
-        if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyPrint)}")
+          // Check whether the sequent follows directly from an axiom.
+          val (fromIdAxiom, fromTAxiom) = followsFromAxioms(sequent) // This could be empty or non-empty.
+          // If the sequent follows from Id axiom, we will ignore `fromTAxiom`, because this will most likely not yield a good solution.
+          // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
+          val fromAxioms = if (fromIdAxiom.nonEmpty) fromIdAxiom else fromTAxiom
 
-        // Try each rule on sequent. If rule applies, obtain the next sequent.
-        // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
+          if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyPrint).mkString("; ")}")
 
-        // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
-        // We should apply that invertible rule and proceed from there.
-        val fromRules: Seq[ProofTerm[T]] = invertibleRules[T].view.flatMap(_.applyTo(sequent)).headOption match {
-          case Some(ruleResult) ⇒ concatProofs(ruleResult) ++ fromAxioms
-          case None ⇒
-            // Try invertible ambiguous rules. Each of these rules may generate more than one new sequent,
-            // and each of these sequents yields a proof if the original formula has a proof.
-            // We need to gather and concatenate all these proofs.
-            // We proceed to non-invertible rules only if no rules apply at this step.
-            val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
-              .flatMap(_.applyTo(sequent))
-              .flatMap(concatProofs)
-            if (fromInvertibleAmbiguousRules.nonEmpty)
-              fromInvertibleAmbiguousRules ++ fromAxioms
-            else {
-              // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
-              // Each non-invertible rule will generate some proofs or none.
-              // If a rule generates no proofs, another rule should be used.
-              // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
-              // If no more rules apply here, we return `fromAxioms`.
-              // Use flatMap to concatenate all results from all applicable non-invertible rules.
-              val fromNoninvertibleRules: Seq[ProofTerm[T]] = nonInvertibleRulesForSequent[T](sequent)
+          // Try each rule on sequent. If rule applies, obtain the next sequent.
+          // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
+
+          // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
+          // We should apply that invertible rule and proceed from there.
+          val fromRules: Seq[ProofTerm[T]] = invertibleRules[T].view.flatMap(_.applyTo(sequent)).headOption match {
+            case Some(ruleResult) ⇒ concatProofs(ruleResult) ++ fromAxioms
+            case None ⇒
+              // Try invertible ambiguous rules. Each of these rules may generate more than one new sequent,
+              // and each of these sequents yields a proof if the original formula has a proof.
+              // We need to gather and concatenate all these proofs.
+              // We proceed to non-invertible rules only if no rules apply at this step.
+              val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
                 .flatMap(_.applyTo(sequent))
                 .flatMap(concatProofs)
-              fromNoninvertibleRules ++ fromAxioms
-            }
-        }
-        val termsFound = fromRules.map(_.simplify()).distinct
-        if (debug || debugTrace) {
-          val termsMessage = termsFound.length match {
-            case 0 ⇒ "no terms"
-            case x ⇒
-              val messagePrefix = if (x > maxTermsPrinted) s"first $maxTermsPrinted out of " else ""
-              s"$messagePrefix$x terms:\n " + termsFound.take(maxTermsPrinted).map(_.prettyPrint).mkString(" ;\n ") + " ,\n"
+              if (fromInvertibleAmbiguousRules.nonEmpty)
+                fromInvertibleAmbiguousRules ++ fromAxioms
+              else {
+                // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
+                // Each non-invertible rule will generate some proofs or none.
+                // If a rule generates no proofs, another rule should be used.
+                // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
+                // If no more rules apply here, we return `fromAxioms`.
+                // Use flatMap to concatenate all results from all applicable non-invertible rules.
+                val fromNoninvertibleRules: Seq[ProofTerm[T]] = nonInvertibleRulesForSequent[T](sequent)
+                  .flatMap(_.applyTo(sequent))
+                  .flatMap(concatProofs)
+                fromNoninvertibleRules ++ fromAxioms
+              }
           }
-          println(s"DEBUG: returning $termsMessage for sequent $sequent")
+          val termsFound = fromRules.map(_.simplify()).distinct
+          if (debug || debugTrace) {
+            val termsMessage = termsFound.length match {
+              case 0 ⇒ "no terms"
+              case x ⇒
+                val messagePrefix = if (x > maxTermsPrinted) s"first $maxTermsPrinted out of " else ""
+                s"$messagePrefix$x terms:\n " + termsFound.take(maxTermsPrinted).map(_.prettyPrint).mkString(" ;\n ") + " ,\n"
+            }
+            println(s"DEBUG: returning $termsMessage for sequent $sequent")
+          }
+          // TODO: refactor this if there is a useful caching heuristic
+          sequentsAlreadyProved.update(sequent, termsFound)
+          termsFound
         }
-        // TODO: refactor this if there is a useful caching heuristic
-        sequentsSeen.update(sequent, termsFound)
-        termsFound
     }
   }
-
 
 }

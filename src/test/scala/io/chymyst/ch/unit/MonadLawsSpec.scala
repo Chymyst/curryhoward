@@ -225,7 +225,7 @@ class LawsSpec extends LawChecking {
     checkMonadLaws[Int, Long, String, Dens](pointS, fmapS, flatmapS)
   }
 
-  it should "cannot implement Option[Option] monad due to ambiguities" in {
+  it should "fail to implement Option[Option] monad due to ambiguities" in {
     case class OOption[A](x: Option[Option[A]])
 
     val pointS = new FPoint[OOption] {
