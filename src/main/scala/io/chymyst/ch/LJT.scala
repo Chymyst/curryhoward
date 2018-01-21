@@ -56,16 +56,16 @@ Additional rules for named conjunctions:
 object LJT {
 
   def invertibleRules[T]: Seq[ForwardRule[T]] = Seq(
-    ruleImplicationAtRight,
-    ruleConjunctionAtLeft,
-    ruleImplicationAtLeft2,
-    ruleImplicationAtLeft3,
-    ruleNamedConjunctionAtLeft,
-    ruleNamedConjunctionAtRight,
-    ruleImplicationWithNamedConjunctionAtLeft,
+    ruleImplicationAtRight
+    , ruleNamedConjunctionAtLeft
+    , ruleConjunctionAtLeft
+    , ruleNamedConjunctionAtRight // Conjunction at right duplicates the context but we have inconsistent results if named conjunctions are treated differently from non-named ones.
+    , ruleConjunctionAtRight
+    , ruleImplicationAtLeft2
+    , ruleImplicationAtLeft3
+    , ruleImplicationWithNamedConjunctionAtLeft
     // The following rules are tried later because they duplicate the context G*.
-    ruleDisjunctionAtLeft,
-    ruleConjunctionAtRight
+    , ruleDisjunctionAtLeft
   )
 
   def invertibleAmbiguousRules[T]: Seq[ForwardRule[T]] = Seq() // Seq(ruleImplicationAtLeft1)

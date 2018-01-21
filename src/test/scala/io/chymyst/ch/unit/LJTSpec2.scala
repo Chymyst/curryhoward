@@ -225,10 +225,42 @@ class LJTSpec2 extends FlatSpec with Matchers {
   it should "check an example that failed in live demo in chapter 4" in {
     final case class Data[A, B](ab: Either[A, B], d: (A ⇒ Int) ⇒ B)
 
-    // TODO: fix
-    "def fmapB[Z, B, C](f: B ⇒ C): Data[Z, B] ⇒ Data[Z, C] = implement" shouldNot compile
+    def fmapB[Z, B, C](f: B ⇒ C): Data[Z, B] ⇒ Data[Z, C] = implement
 
-    "def fmap[X, Y, B](f: X ⇒ Y): Data[X, B] ⇒ Data[Y, B] = implement" shouldNot compile
+    def fmap[X, Y, B](f: X ⇒ Y): Data[X, B] ⇒ Data[Y, B] = implement
+  }
+
+  it should "check examples where case classes gave different results from tuples" in {
+    final case class Data[A, B](ab: Either[A, B], d: (A ⇒ Int) ⇒ B)
+    final case class Data1[A](ab: Either[A, String], d: (A ⇒ Int) ⇒ String)
+
+    def fmap12[A, B]: (A ⇒ B) ⇒ ((Either[A, String], (A ⇒ Int) ⇒ String)) ⇒ (Either[B, String], (B ⇒ Int) ⇒ String) = implement
+
+    def fmap13[A, B]: (A ⇒ B) ⇒ Data1[A] ⇒ Data1[B] = implement
+
+    def fmap14[A, B]: (A ⇒ B) ⇒ ((Either[Int, A], Int ⇒ A)) ⇒ (Either[Int, B], Int ⇒ B) = implement
+
+    case class Data2[A](x: Either[Int, A], y: Int ⇒ A)
+
+    def fmap15[A, B]: (A ⇒ B) ⇒ Data2[A] ⇒ Data2[B] = implement
+
+
+    def fmap16[A, B]: (A ⇒ B) ⇒ ((Either[Int, A], A)) ⇒ (Either[Int, B], B) = implement
+
+    case class Data3[A](x: Either[Int, A], y: A)
+
+
+    def fmap17[A, B]: (A ⇒ B) ⇒ Data3[A] ⇒ Data3[B] = implement
+
+
+    def fmap18[A, B]: (A ⇒ B) ⇒ ((Either[Int, A], Int)) ⇒ (Either[Int, B], Int) = implement
+
+
+    case class Data4[A](_1: Either[Int, A], _2: Int)
+
+
+    def fmap19[A, B]: (A ⇒ B) ⇒ Data4[A] ⇒ Data4[B] = implement
+
   }
 
 }
