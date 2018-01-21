@@ -116,7 +116,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     def result[P](): (String, String) = testType[P ⇒ Either[List[P], Option[P]]]
 
     val r = result()
-    // TODO: fix type parameters - should be P and not B
+
     r._1 shouldEqual "P ⇒ Either[List[P]{::[P] + Nil.type},Option[P]{None.type + Some[P]}]{Left[List[P]{::[P] + Nil.type},Option[P]{None.type + Some[P]}] + Right[List[P]{::[P] + Nil.type},Option[P]{None.type + Some[P]}]}"
   }
 
@@ -174,7 +174,6 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     val r = result[Int]
     r.prettyPrint shouldEqual "Z ⇒ Either[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]{Left[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}] + Right[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]}"
 
-    // TODO: fix type parameter names - we should not have any S1 or R1 in these type expressions!
     val typeAInt = testReifyType[A[Int]]
     typeAInt shouldEqual DisjunctT("A", List(BasicT("Int")), List(NamedConjunctT("A1", List(BasicT("Int")), List("b1"), List(DisjunctT("B", List(BasicT("Int")), List(NamedConjunctT("B1", List(BasicT("Int")), List("a1"), List(RecurseT("A", List(BasicT("Int"))))), NamedConjunctT("B2", List(BasicT("Int")), List("b2"), List(RecurseT("B", List(BasicT("Int"))))))))), NamedConjunctT("A2", List(BasicT("Int")), List("a2"), List(RecurseT("A", List(BasicT("Int")))))))
     typeAInt.prettyPrint shouldEqual "A[<c>Int]{A1[<c>Int] + A2[<c>Int]}"

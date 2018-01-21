@@ -237,7 +237,7 @@ class LawsSpec extends LawChecking {
 
     // All implementations should transform a non-empty option correctly.
     val mapsIntString = maps[Int, String]
-    mapsIntString.length shouldEqual 4
+    mapsIntString.length shouldEqual 1
     mapsIntString.foreach { m ⇒
       m(_.toString + "abc")(OOption(Some(Some(123)))) shouldEqual OOption(Some(Some("123abc")))
     }
@@ -245,7 +245,7 @@ class LawsSpec extends LawChecking {
     def flatmaps[A, B] = allOfType[(A => OOption[B]) => OOption[A] => OOption[B]]
 
     val flatmapsIntString = flatmaps[Int, String]
-    flatmapsIntString.length shouldEqual 44
+    flatmapsIntString.length shouldEqual 12
 
 
     /*    val fmapS = new FMap[OOption] {

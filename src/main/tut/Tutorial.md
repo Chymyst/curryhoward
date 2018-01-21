@@ -175,26 +175,23 @@ In this case, `allOfType[]()` might be useful.
 
 # Using `allOfType`
 
-The macro `allOfType` will find the the implementations that have the lowest information loss, and return a sequence of these implementations.
+The macro `allOfType` will find the implementations that have the lowest information loss, and return a sequence of these implementations if there are more than one.
 User's code can then examine each of them and check laws or other properties, selecting the implementation with the desired properties.
 
-As a simple example, consider a function that maps `Option[Int]` to `Option[Option[Int]]`: 
+As a simple example, consider a function of type `Int ⇒ Int ⇒ Int`: 
 
 ```tut
-val fs = allOfType[Option[Int] => Option[Option[Int]]]
-fs.map(f => f(Some(123)))
-fs.map(f => f(None))
+val fs = allOfType[Int ⇒ Int ⇒ Int]
+fs.map(f ⇒ f(1)(2))
 ```
 
-The list `fs` contains the two chosen implementations that have the smallest information loss.
-These two implementations differ on how they transform a `None` value: the first implementation returns `None`, the second `Some(None)`.
+The list `fs` contains the two chosen implementations, both of them having equal levels of information loss.
+
+These two implementations differ on which of the `Int` values is chosen as the result, the first one or the second one.
 This is clear by looking at the function code printed above.
-When given a `None` value, the first implementation returns the term `(None() + 0)`, while the second returns `(0 + Some((None() + 0)))`.  
 
-Both implementations could be desirable desired in different circumstances: the first is an `Option#map` on the function `Some.apply`, while the second one is `Some[Option[Int]].apply`.   
-
+Both implementations could be desirable desired in different circumstances.
 User code can be written to examine all available implementations and to select a desired one (at run time).
-
 
 # Debugging and logging
 

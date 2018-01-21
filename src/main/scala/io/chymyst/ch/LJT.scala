@@ -56,26 +56,26 @@ Additional rules for named conjunctions:
 object LJT {
 
   def invertibleRules[T]: Seq[ForwardRule[T]] = Seq(
-    ruleImplicationAtRight,
-    ruleConjunctionAtLeft,
-    ruleImplicationAtLeft2,
-    ruleImplicationAtLeft3,
-    ruleNamedConjunctionAtLeft,
-    ruleNamedConjunctionAtRight,
-    ruleImplicationWithNamedConjunctionAtLeft,
+    ruleImplicationAtRight
+    , ruleNamedConjunctionAtLeft
+    , ruleConjunctionAtLeft
+    , ruleNamedConjunctionAtRight // Conjunction at right duplicates the context but we have inconsistent results if named conjunctions are treated differently from non-named ones.
+    , ruleConjunctionAtRight
+    , ruleImplicationAtLeft2
+    , ruleImplicationAtLeft3
+    , ruleImplicationWithNamedConjunctionAtLeft
     // The following rules are tried later because they duplicate the context G*.
-    ruleDisjunctionAtLeft,
-    ruleConjunctionAtRight
+    , ruleDisjunctionAtLeft
   )
 
-  def invertibleAmbiguousRules[T]: Seq[ForwardRule[T]] = Seq(ruleImplicationAtLeft1)
+  def invertibleAmbiguousRules[T]: Seq[ForwardRule[T]] = Seq() // Seq(ruleImplicationAtLeft1)
 
   def nonInvertibleRulesForSequent[T](sequent: Sequent[T]): Seq[ForwardRule[T]] = {
     // Generate all +Rn rules if the sequent has a disjunction goal.
     (sequent.goal match {
       case DisjunctT(_, _, terms) ⇒ terms.indices.map(ruleDisjunctionAtRight[T])
       case _ ⇒ Seq[ForwardRule[T]]()
-    }) ++ Seq(ruleImplicationAtLeft4[T]) // This rule is for all sequents.
+    }) ++ Seq(ruleImplicationAtLeft1[T], ruleImplicationAtLeft4[T]) // This is the same for all sequents.
   }
 
   private def omitPremise[C](indexedPremises: Seq[(C, Int)], index: Int): List[C] = indexedPremises.filterNot(_._2 == index).map(_._1).toList

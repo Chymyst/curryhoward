@@ -70,10 +70,117 @@ object TermExpr {
     case _ ⇒ inExpr
   }
 
+  def findFirst[T, R](inExpr: TermExpr[T])(pred: PartialFunction[TermExpr[T], R]): Option[R] = {
+    Some(inExpr).collect(pred).orElse {
+      inExpr match {
+        case PropE(_, _) ⇒ None
+        case AppE(head, arg) ⇒ findFirst(head)(pred).orElse(findFirst(arg)(pred))
+        case CurriedE(_, body) ⇒ findFirst(body)(pred)
+        case UnitE(_) ⇒ None
+        case NamedConjunctE(terms, _) ⇒ terms.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred))
+        case ConjunctE(terms) ⇒ terms.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred))
+        case ProjectE(_, term) ⇒ findFirst(term)(pred)
+        case MatchE(term, cases) ⇒ findFirst(term)(pred).orElse(cases.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred)))
+        case DisjunctE(_, _, term, _) ⇒ findFirst(term)(pred)
+      }
+    }
+  }
+
+  private def sameConstructor[T](t1: TypeExpr[T], t2: TypeExpr[T]): Boolean = t1 match {
+    case NamedConjunctT(c1, _, _, _) ⇒ t2 match {
+      case NamedConjunctT(c2, _, _, _) ⇒ c1 == c2
+      case _ ⇒ false
+    }
+    case DisjunctT(c1, _, _) ⇒ t2 match {
+      case DisjunctT(c2, _, _) ⇒ c1 == c2
+      case _ ⇒ false
+    }
+    case _ ⇒ false
+  }
+
+  private def atLeastOnce(x: Int): Int = math.max(x - 1, 0)
+
+  // How many times each function uses its argument. Only counts when an argument is used more than once.
+  def argsMultiUseCountDeep[T](inExpr: TermExpr[T]): Int = inExpr match {
+    case PropE(_, _) ⇒ 0
+    case AppE(head, arg) ⇒ argsMultiUseCountDeep(head) + argsMultiUseCountDeep(arg)
+    case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum + argsMultiUseCountDeep(body)
+    case UnitE(_) ⇒ 0
+    case NamedConjunctE(terms, tExpr) ⇒ terms.map(argsMultiUseCountDeep).sum
+    case ConjunctE(terms) ⇒ terms.map(argsMultiUseCountDeep).sum
+    case ProjectE(index, term) ⇒ argsMultiUseCountDeep(term)
+    case MatchE(term, cases) ⇒ argsMultiUseCountDeep(term) + cases.map(argsMultiUseCountDeep).sum
+    case DisjunctE(index, total, term, tExpr) ⇒ argsMultiUseCountDeep(term)
+  }
+
+  def argsMultiUseCountShallow[T](inExpr: TermExpr[T]): Int = inExpr match {
+    case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum
+    case _ ⇒ 0
+  }
+
+  def conjunctionPermutationScore[T](inExpr: TermExpr[T]): Double = {
+    inExpr match {
+      case PropE(_, _) ⇒ 0
+      case AppE(head, arg) ⇒ conjunctionPermutationScore(head) + conjunctionPermutationScore(arg)
+      case CurriedE(_, body) ⇒ conjunctionPermutationScore(body)
+      case UnitE(_) ⇒ 0
+      case NamedConjunctE(terms, tExpr) ⇒
+        terms.map(conjunctionPermutationScore).sum +
+          terms.zipWithIndex.flatMap { case (t, i) ⇒
+            // Only count projections from terms of exactly the same type as this `NamedConjunctE`.
+            findFirst(t) { case ProjectE(index, term) if sameConstructor(term.tExpr, tExpr) ⇒
+              conjunctionPermutationScore(term) / terms.length.toDouble +
+                (if (index == i) 0 else 1)
+            }
+          }.sum
+      case ConjunctE(terms) ⇒
+        terms.zipWithIndex.flatMap { case (t, i) ⇒
+          findFirst(t) { case ProjectE(index, term) if (term.tExpr match {
+            case ConjunctT(_) ⇒ true
+            case _ ⇒ false
+          }) ⇒
+            conjunctionPermutationScore(term) / terms.length.toDouble +
+              (if (index == i) 0 else 1)
+          }
+        }.sum
+      case ProjectE(_, term) ⇒ conjunctionPermutationScore(term)
+      case MatchE(term, cases) ⇒ conjunctionPermutationScore(term) + cases.map(conjunctionPermutationScore).sum
+      case DisjunctE(_, _, term, _) ⇒ conjunctionPermutationScore(term)
+    }
+  }
+
+  def disjunctionPermutationScore[T](inExpr: TermExpr[T]): Double = {
+    inExpr match {
+      case PropE(name, tExpr) ⇒ 0
+      case AppE(head, arg) ⇒ disjunctionPermutationScore(head) + disjunctionPermutationScore(arg)
+      case CurriedE(heads, body) ⇒ disjunctionPermutationScore(body)
+      case UnitE(tExpr) ⇒ 0
+      case NamedConjunctE(terms, tExpr) ⇒ terms.map(disjunctionPermutationScore).sum
+      case ConjunctE(terms) ⇒ terms.map(disjunctionPermutationScore).sum
+      case ProjectE(index, term) ⇒ disjunctionPermutationScore(term)
+      case MatchE(term, cases) ⇒
+        disjunctionPermutationScore(term) +
+          cases.zipWithIndex.flatMap { case (t, i) ⇒
+            // Only count disjunction constructions into terms of exactly the same type as the `term` being matched.
+            findFirst(t) { case DisjunctE(index, _, t2, tExpr) if sameConstructor(term.tExpr, tExpr) ⇒
+              disjunctionPermutationScore(t2) / cases.length.toDouble +
+                (if (index == i) 0 else 1)
+            }
+          }.sum
+      case DisjunctE(index, total, term, tExpr) ⇒ disjunctionPermutationScore(term)
+    }
+  }
+
 }
 
 sealed trait TermExpr[+T] {
-  def informationLossScore = (unusedArgs.size + unusedTupleParts + unusedMatchClauseVars, argsMultiUseCount)
+  def informationLossScore = (
+    ()
+    , unusedArgs.size
+    , unusedTupleParts + unusedMatchClauseVars
+    , TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this)
+    , TermExpr.argsMultiUseCountDeep(this)
+  )
 
   def tExpr: TypeExpr[T]
 
@@ -151,7 +258,8 @@ sealed trait TermExpr[+T] {
     case ConjunctE(terms) ⇒ terms.flatMap(_.unusedArgs).toSet
     case ProjectE(_, term) ⇒ term.unusedArgs
     case MatchE(term, cases) ⇒ term.unusedArgs ++ cases.flatMap {
-      case CurriedE(List(_), body) ⇒ body.unusedArgs // the case arg is counted in unusedMatchClauseVars
+      // the unused heads in this CurriedE are counted separately by `unusedMatchClauseVars`
+      case CurriedE(List(_), body) ⇒ body.unusedArgs
       case c ⇒ c.unusedArgs
     }.toSet
     case DisjunctE(_, _, term, _) ⇒ term.unusedArgs
@@ -229,8 +337,6 @@ sealed trait TermExpr[+T] {
     case MatchE(term, cases) ⇒ term.varCount(varName) + cases.map(_.varCount(varName)).sum
     case DisjunctE(_, _, term, _) ⇒ term.varCount(varName)
   }
-
-  lazy val argsMultiUseCount: Int = 0
 
   // Rename all variable at once *everywhere* in the expression. (This is not the alpha-conversion!)
   def renameAllVars(oldNames: Seq[VarName], newNames: Seq[VarName]): TermExpr[T] = {
@@ -312,7 +418,6 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
     }
   }
 
-  override lazy val argsMultiUseCount: Int = heads.map(head ⇒ body.varCount(head.name)).sum
 }
 
 final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T]

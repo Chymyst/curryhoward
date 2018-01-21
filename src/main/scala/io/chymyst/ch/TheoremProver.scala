@@ -13,7 +13,7 @@ object TheoremProver {
 
   // Heuristic to speed up the proof search: select the terms with the best scores and ignore others.
   // The number of terms to take depends on the number of premises in the sequent.
-  // We will never take less than 64 = 2 << 6 and more than a million terms (2 << 20) at any step.
+  // We will never take less than 64 = 2 << 6 or more than a million terms (2 << 20) at any step.
   private def maxTermsToSelect[T](sequent: Sequent[T]): Int = 2 << math.min(6, math.max(20, 2 + sequent.premises.length))
 
   private[ch] def inhabitInternal[T](typeStructure: TypeExpr[T]): Either[String, (Option[String], TermExpr[T])] = {
@@ -24,13 +24,13 @@ object TheoremProver {
       case (List(termFound), allTerms) ⇒
         allTerms.length match {
           case count if count > 1 ⇒
-            val message = s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(_.prettyPrint).mkString(" ;\n ")} ."
+            val message = s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(t ⇒ s"${t.prettyPrint} [score: ${t.informationLossScore}]").mkString(";\n ")}."
             Right((Some(message), termFound))
           case _ ⇒
             Right((None, termFound))
         }
       case (list, _) ⇒
-        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} inequivalent ways:\n ${list.map(_.prettyPrint).mkString(" ;\n ")} .")
+        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} inequivalent ways:\n ${list.map(t ⇒ s"${t.prettyPrint} [score: ${t.informationLossScore}]").mkString(";\n ")}.")
     }
   }
 
@@ -57,7 +57,7 @@ object TheoremProver {
     sequentsAlreadyRequested.clear()
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
-    val proofTerms = findProofTerms(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename)).distinct
+    val proofTerms = findProofTerms(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename).prettyRename).distinct
     if (debug || debugTrace) {
       val prettyPT = proofTerms.map(p ⇒ (p.informationLossScore, s"${p.prettyPrint}; score = ${p.informationLossScore}: ${p.unusedArgs.size} unused args: ${p.unusedArgs}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }}"))
         .sortBy(_._1).map(_._2)
@@ -66,7 +66,7 @@ object TheoremProver {
 //      val sequentsSeenMoreThanOnce = sequentsSeen.filter { case (_, v) ⇒ v.length > 1 }.mapValues(_.length)
 //      if (sequentsSeenMoreThanOnce.nonEmpty) println(s"DEBUG: sequents seen more than once are $sequentsSeenMoreThanOnce")
     }
-    // Return the group of proofs that leave the smallest number of values unused, but has the smallest use count of those that are used.
+    // Return the group of proofs with the smallest information loss score, and also return all terms found.
     val chosenTerms = proofTerms
       .groupBy(_.informationLossScore) // Map[score, Seq[ProofTerm[T]]]
       .toSeq.sortBy(_._1) // Seq[(score, Seq[ProofTerm[T]])] sorted by increasing score
@@ -79,6 +79,8 @@ object TheoremProver {
   // Main recursive function that computes the list of available proofs for a sequent.
   // The main assumption is that the depth-first proof search terminates.
   // Loop checking is performed on sequents by looking up in `sequentsAlreadyRequested`.
+  // The calculus LJT does not generate any loops, but loop checking is activated now because
+  // we might add more rules and/or modify the calculus LJT in the future.
   private[ch] def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
 
     def concatProofs(ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {
@@ -130,23 +132,24 @@ object TheoremProver {
               // and each of these sequents yields a proof if the original formula has a proof.
               // We need to gather and concatenate all these proofs.
               // We proceed to non-invertible rules only if no rules apply at this step.
-              val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
-                .flatMap(_.applyTo(sequent))
-                .flatMap(concatProofs)
-              if (fromInvertibleAmbiguousRules.nonEmpty)
-                fromInvertibleAmbiguousRules ++ fromAxioms
-              else {
+//              val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
+//                .flatMap(_.applyTo(sequent))
+//                .flatMap(concatProofs)
+//              if (fromInvertibleAmbiguousRules.nonEmpty) {
+//                fromInvertibleAmbiguousRules ++ fromAxioms
+//              } else {
                 // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
                 // Each non-invertible rule will generate some proofs or none.
                 // If a rule generates no proofs, another rule should be used.
                 // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
                 // If no more rules apply here, we return `fromAxioms`.
                 // Use flatMap to concatenate all results from all applicable non-invertible rules.
-                val fromNoninvertibleRules: Seq[ProofTerm[T]] = nonInvertibleRulesForSequent[T](sequent)
+                val fromNoninvertibleRules: Seq[ProofTerm[T]] =
+                  (invertibleAmbiguousRules[T] ++ nonInvertibleRulesForSequent[T](sequent))
                   .flatMap(_.applyTo(sequent))
                   .flatMap(concatProofs)
                 fromNoninvertibleRules ++ fromAxioms
-              }
+//              }
           }
           val termsFound = fromRules.map(_.simplify()).distinct
           if (debug || debugTrace) {

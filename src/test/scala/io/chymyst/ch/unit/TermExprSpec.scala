@@ -54,6 +54,31 @@ class TermExprSpec extends FlatSpec with Matchers {
     val termExpr1a = termExpr1.renameAllVars(Seq("x2", "x3", "x4"), Seq("y2", "y3", "y4"))
     TermExpr.equiv(termExpr1a, termExpr1) shouldEqual true
   }
+//
+//  behavior of "information loss"
+//
+//  it should "compute permutation score for conjunctions" in {
+//    val c = ConjunctE(Seq(PropE("a", TP("A")), PropE("b", TP("B"))))
+//    val t = ConjunctE(Seq(
+//      ProjectE(0, c),
+//      ProjectE(1, c)
+//    ))
+//    t.informationLossScore._3 shouldEqual 0
+//
+//    ConjunctE(Seq(
+//      ProjectE(1, c),
+//      ProjectE(1, c)
+//    )).informationLossScore._3 shouldEqual 1
+//
+//    ConjunctE(Seq(
+//      ProjectE(1, c),
+//      ProjectE(0, c)
+//    )).informationLossScore._3 shouldEqual 2
+//
+//    TermExpr.findFirst(t){
+//      case ProjectE(_, _) ⇒ "abc"
+//    } shouldEqual Some("abc")
+//  }
 
   behavior of "TermExpr#simplify"
 
@@ -72,7 +97,7 @@ class TermExprSpec extends FlatSpec with Matchers {
     t1.simplify() shouldEqual CurriedE(List(PropE("x5", TP(1))), PropE("y", TP(2)))
 
     // x3:A -> (x2:A → B) -> (x4:B  -> x5:A -> x4:B) ( (x2:A → B)(x3:A) ) (x3:A)
-    val termExpr4 = CurriedE(List(x3, x2), AppE( AppE(f1, AppE(x2, x3)), x3))
+    val termExpr4 = CurriedE(List(x3, x2), AppE(AppE(f1, AppE(x2, x3)), x3))
     termExpr4.simplify() shouldEqual CurriedE(List(x3, x2), AppE(x2, x3))
   }
 
