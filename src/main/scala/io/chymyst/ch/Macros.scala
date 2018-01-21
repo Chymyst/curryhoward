@@ -414,6 +414,7 @@ class Macros(val c: whitebox.Context) {
     * @param givenArgs     Available Scala values that can be used while implementing the type.
     * @param transform     A final transformation for the implemented expression (e.g. apply it to some given arguments).
     * @return A Scala expression tree for the implemented expression.
+    *         Will return `null` if the theorem prover fails to find a single "best" implementation.
     */
   private def inhabitOneInternal(
     typeStructure: TypeExpr[String],

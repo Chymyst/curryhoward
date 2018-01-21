@@ -70,10 +70,70 @@ object TermExpr {
     case _ ⇒ inExpr
   }
 
+  def findFirst[T, R](inExpr: TermExpr[T])(pred: PartialFunction[TermExpr[T], R]): Option[R] = {
+    Some(inExpr).collect(pred).orElse {
+      inExpr match {
+        case PropE(name, tExpr) ⇒ None
+        case AppE(head, arg) ⇒ findFirst(head)(pred).orElse(findFirst(arg)(pred))
+        case CurriedE(heads, body) ⇒ findFirst(body)(pred)
+        case UnitE(tExpr) ⇒ None
+        case NamedConjunctE(terms, tExpr) ⇒ terms.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred))
+        case ConjunctE(terms) ⇒ terms.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred))
+        case ProjectE(index, term) ⇒ findFirst(term)(pred)
+        case MatchE(term, cases) ⇒ findFirst(term)(pred).orElse(cases.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred)))
+        case DisjunctE(index, total, term, tExpr) ⇒ findFirst(term)(pred)
+      }
+    }
+  }
+
+  def conjunctionPermutationScore[T](inExpr: TermExpr[T]): Double = {
+    inExpr match {
+      case PropE(name, tExpr) ⇒ 0
+      case AppE(head, arg) ⇒ conjunctionPermutationScore(head) + conjunctionPermutationScore(arg)
+      case CurriedE(heads, body) ⇒ conjunctionPermutationScore(body)
+      case UnitE(tExpr) ⇒ 0
+      case NamedConjunctE(terms, tExpr) ⇒ conjunctionPermutationScore(ConjunctE(terms))
+      case ConjunctE(terms) ⇒
+        terms.zipWithIndex.flatMap { case (t, i) ⇒
+          findFirst(t) { case ProjectE(index, term) ⇒ conjunctionPermutationScore(term) / terms.length.toDouble +
+            (if (index == i) 0 else 1)
+          }
+        }.sum
+      case ProjectE(index, term) ⇒ conjunctionPermutationScore(term)
+      case MatchE(term, cases) ⇒ conjunctionPermutationScore(term) + cases.map(conjunctionPermutationScore).sum
+      case DisjunctE(index, total, term, tExpr) ⇒ conjunctionPermutationScore(term)
+    }
+  }
+
+  def disjunctionPermutationScore[T](inExpr: TermExpr[T]): Double = {
+    inExpr match {
+      case PropE(name, tExpr) ⇒ 0
+      case AppE(head, arg) ⇒ disjunctionPermutationScore(head) + disjunctionPermutationScore(arg)
+      case CurriedE(heads, body) ⇒ disjunctionPermutationScore(body)
+      case UnitE(tExpr) ⇒ 0
+      case NamedConjunctE(terms, tExpr) ⇒ disjunctionPermutationScore(ConjunctE(terms))
+      case ConjunctE(terms) ⇒ terms.map(disjunctionPermutationScore).sum
+      case ProjectE(index, term) ⇒ disjunctionPermutationScore(term)
+      case MatchE(term, cases) ⇒ disjunctionPermutationScore(term) +
+        cases.zipWithIndex.flatMap { case (t, i) ⇒
+          findFirst(t) { case DisjunctE(index, _, t2, _) ⇒
+            disjunctionPermutationScore(t2) / cases.length.toDouble +
+              (if (index == i) 1 else 0)
+          }
+        }.sum
+      case DisjunctE(index, total, term, tExpr) ⇒ disjunctionPermutationScore(term)
+    }
+  }
+
 }
 
 sealed trait TermExpr[+T] {
-  def informationLossScore = (unusedArgs.size + unusedTupleParts + unusedMatchClauseVars, argsMultiUseCount)
+  def informationLossScore = (
+    unusedArgs.size + unusedTupleParts + unusedMatchClauseVars,
+    argsMultiUseCount,
+    TermExpr.conjunctionPermutationScore(this),
+    TermExpr.disjunctionPermutationScore(this)
+  )
 
   def tExpr: TypeExpr[T]
 

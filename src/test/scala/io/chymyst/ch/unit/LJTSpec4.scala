@@ -9,6 +9,10 @@ class LJTSpec4 extends FlatSpec with Matchers {
   behavior of "misc. tests"
 
   it should "work" in {
+    final case class P(x: Int, y: Int)
+    val exprs = allOfType[((Int, Int)) ⇒ (Int, Int)]
+    val exprs2 = allOfType[P ⇒ P]
 
+    def exprs3[A] = ofType[((A, A)) ⇒ (A, A)]
   }
 }

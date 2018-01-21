@@ -13,7 +13,7 @@ object TheoremProver {
 
   // Heuristic to speed up the proof search: select the terms with the best scores and ignore others.
   // The number of terms to take depends on the number of premises in the sequent.
-  // We will never take less than 64 = 2 << 6 and more than a million terms (2 << 20) at any step.
+  // We will never take less than 64 = 2 << 6 or more than a million terms (2 << 20) at any step.
   private def maxTermsToSelect[T](sequent: Sequent[T]): Int = 2 << math.min(6, math.max(20, 2 + sequent.premises.length))
 
   private[ch] def inhabitInternal[T](typeStructure: TypeExpr[T]): Either[String, (Option[String], TermExpr[T])] = {
@@ -24,7 +24,7 @@ object TheoremProver {
       case (List(termFound), allTerms) ⇒
         allTerms.length match {
           case count if count > 1 ⇒
-            val message = s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(_.prettyPrint).mkString(" ;\n ")} ."
+            val message = s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(t ⇒ s"${t.prettyPrint} [score: ${t.informationLossScore}]").mkString(";\n ")}."
             Right((Some(message), termFound))
           case _ ⇒
             Right((None, termFound))
@@ -66,7 +66,7 @@ object TheoremProver {
 //      val sequentsSeenMoreThanOnce = sequentsSeen.filter { case (_, v) ⇒ v.length > 1 }.mapValues(_.length)
 //      if (sequentsSeenMoreThanOnce.nonEmpty) println(s"DEBUG: sequents seen more than once are $sequentsSeenMoreThanOnce")
     }
-    // Return the group of proofs that leave the smallest number of values unused, but has the smallest use count of those that are used.
+    // Return the group of proofs with the smallest information loss score, and also return all terms found.
     val chosenTerms = proofTerms
       .groupBy(_.informationLossScore) // Map[score, Seq[ProofTerm[T]]]
       .toSeq.sortBy(_._1) // Seq[(score, Seq[ProofTerm[T]])] sorted by increasing score
@@ -79,6 +79,8 @@ object TheoremProver {
   // Main recursive function that computes the list of available proofs for a sequent.
   // The main assumption is that the depth-first proof search terminates.
   // Loop checking is performed on sequents by looking up in `sequentsAlreadyRequested`.
+  // The calculus LJT does not generate any loops, but loop checking is activated now because
+  // we might add more rules and/or modify the calculus LJT in the future.
   private[ch] def findProofTerms[T](sequent: Sequent[T]): Seq[ProofTerm[T]] = {
 
     def concatProofs(ruleResult: RuleResult[T]): Seq[ProofTerm[T]] = {

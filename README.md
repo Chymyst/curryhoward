@@ -4,45 +4,33 @@
 [![Github Tag](https://img.shields.io/github/tag/Chymyst/curryhoward.svg?label=release&colorB=blue)](https://github.com/Chymyst/curryhoward/tags)
 [![Maven Central](https://img.shields.io/maven-central/v/io.chymyst/curryhoward_2.12.svg)](http://search.maven.org/#search%7Cga%7C1%7Cio.chymyst)
 
+# Quotation
+
+_These are all interesting examples, but is there a practical side to Curry-Howard isomorphism? Probably not in everyday programming._ -- Bartosz Milewski (2015), [Category Theory for Programmers, Chapter 9: Function types.](https://bartoszmilewski.com/2015/03/13/function-types/)
+
+The `curryhoward` library aims to use the Curry-Howard isomorphism as a tool for practical applications.
+
 # curryhoward
 
-A library for automatic implementation of Scala expressions via the Curry-Howard isomorphism.
+This is a library for automatic implementation of Scala expressions via the Curry-Howard isomorphism.
 
 The Curry-Howard isomorphism maps functions with fully parametric types to theorems in the intuitionistic propositional logic (IPL) with universally quantified propositions.
 
 For example, the type of the function
 
 ```scala
-def f[X, Y]: X ⇒ Y ⇒ X = (x: X) ⇒ ((y: Y) ⇒ x)
+def f[X, Y]: X ⇒ Y ⇒ X = (x: X) ⇒ (y: Y) ⇒ x
 
 ```
 
-is mapped to the propositional theorem `forall X, Y: X ⇒ (Y ⇒ X)` in the IPL.
+is mapped to the propositional theorem `forall X, Y : X ⇒ (Y ⇒ X)` in the IPL.
 
-The `curryhoward` library provides Scala macros that generate code automatically for all such functions based on their type.
+The `curryhoward` library provides Scala macros that generate code automatically for any such function, based on the function's required type signature.
 
-The code is generated at compile time. A compile-time error occurs when there are several inequivalent implementations for a given type, or if the type cannot be implemented at all (i.e. when the given propositional formula is not a theorem).
+The code is generated at compile time.
+A compile-time error occurs when there are several inequivalent implementations for a given type, or if the type cannot be implemented at all (i.e. when the given propositional formula is not a theorem).
 
 See the [youtube presentation](https://youtu.be/cESdgot_ZxY) and the [tutorial](docs/Tutorial.md) for more details.
-
-# Quotation
-
-_These are all interesting examples, but is there a practical side to Curry-Howard isomorphism? Probably not in everyday programming._ -- Bartosz Milewski (2015), [Category Theory for Programmers, Chapter 9: Function types.](https://bartoszmilewski.com/2015/03/13/function-types/)
-
-The `curryhoward` library is an example of how we can use the Curry-Howard isomorphism for practical applications.
-
-# How it works
-
-The macro examines the type expression via reflection (at compile time), 
-
-The current implementation uses an IPL theorem prover based on the sequent calculus called LJT as presented in:
-
-[D. Galmiche, D. Larchey-Wendling. _Formulae-as-Resources Management for an Intuitionistic Theorem Prover_ (1998)](http://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.35.2618). 	In 5th Workshop on Logic, Language, Information and Computation, WoLLIC'98, Sao Paulo.
-
-The original presentation of LJT is found in:
-
-[R. Dyckhoff, _Contraction-Free Sequent Calculi for Intuitionistic Logic_, The Journal of Symbolic Logic, Vol. 57, No. 3, (Sep., 1992), pp. 795-807](https://rd.host.cs.st-andrews.ac.uk/publications/jsl57.pdf).
-
 
 # Usage
 
@@ -83,6 +71,30 @@ val user = ofType[User](f, s, x)
 
 The generated code is purely functional and assumes that all given values and types are free of side effects.
 
+# How it works
+
+The macros examine the given type expression via reflection (at compile time).
+The type expression is rewritten as a formula of IPL and passed on to the theorem prover.
+The theorem prover performs an exhaustive proof search to look for all possible lambda-terms that implement the given type.
+After that, the terms are simplified, so that equivalent terms that are different only by alpha-conversion, beta-conversion, or eta-conversion are eliminated.
+Finally, the terms are measured according to their "information loss score", and sorted so that the terms with the least information loss are returned (and all other alternative terms ignored).
+The Scala macro then converts the lambda-terms into Scala code.
+All this happens at compile time, so compilation may take longer if a lot of terms are being generated.
+
+It is also possible to use some given expressions with known types.
+
+For example, if required to implement a type `Option[B]` given value `x` of type `Option[A]` and value `f` of type `A ⇒ Option[B]`, the library will first rewrite the problem as that of implementing a function type `Option[A] ⇒ (A ⇒ Option[B]) ⇒ Option[B]` with type parameters `A` and `B`.
+Having obtained a solution, i.e. a term of that type, the library will then apply this term to arguments `x` and `f`.
+The resulting term will be returned as Scala code that uses the given values `x` and `f`.
+
+The current implementation uses an IPL theorem prover based on the sequent calculus called LJT as presented in:
+
+[D. Galmiche, D. Larchey-Wendling. _Formulae-as-Resources Management for an Intuitionistic Theorem Prover_ (1998)](http://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.35.2618). 	In 5th Workshop on Logic, Language, Information and Computation, WoLLIC'98, Sao Paulo.
+
+The original presentation of LJT is found in:
+
+[R. Dyckhoff, _Contraction-Free Sequent Calculi for Intuitionistic Logic_, The Journal of Symbolic Logic, Vol. 57, No. 3, (Sep., 1992), pp. 795-807](https://rd.host.cs.st-andrews.ac.uk/publications/jsl57.pdf).
+
 # Unit tests
 
 `sbt test`
@@ -107,7 +119,7 @@ The generated code is purely functional and assumes that all given values and ty
 # Known bugs
 
 - Limited support for recursive case classes (including `List`): generated code cannot contain recursive functions
-- Type aliases `type MyType[T] = (Int, T)` will silently generate incorrect code
+- Type aliases `type MyType[T] = (Int, T)` are not supported - they will silently generate incorrect code or fail
 - No support for the conventional Java-style function types with multiple arguments, e.g. `(T, U) ⇒ T`; tuple types need to be used instead, e.g. `((T, U)) ⇒ T`
 
 # Examples of working functionality
@@ -118,7 +130,7 @@ The following code examples show how various functions are implemented automatic
 // "Weak" Peirce's law:
 def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
 
-// Weak law of _tertium non datur_
+// "Weak" law of _tertium non datur_:
 def f[A, B]: (Either[A, A ⇒ B] ⇒ B) ⇒ B = implement
 
 ```
@@ -151,9 +163,9 @@ def eitherAssoc[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = 
 
 ```
 
-Case objects are treated as named versions of the `Unit` type.
+Case objects (and case classes with zero-argument constructors) are treated as named versions of the `Unit` type.
 
-## Alternative syntax
+## Supported syntax in depth
 
 There are three ways in which code can be generated based on a given type:
 
@@ -167,7 +179,7 @@ import io.chymyst.ch._
 // Conventional Scala syntax for functions.
 def f1[T, U](x: T, y: T ⇒ U) : (T, U) = implement
 
-// Fully or partially curried functions.
+// Fully or partially curried functions are supported.
 def f2[T, U](x: T): (T ⇒ U) ⇒ (T, U) = implement
 
 def f3[T, U]: T ⇒ (T ⇒ U) ⇒ (T, U) = implement
@@ -177,21 +189,22 @@ case class User(name: String, id: Long)
 
 val f: Int ⇒ Long = _.toLong
 
-ofType[User](123, "abc", f).id // 123L
+ofType[User](123, "abc", f).id // This expression evaluates to `123L`.
 
 ```
 
 ## Heuristics for choosing different implementations
 
-If the theorem prover finds several alternative implementations of a function, it attempts to find the implementation with the smallest "information loss".
+If the theorem prover finds several alternative implementations of a type, it attempts to find the implementation with the smallest "information loss".
 
-The "information loss" of a function is defined as an integer number being the sum of:
+The "information loss" of a term is defined as an integer number being the sum of:
 
-- the number of (curried) arguments that are ignored by the function,
-- the number of tuple parts that are computed but subsequently not used by the function,
+- the number of (curried) arguments that are ignored by some function,
+- the number of tuple parts that are computed but subsequently not used,
 - the number of `case` clauses that do not use their arguments.
 
-Choosing the smallest "information loss" is a heuristic that enables automatic implementations of `pure`, `map`, and `flatMap` for the `State` monad:
+Choosing the smallest "information loss" is a heuristic that enables automatic choice of the correct implementations for a number of cases.
+For example, here are correct implementations of `pure`, `map`, and `flatMap` for the `State` monad:
 
 ```scala
 def pure[S, A]: A ⇒ (S ⇒ (A, S)) = implement
@@ -201,7 +214,11 @@ def flatMap[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S))
 ```
 
 Note that there are several inequivalent implementations for the State monad's `map` and `flatMap`,
-but only one of them loses no information (and thus has a chance of satisfying the correct laws).
+but only one of them loses no information -- and thus has a higher chance of satisfying the correct laws.
+
+The theorem prover does not check any equational laws.
+It selects the terms with the smallest level of information loss, in hopes that there will be only one term selected,
+and that it will be the desired term that satisfies equational laws of whatever sort the users expect. 
 
 The theorem prover will generate a (compile-time) error when there are two or more implementations with the smallest level of information loss.
 
@@ -214,7 +231,7 @@ Warning:scalac: type (S → (A, S)) → (A → B) → S → (B, S) has 2 impleme
 ```
 
 This message means that the resulting implementation is _probably_ the right one, but there was a choice to be made.
-If there exist some equational laws that apply to this function, the laws need to be checked.
+If there exist some equational laws that apply to this function, the laws need to be checked by the user (e.g. in unit tests).
 
 The "smallest information loss" heuristic allows us to select the "better" implementation in the following example:
 
@@ -226,10 +243,10 @@ optionId(None) == None
 
 ```
 
-There are two possible implementations of the type `Option[X] ⇒ Option[X]`: the "trivial" implementation (always return `None`), and the "interesting" implementation (return the same value as given).
-The "trivial" implementation is rejected by the algorithm because it ignores the information given in the original data.
+There are two possible implementations of the type `Option[X] ⇒ Option[X]`: the "trivial" implementation (always returns `None`), and the "interesting" implementation (returns the same value as given).
+The "trivial" implementation is rejected by the algorithm because it ignores the information given in the original data, so it has higher "information loss".
 
-Generally, the algorithm prefers implementations that use more parts of the disjunction.
+As another heuristic, the algorithm prefers implementations that use more parts of a disjunction.
 
 In some cases, there are several inequivalent implementations that all have the same level of "information loss."
 The function `allOfType` returns all these implementations.
