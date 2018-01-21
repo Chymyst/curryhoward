@@ -139,9 +139,11 @@ class ApiSpec extends LawChecking {
   }
 
   it should "run the example in the tutorial" in {
+    ofType[Option[Int] ⇒ Option[Option[Int]]] // should print alternative terms
+
     val fs = allOfType[Option[Int] ⇒ Option[Option[Int]]]
-    fs.map(f ⇒ f(Some(123))) shouldEqual List(Some(Some(123)), Some(Some(123)))
-    fs.map(f ⇒ f(None)) shouldEqual List(None, Some(None))
+    fs.map(f ⇒ f(None)) shouldEqual List(None)
+    fs.map(f ⇒ f(Some(123))) shouldEqual List(Some(Some(123)))
 
   }
 

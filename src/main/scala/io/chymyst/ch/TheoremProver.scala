@@ -30,7 +30,7 @@ object TheoremProver {
             Right((None, termFound))
         }
       case (list, _) ⇒
-        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} inequivalent ways:\n ${list.map(_.prettyPrint).mkString(" ;\n ")} .")
+        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} inequivalent ways:\n ${list.map(t ⇒ s"${t.prettyPrint} [score: ${t.informationLossScore}]").mkString(";\n ")}.")
     }
   }
 

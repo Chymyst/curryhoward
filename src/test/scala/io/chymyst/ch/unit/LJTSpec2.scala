@@ -177,9 +177,13 @@ class LJTSpec2 extends FlatSpec with Matchers {
     // Notice that Data[A] is the same as an Either[..., ...]
     final case class Data[A](d: Either[Data2[String, Int, A], Data2[Boolean, Double, A]])
 
-    def fmap[A, B](f: A ⇒ B) = allOfType[Data[A] ⇒ Data[B]](f)
+    def fmap[A, B](f: A ⇒ B): Data[A] ⇒ Data[B] = implement
 
-    fmap[Int, String](_.toString).length shouldEqual 4
+    val res: Data[String] = fmap[Int, String](_.toString)(Data(Left(Data2(_ => _ => 100, 200))))
+
+    res match {
+      case Data(Left(Data2(f, g))) ⇒ (f("")(0), g) shouldEqual (("100", "200"))
+    }
   }
 
   it should "generate functor instance on wrapped Reader" in {
