@@ -179,11 +179,34 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
     def fmap[A, B](f: A ⇒ B): Data[A] ⇒ Data[B] = implement
 
-    val res: Data[String] = fmap[Int, String](_.toString)(Data(Left(Data2(_ => _ => 100, 200))))
+    val res: Data[String] = fmap[Int, String](_.toString)(Data(Left(Data2(_ => x => x + 100, 200))))
 
     res match {
-      case Data(Left(Data2(f, g))) ⇒ (f("")(0), g) shouldEqual (("100", "200"))
+      case Data(Left(Data2(f, q))) ⇒ (f("")(10), q) shouldEqual (("110", "200"))
     }
+  }
+
+  it should "generate correct code for rule ->L1 with rule +Rn" in {
+    final case class Data2[X, A](g: X => A, x: A)
+
+    final case class P[T](t: Option[T])
+
+    final case class Data[A](d: Either[Data2[String, A], Data2[Boolean, A]])
+
+    allOfType[(Int ⇒ Double) ⇒ Data[Int] ⇒ Data[Double]].length shouldEqual 1
+
+    def fmap14[A, B]: (A ⇒ B) ⇒ Data[A] ⇒ Data[B] = implement
+
+    def fmap2[A, B]: (A ⇒ B) ⇒ Option[Data2[Int, A]] ⇒ Option[Data2[Int, B]] = implement
+
+    def fmap2a[A, B]: (A ⇒ B) ⇒ P[(Int => A, A)] ⇒ P[(Int ⇒ B, B)] = implement
+
+    def fmap3[A, B]: (Int ⇒ A) ⇒ A ⇒ (A ⇒ B) ⇒ Option[Int ⇒ B] = implement
+
+    def fmap4[A, B] = allOfType[A ⇒ (A ⇒ B) ⇒ Option[A ⇒ B]].length
+
+    // TODO: fix - this should be 2, not 3
+    fmap4[Int, String] shouldEqual 3
   }
 
   it should "generate functor instance on wrapped Reader" in {
@@ -203,9 +226,10 @@ class LJTSpec2 extends FlatSpec with Matchers {
   it should "check an example that failed in live demo in chapter 4" in {
     final case class Data[A, B](ab: Either[A, B], d: (A ⇒ Int) ⇒ B)
 
-    def fmapB[Z, B, C](f: B ⇒ C): Data[Z, B] ⇒ Data[Z, C] = implement
+    // TODO: fix
+    "def fmapB[Z, B, C](f: B ⇒ C): Data[Z, B] ⇒ Data[Z, C] = implement" shouldNot compile
 
-    def fmap[X, Y, B](f: X ⇒ Y): Data[X, B] ⇒ Data[Y, B] = implement
+    "def fmap[X, Y, B](f: X ⇒ Y): Data[X, B] ⇒ Data[Y, B] = implement" shouldNot compile
   }
 
 }

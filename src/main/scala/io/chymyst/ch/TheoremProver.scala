@@ -132,23 +132,24 @@ object TheoremProver {
               // and each of these sequents yields a proof if the original formula has a proof.
               // We need to gather and concatenate all these proofs.
               // We proceed to non-invertible rules only if no rules apply at this step.
-              val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
-                .flatMap(_.applyTo(sequent))
-                .flatMap(concatProofs)
-              if (fromInvertibleAmbiguousRules.nonEmpty)
-                fromInvertibleAmbiguousRules ++ fromAxioms
-              else {
+//              val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
+//                .flatMap(_.applyTo(sequent))
+//                .flatMap(concatProofs)
+//              if (fromInvertibleAmbiguousRules.nonEmpty) {
+//                fromInvertibleAmbiguousRules ++ fromAxioms
+//              } else {
                 // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
                 // Each non-invertible rule will generate some proofs or none.
                 // If a rule generates no proofs, another rule should be used.
                 // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
                 // If no more rules apply here, we return `fromAxioms`.
                 // Use flatMap to concatenate all results from all applicable non-invertible rules.
-                val fromNoninvertibleRules: Seq[ProofTerm[T]] = nonInvertibleRulesForSequent[T](sequent)
+                val fromNoninvertibleRules: Seq[ProofTerm[T]] =
+                  (invertibleAmbiguousRules[T] ++ nonInvertibleRulesForSequent[T](sequent))
                   .flatMap(_.applyTo(sequent))
                   .flatMap(concatProofs)
                 fromNoninvertibleRules ++ fromAxioms
-              }
+//              }
           }
           val termsFound = fromRules.map(_.simplify()).distinct
           if (debug || debugTrace) {

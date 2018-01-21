@@ -245,7 +245,7 @@ class LawsSpec extends LawChecking {
     def flatmaps[A, B] = allOfType[(A => OOption[B]) => OOption[A] => OOption[B]]
 
     val flatmapsIntString = flatmaps[Int, String]
-    flatmapsIntString.length shouldEqual 11
+    flatmapsIntString.length shouldEqual 12
 
 
     /*    val fmapS = new FMap[OOption] {

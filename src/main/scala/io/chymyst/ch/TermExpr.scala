@@ -113,6 +113,11 @@ object TermExpr {
     case DisjunctE(index, total, term, tExpr) ⇒ argsMultiUseCount(term)
   }
 
+  def argsMultiUseCountShallow[T](inExpr: TermExpr[T]): Int = inExpr match {
+    case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum
+    case _ ⇒ 0
+  }
+
   def conjunctionPermutationScore[T](inExpr: TermExpr[T]): Double = {
     inExpr match {
       case PropE(_, _) ⇒ 0
@@ -174,7 +179,7 @@ sealed trait TermExpr[+T] {
     , unusedArgs.size
     , unusedTupleParts + unusedMatchClauseVars
     , TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this)
-    , TermExpr.argsMultiUseCount(this)
+    , TermExpr.argsMultiUseCountShallow(this)
   )
 
   def tExpr: TypeExpr[T]
