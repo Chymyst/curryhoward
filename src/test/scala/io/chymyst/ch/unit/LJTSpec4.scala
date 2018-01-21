@@ -9,6 +9,6 @@ class LJTSpec4 extends FlatSpec with Matchers {
   behavior of "misc. tests"
 
   it should "work" in {
-        def f1(x: Option[Option[Int]]): Option[Option[Int]] = implement
+
   }
 }
