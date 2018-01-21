@@ -205,8 +205,7 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
     def fmap4[A, B] = allOfType[A ⇒ (A ⇒ B) ⇒ Option[A ⇒ B]].length
 
-    // TODO: fix - this should be 2, not 3
-    fmap4[Int, String] shouldEqual 3
+    fmap4[Int, String] shouldEqual 2
   }
 
   it should "generate functor instance on wrapped Reader" in {
