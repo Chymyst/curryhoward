@@ -101,16 +101,16 @@ object TermExpr {
   private def atLeastOnce(x: Int): Int = math.max(x - 1, 0)
 
   // How many times each function uses its argument. Only counts when an argument is used more than once.
-  def argsMultiUseCount[T](inExpr: TermExpr[T]): Int = inExpr match {
+  def argsMultiUseCountDeep[T](inExpr: TermExpr[T]): Int = inExpr match {
     case PropE(_, _) ⇒ 0
-    case AppE(head, arg) ⇒ argsMultiUseCount(head) + argsMultiUseCount(arg)
-    case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum + argsMultiUseCount(body)
+    case AppE(head, arg) ⇒ argsMultiUseCountDeep(head) + argsMultiUseCountDeep(arg)
+    case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum + argsMultiUseCountDeep(body)
     case UnitE(_) ⇒ 0
-    case NamedConjunctE(terms, tExpr) ⇒ terms.map(argsMultiUseCount).sum
-    case ConjunctE(terms) ⇒ terms.map(argsMultiUseCount).sum
-    case ProjectE(index, term) ⇒ argsMultiUseCount(term)
-    case MatchE(term, cases) ⇒ argsMultiUseCount(term) + cases.map(argsMultiUseCount).sum
-    case DisjunctE(index, total, term, tExpr) ⇒ argsMultiUseCount(term)
+    case NamedConjunctE(terms, tExpr) ⇒ terms.map(argsMultiUseCountDeep).sum
+    case ConjunctE(terms) ⇒ terms.map(argsMultiUseCountDeep).sum
+    case ProjectE(index, term) ⇒ argsMultiUseCountDeep(term)
+    case MatchE(term, cases) ⇒ argsMultiUseCountDeep(term) + cases.map(argsMultiUseCountDeep).sum
+    case DisjunctE(index, total, term, tExpr) ⇒ argsMultiUseCountDeep(term)
   }
 
   def argsMultiUseCountShallow[T](inExpr: TermExpr[T]): Int = inExpr match {
@@ -179,7 +179,7 @@ sealed trait TermExpr[+T] {
     , unusedArgs.size
     , unusedTupleParts + unusedMatchClauseVars
     , TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this)
-    , TermExpr.argsMultiUseCountShallow(this)
+    , TermExpr.argsMultiUseCountDeep(this)
   )
 
   def tExpr: TypeExpr[T]
