@@ -12,6 +12,10 @@ You need to start your sbt in debug mode and then connect the idea debugger remo
 
 start sbt with: sbt -jvm-debug 5005
 
+If this does not work, use the long form:
+
+SBT_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005" sbt
+
 create a "Remote" "Run/Debug Config" in idea (defaults to port 5005 )
 
 Run the remote­debug config in idea. That will connect it to your running sbt. Then you can set breakpoints in your macro code and when running compile in sbt, idea should stop at the breakpoint.
@@ -358,7 +362,7 @@ class Macros(val c: whitebox.Context) {
   def inhabitImpl[U]: c.Tree = {
     val typeU = c.internal.enclosingOwner.typeSignature
     // Detect whether we are given a function with arguments.
-    val result = typeU.resultType.paramLists match {
+    val result = typeU.paramLists match {
       case Nil ⇒ inhabitOneInternal(buildTypeExpr(typeU))()
       case lists ⇒
         val givenVars = lists.flatten.map(s ⇒ PropE(s.name.decodedName.toString, buildTypeExpr(s.typeSignature)))

@@ -17,7 +17,8 @@ class OrderingSpec extends FlatSpec with Matchers {
     allOfType[P[Int] ⇒ (Int ⇒ Double) ⇒ Q[Double]].length shouldEqual 9
 
     def f2: P[Int] ⇒ (Int ⇒ Double) ⇒ P[Double] = implement
-    //    def f3(p: P[Int], f: Int ⇒ Double): Q[Double] = implement // bug: should work too!
+
+    def f3(p: P[Int], f: Int ⇒ Double): P[Double] = implement // bug: should work too!
   }
 
   it should "generate correct code for disjunctions with coincident types" in {
@@ -27,7 +28,7 @@ class OrderingSpec extends FlatSpec with Matchers {
 
     case class Q[T](x: T, y: T)
 
-  "def f2a: Either[P[Int], Q[Int]] ⇒ Either[Q[Int], P[Int]] = implement" shouldNot compile
+    "def f2a: Either[P[Int], Q[Int]] ⇒ Either[Q[Int], P[Int]] = implement" shouldNot compile
 
     def f2b[T] = allOfType[Either[P[T], Q[T]] ⇒ Either[Q[T], P[T]]]
 
@@ -35,8 +36,9 @@ class OrderingSpec extends FlatSpec with Matchers {
   }
 
   it should "generate desired code for Option[Option[T]]" in {
-    // bug: cannot implement this syntax without a type parameter! Will fix.
-    //    def f1(x: Option[Option[Int]]): Option[Option[Int]] = implement
+    // bug: cannot implement this syntax without a type parameter!
+
+    def f1(x: Option[Option[Int]]): Option[Option[Int]] = implement
 
     def f2[T](x: Option[Option[T]]): Option[Option[T]] = implement
   }
