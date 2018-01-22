@@ -131,7 +131,6 @@ For a good overview of approaches to IPL theorem proving, see these talk slides:
 # Known bugs
 
 - Limited support for recursive case classes (including `List`): generated code cannot contain recursive functions
-- Type aliases `type MyType[T] = (Int, T)` are not supported - they will silently generate incorrect code or fail
 - No support for the conventional Java-style function types with multiple arguments, e.g. `(T, U) ⇒ T`; tuple types need to be used instead, e.g. `((T, U)) ⇒ T`
 
 # Examples of working functionality
@@ -177,7 +176,7 @@ def eitherAssoc[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = 
 
 Case objects (and case classes with zero-argument constructors) are treated as named versions of the `Unit` type.
 
-## Supported syntax in depth
+## Supported syntax
 
 There are three ways in which code can be generated based on a given type:
 
@@ -288,3 +287,12 @@ The analogous parts-ordering heuristic is used for disjunctions, which selects t
 def f[X]: Either[X, X] ⇒ Either[X, X] = implement
 
 ```
+
+# Revision history
+
+- 0.2.4 Support named type aliases and ordering heuristics for conjunctions and disjunctions; bug fixes for conventional function types not involving type parameters and for eta-contraction
+- 0.2.3 Fix stack overflow when using recursive types (code is still not generated for recursive functions); implement loop detection in proof search; bug fixes for alpha-conversion of type-Lambdas
+- 0.2.2 Bug fix for back-transform in rule named-&R
+- 0.2.1 Checking monad laws for State monad; fix some problems with alpha-conversion of type-Lambdas
+- 0.2.0 Implement `allOfType`; use eta-contraction to simplify and canonicalize terms (simplify until stable); cache sequents already seen, limit the search tree by information loss score to avoid exponential blow-up in some examples
+- 0.1.0 Initial release; support case classes and tuples; support `implement` and `ofType`; full implementation of LJT calculus

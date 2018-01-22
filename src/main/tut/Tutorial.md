@@ -63,7 +63,7 @@ The library always prints the lambda-calculus term corresponding to the generate
 In this example, the term is `User(userName, userIdGenerator userName)`.
 
 The chosen notation for lambda-calculus terms supports tuples and named case classes.
-Below we will see more examples of the generated terms.
+Below we will see more examples of the generated terms printed using the lambda-calculus notation.
 
 ## Curried functions
 
@@ -138,15 +138,50 @@ val x: Int = ofType(123)
 
 Some types have more than one implementation.
 
-There are two ways in which this can happen:
+There are many ways in which this can happen:
 
 1. The type involves a function with several arguments of the same type, for example `X ⇒ X ⇒ ...`.
 If this type can be implemented, there will be at least two implementations that differ only by the choice of the argument of type `X`.
 This ambiguity cannot be resolved in any reasonable way, except by making types different.
 2. One implementation ignores some function argument(s), while another does not.
 For example, the "Church numeral" type `(X ⇒ X) ⇒ X ⇒ X` can be implemented in infinitely many ways: `_ ⇒ x ⇒ x`, `f ⇒ x ⇒ f x`, `f ⇒ x ⇒ f (f x)`, etc. Of these ways, the most likely candidate is `f ⇒ x ⇒ f x` because it is the identity on the type `X ⇒ X`, which was most likely what is intended here. The implementation `_ ⇒ x ⇒ x` should be probably rejected because it ignores some part of the given input.
+3. Some arguments can be used more than once, and different implementations use them differently. Again, the "Church numerals" are an example.
+The type `(X ⇒ X) ⇒ X ⇒ X` can be implemented as `f ⇒ x ⇒ f x` or as `f ⇒ x ⇒ f (f x)` or as `f ⇒ x ⇒ f (f (f x))`, etc.
+There are infinitely many possible implementations that differ in how many times the argument `f` was used.
+In this example, probably the desired implementation is that which uses `f` only once.
+4. The type involves a tuple or a case class with several parts of the same type.
+Implementing such a type will always have an ordering ambiguity.
+For example, the type `(X, X, X) ⇒ (X, X, X)` can be implemented as `a ⇒ (a._1, a._2, a._3)` or as `a ⇒ (a._2, a._1, a._3)` or as `a ⇒ (a._1, a._1, a._1)`, etc.
+In this example, the first implementation (preserving the ordering) is probably the desired one.
+It is, however, not clear what implementation is desired for a type such as `(X, X, X, X) ⇒ (X, X)`.
+5. The type involves a disjunction with several parts of the same type.
+Implementing such a type will always have an ordering ambiguity.
+For example, the type `Either[X, X] ⇒ Either[X, X]` can be implemented in four ways that differ by the ordering of the parts of the disjunctions: 
 
-The `curryhoward` library implements a heuristic for choosing the "most sensible" implementation when there are several.
+```scala
+def f1[X]: Either[X, X] ⇒ Either[X, X] = { // identity[Either[X, X]]
+  case Left(x) ⇒ Left(x)
+  case Right(x) ⇒ Right(x)
+}
+def f2[X]: Either[X, X] ⇒ Either[X, X] = { // switch left and right
+  case Left(x) ⇒ Right(x)
+  case Right(x) ⇒ Left(x)
+}
+def f3[X]: Either[X, X] ⇒ Either[X, X] = { // always return left
+  case Left(x) ⇒ Left(x)
+  case Right(x) ⇒ Left(x)
+}
+def f4[X]: Either[X, X] ⇒ Either[X, X] = { // always return right
+  case Left(x) ⇒ Right(x)
+  case Right(x) ⇒ Right(x)
+}
+
+```
+
+In this example, the implementation `f1` is probably the desired one.
+
+The `curryhoward` library implements a heuristic for choosing the "most sensible" implementation when there are several possibilities.
+
 As an example, consider the `map` function for the State monad:
 
 ```tut

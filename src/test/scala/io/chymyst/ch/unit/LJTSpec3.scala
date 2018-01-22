@@ -240,6 +240,12 @@ class LJTSpec3 extends FlatSpec with Matchers {
     def f[T]: Int ⇒ T ⇒ MyType[T] = implement
 
     f(1)("abc") shouldEqual ((1, "abc", "abc"))
+
+    type A[T] = ((T, Int)) ⇒ T
+
+    val x = ofType[A[String]]
+
+    x(("abc", 123)) shouldEqual "abc"
   }
 
   it should "check miscellaneous logic identities" in {

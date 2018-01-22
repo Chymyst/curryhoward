@@ -9,7 +9,6 @@ class LJTSpec4 extends FlatSpec with Matchers {
   behavior of "misc. tests"
 
   it should "work" in {
-    type A[T] = ((T, Int)) ⇒ T
-    ofType[A[String]]
+    
   }
 }
