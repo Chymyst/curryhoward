@@ -9,6 +9,6 @@ class LJTSpec4 extends FlatSpec with Matchers {
   behavior of "misc. tests"
 
   it should "work" in {
-
+    
   }
 }

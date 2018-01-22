@@ -58,7 +58,9 @@ class Macros(val c: whitebox.Context) {
     * @param typesSeen Types of case classes or sealed traits that are possibly being recursed on.
     * @return Type expression corresponding to the type `t`, with correctly assigned type parameters.
     */
-  private def buildTypeExpr(t: c.Type, tMap: Seq[(String, TypeExpr[String])] = Seq(), typesSeen: Set[String] = Set()): TypeExpr[String] = {
+  private def buildTypeExpr(tRaw: c.Type, tMap: Seq[(String, TypeExpr[String])] = Seq(), typesSeen: Set[String] = Set()): TypeExpr[String] = {
+
+    val t = tRaw.dealias
 
     val typeName = t.typeSymbol.name.decodedName.toString
 
