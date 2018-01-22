@@ -2,6 +2,7 @@ package io.chymyst.ch.unit
 
 import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
+
 case class Wrap1[A, B](x: Int, a: A, b: B)
 
 sealed trait SimpleChoice[A]
@@ -219,32 +220,26 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
   behavior of "named types"
 
-  // TODO: make this work
-
   it should "generate code by reflection on named type that has no type parameters" in {
     type MyType = (Int, String)
 
-    "def f: MyType ⇒ Int = implement" shouldNot compile
+    def f: MyType ⇒ Int = implement
 
-    //      f((123, "abc")) shouldEqual 123
+    f((123, "abc")) shouldEqual 123
   }
 
   it should "generate code by reflection on named type that represents the Reader monad" in {
     type MyType[T] = Int ⇒ T
 
-    "def f[T]: MyType[T] ⇒ Int ⇒ T = implement" shouldNot compile
+    def f[T]: MyType[T] ⇒ Int ⇒ T = implement
   }
-
-  // TODO: make this work
-  // This does not work because we match Tuple3 but `args` show only one type parameter. So this
-  // is incorrectly recognized as a tuple with a single element of type T.
 
   it should "generate code by reflection on named type with type parameters" in {
     type MyType[T] = (Int, T, T)
 
-    "def f[T]: Int ⇒ T ⇒ T ⇒ MyType[T] = implement" shouldNot compile
+    def f[T]: Int ⇒ T ⇒ MyType[T] = implement
 
-    //      f(1)("abc") shouldEqual ((1, "abc", "abc"))
+    f(1)("abc") shouldEqual ((1, "abc", "abc"))
   }
 
   it should "check miscellaneous logic identities" in {

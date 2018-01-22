@@ -36,8 +36,6 @@ class OrderingSpec extends FlatSpec with Matchers {
   }
 
   it should "generate desired code for Option[Option[T]]" in {
-    // bug: cannot implement this syntax without a type parameter!
-
     def f1(x: Option[Option[Int]]): Option[Option[Int]] = implement
 
     def f2[T](x: Option[Option[T]]): Option[Option[T]] = implement
