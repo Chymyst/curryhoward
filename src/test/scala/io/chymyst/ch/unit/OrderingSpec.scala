@@ -54,6 +54,10 @@ class OrderingSpec extends FlatSpec with Matchers {
     f2b(1, 2) shouldEqual ((2, 1))
   }
 
+  it should "handle function argumens" in {
+    def fmap1[A, B]: (A ⇒ B, (A, Int)) ⇒ (B, Int) = implement
+  }
+
   it should "correctly handle higher-order functions with java arg groups" in {
     def fmap1[A, B]: (A ⇒ B, ((A, Int) ⇒ String) ⇒ Double) ⇒ ((B, Int) ⇒ String) ⇒ Double = implement
   }
