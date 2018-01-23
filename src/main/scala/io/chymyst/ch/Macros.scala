@@ -6,7 +6,7 @@ import scala.reflect.macros.whitebox
 
 /* http://stackoverflow.com/questions/17494010/debug-scala-macros-with-intellij
 
-How to debug Scala macros:
+How to debug Scala macros: The previous instructions do not work with IntelliJ 2017.
 
 You need to start your sbt in debug mode and then connect the idea debugger remotely:
 
@@ -16,26 +16,26 @@ If this does not work, use the long form:
 
 SBT_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005" sbt
 
-create a "Remote" "Run/Debug Config" in idea (defaults to port 5005 )
+Then create a "Remote" "Run/Debug Config" in IntelliJ (defaults to port 5005)
 
-Run the remote­debug config in idea. That will connect it to your running sbt. Then you can set breakpoints in your macro code and when running compile in sbt, idea should stop at the breakpoint.
+Open terminal and start sbt. Run `test:compile` to make sure everything is compiled.
 
-note: to re­run compile after a successful compile you need either to clean or change some code
+Run the remote­debug config in IntelliJ using "Debug" button. That will connect it to your running sbt. Then you can set breakpoints in your macro code.
+
+Now make a small change in your code and run compile in sbt, - IntelliJ should stop at the breakpoint.
  */
 
-/*  Priority is given in parentheses.
-- use c.Type and c.Tree instead of String for correct code generation (3)?? Probably impossible since we can't reify types directly from reflection results, - need to use names.
-- probably can simplify data structures by eliminating [T], VarName, and ProofTerm
+/*
+- streamline LJT so that named conjunctions are directly converted to other sequents, not going through ConjunctT first.
+- probably can simplify data structures by eliminating [T], VarName, and ProofTerm.
 - make sure the alpha-conversion is correct on type parameters! This seems to be a deeper problem.
 - think about supporting recursive types beyond the palliative measures implemented currently
-- conjunction / disjunction with permuted order of results should be disfavored, prefer original order. This should help Option[Option[T]] or (T, T)
 - use blackbox macros instead of whitebox if possible (5) ?? Seems to prevent the " = implement" and "= ofType[]" syntax from working.
-- implement uncurried functions and multiple argument lists (6)?? Not sure this helps. We can already do this with `implement`.
-- use a special subclass of Function1 that also carries symbolic information about the lambda-term (6)
-
+- implement uncurried functions and multiple argument lists as types for additional values in ofType(...).
+- use a special subclass of Function1 that also carries symbolic information about the lambda-term.
+- decide whether we can implement a single function implement[]() that looks up the LHS when the given type is Nothing.
  */
 
-// TODO: can we replace this with blackbox? So far this only works with whitebox.
 class Macros(val c: whitebox.Context) {
 
   import c.universe._
@@ -48,27 +48,30 @@ class Macros(val c: whitebox.Context) {
     * This function performs further reflection steps recursively in order to detect sealed traits / case classes
     * or other nested types.
     *
-    * There are two cases when this function is called: 1) to build a TypeExpr from a given Scala type expression,
+    * There are two cases when this function is called:
+    * 1) to build a TypeExpr from a given Scala type expression,
     * 2) recursively, to build a TypeExpr from c.Type information obtained via reflection - this is used for case class
-    * accessors as well as for case classes discovered by reflection on a trait. In the second case, we may need to rename
-    * some type parameters or replace them by other type expressions.
+    * accessors as well as for case classes discovered by reflection on a trait.
+    * In the second case, we may need to rename some type parameters or replace them by other type expressions.
     *
-    * @param t         A `Type` value obtained via reflection.
+    * @param givenType A `Type` value obtained via reflection. Can be a type alias, a case class, or a type expression.
     * @param tMap      A map of known substitutions for type parameters.
     * @param typesSeen Types of case classes or sealed traits that are possibly being recursed on.
     * @return Type expression corresponding to the type `t`, with correctly assigned type parameters.
     */
-  private def buildTypeExpr(tRaw: c.Type, tMap: Seq[(String, TypeExpr[String])] = Seq(), typesSeen: Set[String] = Set()): TypeExpr[String] = {
+  private def buildTypeExpr(givenType: c.Type, tMap: Seq[(String, TypeExpr[String])] = Seq(), typesSeen: Set[String] = Set()): TypeExpr[String] = {
 
-    val t = tRaw.dealias
+    val finalType = givenType.dealias
 
-    val typeName = t.typeSymbol.name.decodedName.toString
+    val finalTypeSymbol = finalType.typeSymbol
+
+    val typeName = finalTypeSymbol.name.decodedName.toString
 
     val typesSeenNow = typesSeen + typeName
 
     // Could be the weird type [X, Y] => (type expression).
     // `finalResultType` seems to help here.
-    val matchedTypeArgs = t.finalResultType.typeArgs
+    val matchedTypeArgs = finalType.finalResultType.typeArgs
       .map(s ⇒ tMap.toMap.getOrElse(s.typeSymbol.name.decodedName.toString, buildTypeExpr(s, Seq(), typesSeen))) // `typesSeen` prevents infinite loops when  a type parameter is the same as the recursive type.
     // Very verbose; enable only when debugging the renaming of type parameters.
     //    if (debug) println(s"DEBUG: buildTypeExpr on $t with $tMap obtained args = ${t.finalResultType.typeArgs.mkString("; ")}")
@@ -79,17 +82,19 @@ class Macros(val c: whitebox.Context) {
     // use something like t.paramLists(0)(0).typeSignature and also .isImplicit to extract types of function parameters
 
     typeName match {
-      case name if name matches "(scala\\.)?Tuple[0-9]+" ⇒ ConjunctT(matchedTypeArgs)
+      //      case name if name matches "(scala\\.)?Tuple[0-9]+" ⇒ ConjunctT(matchedTypeArgs)
       case "scala.Function1" | "Function1" ⇒ matchedTypeArgs.head ->: matchedTypeArgs(1)
+      case name if name matches "(scala\\.)?Function[2-9][0-9]*" ⇒
+        ConjunctT(matchedTypeArgs.slice(0, matchedTypeArgs.length - 1)) ->: matchedTypeArgs.last
       case "scala.Any" | "Any" ⇒ BasicT("_")
       case "scala.Nothing" | "Nothing" ⇒ NothingT("Nothing")
       case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
-      case _ if matchedTypeArgs.isEmpty && t.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(t.toString)
+      case _ if matchedTypeArgs.isEmpty && finalType.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(finalType.toString)
       //      case fullName if t.typeSymbol.isType && t.typeSymbol.asType.isAliasType ⇒ ??? // Not sure `isAliasType()` ever helps. Use .dealias() on a Type?
       case _ if typesSeen contains typeName ⇒ RecurseT(typeName, matchedTypeArgs)
-      case _ if t.typeSymbol.isClass ⇒
+      case _ if finalTypeSymbol.isClass ⇒
         // A type constructor, a case class, a sealed trait / abstract class with case classes, or other class.
-        val typeMap: Seq[(String, TypeExpr[String])] = t.typeSymbol.asClass.typeParams
+        val typeMap: Seq[(String, TypeExpr[String])] = finalTypeSymbol.asClass.typeParams
           .map(_.name.decodedName.toString)
           .zip(matchedTypeArgs)
 
@@ -98,9 +103,9 @@ class Macros(val c: whitebox.Context) {
         // Very verbose; enable only when debugging the renaming of type parameters.
         //        if (debug) println(s" DEBUG: buildTypeExpr on $t with $tMap obtained typeMap = ${typeMap.map(_._2.prettyPrint).mkString("; ")}")
 
-        if (t.typeSymbol.asClass.isModuleClass) { // `case object` is a "module class", but also a "case class".
+        if (finalTypeSymbol.asClass.isModuleClass) { // `case object` is a "module class", but also a "case class".
           NamedConjunctT(typeName, Nil, Nil, Nil) // This represents a case object.
-        } else if (t.typeSymbol.asClass.isCaseClass) {
+        } else if (finalTypeSymbol.asClass.isCaseClass) {
 
           // Detected a case class with zero or more accessors.
 
@@ -108,7 +113,7 @@ class Macros(val c: whitebox.Context) {
 
           //  t.decls.toList(0).asMethod.typeSignature.resultType gives A, t.typeSymbol.asClass.typeParams(0) ==  t.decls.toList(0).asMethod.typeSignature.resultType.typeSymbol
           /* t.typeSymbol.asClass.typeParams gives List(A, B)*/
-          val (accessors, typeExprs) = t.decls
+          val (accessors, typeExprs) = finalType.decls
             .collect { case s: MethodSymbol if s.isCaseAccessor ⇒
               val accessorType = buildTypeExpr(s.typeSignature.resultType, Seq(), typesSeenNow)
               val substitutedType = TypeExpr.substNames(accessorType, typeMap.toMap)
@@ -129,7 +134,7 @@ class Macros(val c: whitebox.Context) {
           // Note: `Either` is a "type" rather than a class, even though isClass() returns true.
           // traits / case classes are classes, but knownDirectSubclasses does not work for both cases.
           // Prepare a type symbol that works for both cases.
-          val typeSymbol = if (t.typeSymbol.isType) t.typeSymbol.asType.toType.typeSymbol else t.typeSymbol
+          val typeSymbol = if (finalTypeSymbol.isType) finalTypeSymbol.asType.toType.typeSymbol else finalTypeSymbol
           val subclasses = typeSymbol
             .asClass.knownDirectSubclasses
             .toList.sortBy(_.name.decodedName.toString) // Otherwise the set is randomly ordered.
@@ -149,7 +154,7 @@ class Macros(val c: whitebox.Context) {
               // The type of the subclass maybe a type-Lambda, in which case we need to discover the correct variable substitution and perform it.
               if (subclassType.typeParams.nonEmpty) {
                 // Discover the type parameters actually used when this subclass extends the parent trait.
-                val baseType = s.typeSignature.baseType(t.typeSymbol.asClass)
+                val baseType = s.typeSignature.baseType(finalTypeSymbol.asClass)
                 // Substitute these type parameter names with the actual types used by the parent trait (as given by typeMap).
                 val substMap: Map[String, TypeExpr[String]] = baseType.typeArgs.map(_.typeSymbol.name.decodedName.toString).zip(typeMap.map(_._2)).toMap
                 //                println(s"DEBUG: baseType = ${baseType.typeSymbol.name.decodedName.toString}, baseType.typeParams = ${baseType.typeArgs.map(_.typeSymbol.name.decodedName.toString)}, substMap = ${substMap.mapValues(_.prettyPrint)}")
@@ -162,9 +167,9 @@ class Macros(val c: whitebox.Context) {
                 DisjunctT(typeName, matchedTypeArgs, parts) // Several case classes implementing a trait.
             }
           } else if (matchedTypeArgs.isEmpty) BasicT(typeName)
-          else ConstructorT(t.toString)
+          else ConstructorT(finalType.toString)
         }
-      case _ ⇒ ConstructorT(t.toString) // Sometimes we get <none> as the type symbol's name... Not sure what to do in that case.
+      case _ ⇒ ConstructorT(finalType.toString) // Sometimes we get <none> as the type symbol's name... Not sure what to do in that case.
     }
   }
 
@@ -227,6 +232,9 @@ class Macros(val c: whitebox.Context) {
 
     termExpr match {
       case p@PropE(name, _) ⇒ givenArgs.getOrElse(p, q"${TermName(name.toString)}")
+
+      // A function applied to several arguments Java-style.
+      case AppE(head, ConjunctE(terms)) ⇒ q"${reifyTermShort(head)}(..${terms.map(reifyTermShort)})"
 
       case AppE(head, arg) ⇒ q"${reifyTermShort(head)}(${reifyTermShort(arg)})"
 
@@ -308,7 +316,7 @@ class Macros(val c: whitebox.Context) {
     c.Expr[TypeExpr[String]](q"$result")
   }
 
-  /* Not used now.
+  /* Not used now, but may be used later.
     def testReifyTermsImpl[U: c.WeakTypeTag]: c.Tree = {
       val typeU: c.Type = c.weakTypeOf[U]
       val result = TheoremProver.findProofs(buildTypeExpr(typeU.resultType))._1

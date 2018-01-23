@@ -50,7 +50,7 @@ Additional rules for named conjunctions:
 
 + G* |- Named(A, B) when G* |- (A & B)  -- rule _&R
 + G*, Named(A, B) |- C when G*, (A & B) |- C  -- rule _&L
-+ G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L
++ G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L2
  */
 
 object LJT {
@@ -305,8 +305,8 @@ object LJT {
       })
   }
 
-  // G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L
-  private def ruleImplicationWithNamedConjunctionAtLeft[T] = uniformRule[T]("_->L") {
+  // G*, Named(A, B) ⇒ C |- D when G*, (A & B) ⇒ C |- D  -- rule _->L2
+  private def ruleImplicationWithNamedConjunctionAtLeft[T] = uniformRule[T]("_->L2") {
     case (nct@NamedConjunctT(constructor, _, accessors, wrapped)) #-> argC ⇒
       val unwrapped = ConjunctT(wrapped match {
         case Nil ⇒ // empty wrapper means a named Unit as a case object

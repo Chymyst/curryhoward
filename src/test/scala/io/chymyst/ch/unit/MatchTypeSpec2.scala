@@ -13,8 +13,8 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
 
     val r = result
 
-    r._2 shouldEqual "(<c>String, <c>String)"
-    r._1 shouldEqual "A ⇒ (A, B) ⇒ A"
+    r._2 shouldEqual "Tuple2[<c>String,<c>String]"
+    r._1 shouldEqual "A ⇒ Tuple2[A,B] ⇒ A"
   }
 
   it should "get type with nested argument tuples" in {
@@ -22,8 +22,8 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
 
     val r = result
 
-    r._2 shouldEqual "(<c>String, <c>String)"
-    r._1 shouldEqual "((A, B) ⇒ A) ⇒ A"
+    r._2 shouldEqual "Tuple2[<c>String,<c>String]"
+    r._1 shouldEqual "(Tuple2[A,B] ⇒ A) ⇒ A"
   }
 
   it should "get a complicated type with argument tuples" in {
@@ -31,8 +31,30 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
 
     val r = result
 
-    r._2 shouldEqual "(<c>String, <c>String)"
-    r._1 shouldEqual "(S ⇒ (A, S)) ⇒ ((A, S) ⇒ (B, S)) ⇒ S ⇒ (B, S)"
+    r._2 shouldEqual "Tuple2[<c>String,<c>String]"
+    r._1 shouldEqual "(S ⇒ Tuple2[A,S]) ⇒ (Tuple2[A,S] ⇒ Tuple2[B,S]) ⇒ S ⇒ Tuple2[B,S]"
+  }
+
+  behavior of "Java-style function argument groups"
+
+  it should "get type with argument group" in {
+    def result[A, B]: (String, String) = testType[A ⇒ (A, B) ⇒ A]
+
+    val r = result
+
+    r._1 shouldEqual "A ⇒ (A, B) ⇒ A"
+  }
+
+  it should "get type with argument group in higher-order function" in {
+    def result[A, B, C]: (String, String) = testType[A ⇒ ((A, B, C) ⇒ A) ⇒ B]
+
+    val r = result
+
+    r._1 shouldEqual "A ⇒ ((A, B, C) ⇒ A) ⇒ B"
+  }
+
+  it should "use conjunct to reify argument group" in {
+    testReifyType[(Int, (Int, Boolean), (Int, String) ⇒ Double) ⇒ Boolean] shouldEqual #->(ConjunctT(List(BasicT("Int"), NamedConjunctT("Tuple2", List(BasicT("Int"), BasicT("Boolean")), List("_1", "_2"), List(BasicT("Int"), BasicT("Boolean"))), #->(ConjunctT(List(BasicT("Int"), BasicT("String"))), BasicT("Double")))), BasicT("Boolean"))
   }
 
   behavior of "type parameters"
@@ -130,7 +152,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
   it should "process a recursive case class (infinite product with tuple)" in {
     final case class InfiniteProduct(x: Int, p: (Double, InfiniteProduct))
     val r = testReifyType[InfiniteProduct]
-    r shouldEqual NamedConjunctT("InfiniteProduct", List(), List("x", "p"), List(BasicT("Int"), ConjunctT(List(BasicT("Double"), RecurseT("InfiniteProduct", Nil)))))
+    r shouldEqual NamedConjunctT("InfiniteProduct", List(), List("x", "p"), List(BasicT("Int"), NamedConjunctT("Tuple2", List(BasicT("Double"), RecurseT("InfiniteProduct", Nil)), List("_1", "_2"), List(BasicT("Double"), RecurseT("InfiniteProduct", Nil)))))
     r.prettyPrint shouldEqual "InfiniteProduct"
   }
 
@@ -153,7 +175,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
 
     val r = testReifyType[InfImplication[Int]]
 
-    r shouldEqual NamedConjunctT("InfImplication", List(BasicT("Int")), List("i"), List(#->(BasicT("Int"),RecurseT("InfImplication", List(BasicT("Int"))))))
+    r shouldEqual NamedConjunctT("InfImplication", List(BasicT("Int")), List("i"), List(#->(BasicT("Int"), RecurseT("InfImplication", List(BasicT("Int"))))))
 
     r.prettyPrint shouldEqual "InfImplication[<c>Int]"
   }

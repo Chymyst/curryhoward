@@ -16,7 +16,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of enclosing owner's type" in {
     def result[A, B, C]: (String, String) = testType[Int]
 
-    result._2 shouldEqual "(<c>String, <c>String)"
+    result._2 shouldEqual "Tuple2[<c>String,<c>String]"
   }
 
   it should "get printable representation of enclosing owner's type with function syntax" in {
@@ -79,13 +79,13 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of tuple types" in {
     def result[A, B, C]: (String, String) = testType[(Any, Nothing, Unit, A, B, C)]
 
-    result._1 shouldEqual "(<c>_, 0, Unit, A, B, C)"
+    result._1 shouldEqual "Tuple6[<c>_,0,Unit,A,B,C]"
   }
 
   it should "get printable representation of tuple as function argument" in {
     def result[A, B, C]: (String, String) = testType[((A, B)) ⇒ C]
 
-    result._1 shouldEqual "(A, B) ⇒ C"
+    result._1 shouldEqual "Tuple2[A,B] ⇒ C"
   }
 
   val basicTypes = List("Int", "String", "Boolean", "Float", "Double", "Long", "Symbol", "Char")
@@ -93,7 +93,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of tuple of basic types" in {
     def result[A, B, C]: (String, String) = testType[(Int, String, Boolean, Float, Double, Long, Symbol, Char)]
 
-    result._1 shouldEqual "(" + basicTypes.map("<c>" + _).mkString(", ") + ")"
+    result._1 shouldEqual "Tuple" + basicTypes.length + "[" + basicTypes.map("<c>" + _).mkString(",") + "]"
   }
 
   it should "get printable representation of single case class" in {
