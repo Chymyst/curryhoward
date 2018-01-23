@@ -182,7 +182,8 @@ class Macros(val c: whitebox.Context) {
     }
 
     typeExpr match {
-      // TODO: check whether `head` is a ConjunctT, then reify as FunctionN[].
+      // Special case for Java-style arg lists.
+      case ConjunctT(terms) #-> body ⇒ tq"(..${terms.map(reifyType)}) ⇒ ${reifyType(body)}"
       case head #-> body ⇒ tq"(${reifyType(head)}) ⇒ ${reifyType(body)}"
       case TP(nameT) ⇒ makeTypeName(nameT)
       case BasicT(nameT) ⇒ makeTypeName(nameT)

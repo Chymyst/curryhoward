@@ -48,7 +48,7 @@ class OrderingSpec extends FlatSpec with Matchers {
 
     f1(1, "abc") shouldEqual ((1, "abc"))
 
-    val Seq(f2a, f2b) = allOfType[ (Int, Int) ⇒ (Int, Int) ]
+    val Seq(f2a, f2b) = allOfType[(Int, Int) ⇒ (Int, Int)]
 
     f2a(1, 2) shouldEqual ((1, 2))
     f2b(1, 2) shouldEqual ((2, 1))
@@ -61,8 +61,20 @@ class OrderingSpec extends FlatSpec with Matchers {
   }
 
   it should "correctly handle higher-order functions with java arg groups" in {
-    def fmap2[A, B]: ((A, Int) ⇒ B) ⇒ A ⇒ Int ⇒ B = implement
+    def fmap1[A, B]: ((A, Int) ⇒ B) ⇒ A ⇒ Int ⇒ B = implement
 
-   "def fmap3[A, B]: (A ⇒ B, ((A, Int) ⇒ String) ⇒ Double) ⇒ ((B, Int) ⇒ String) ⇒ Double = implement" shouldNot compile
+    def f(x: String, y: Int): Boolean = y.toString == x
+
+    fmap1[String, Boolean](f)("123")(123) shouldEqual true
+
+    def fmap2[A, B]: (((A, Int) ⇒ B), A, Int) ⇒ B = implement
+
+    fmap2[String, Boolean](f, "123", 123) shouldEqual true
+
+    def fmap3[A, B](f: (A, Int) ⇒ B, x: A, y: Int): B = implement
+
+    fmap3[String, Boolean](f, "123", 123) shouldEqual true
+
+    def fmap4[A, B]: (A ⇒ B, ((A, Int) ⇒ String) ⇒ Double) ⇒ ((B, Int) ⇒ String) ⇒ Double = implement
   }
 }
