@@ -106,11 +106,11 @@ object TermExpr {
     case AppE(head, arg) ⇒ argsMultiUseCountDeep(head) + argsMultiUseCountDeep(arg)
     case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum + argsMultiUseCountDeep(body)
     case UnitE(_) ⇒ 0
-    case NamedConjunctE(terms, tExpr) ⇒ terms.map(argsMultiUseCountDeep).sum
+    case NamedConjunctE(terms, _) ⇒ terms.map(argsMultiUseCountDeep).sum
     case ConjunctE(terms) ⇒ terms.map(argsMultiUseCountDeep).sum
-    case ProjectE(index, term) ⇒ argsMultiUseCountDeep(term)
+    case ProjectE(_, term) ⇒ argsMultiUseCountDeep(term)
     case MatchE(term, cases) ⇒ argsMultiUseCountDeep(term) + cases.map(argsMultiUseCountDeep).sum
-    case DisjunctE(index, total, term, tExpr) ⇒ argsMultiUseCountDeep(term)
+    case DisjunctE(_, _, term, _) ⇒ argsMultiUseCountDeep(term)
   }
 
   def argsMultiUseCountShallow[T](inExpr: TermExpr[T]): Int = inExpr match {
@@ -151,13 +151,13 @@ object TermExpr {
 
   def disjunctionPermutationScore[T](inExpr: TermExpr[T]): Double = {
     inExpr match {
-      case PropE(name, tExpr) ⇒ 0
+      case PropE(_, _) ⇒ 0
       case AppE(head, arg) ⇒ disjunctionPermutationScore(head) + disjunctionPermutationScore(arg)
-      case CurriedE(heads, body) ⇒ disjunctionPermutationScore(body)
-      case UnitE(tExpr) ⇒ 0
-      case NamedConjunctE(terms, tExpr) ⇒ terms.map(disjunctionPermutationScore).sum
+      case CurriedE(_, body) ⇒ disjunctionPermutationScore(body)
+      case UnitE(_) ⇒ 0
+      case NamedConjunctE(terms, _) ⇒ terms.map(disjunctionPermutationScore).sum
       case ConjunctE(terms) ⇒ terms.map(disjunctionPermutationScore).sum
-      case ProjectE(index, term) ⇒ disjunctionPermutationScore(term)
+      case ProjectE(_, term) ⇒ disjunctionPermutationScore(term)
       case MatchE(term, cases) ⇒
         disjunctionPermutationScore(term) +
           cases.zipWithIndex.flatMap { case (t, i) ⇒
@@ -167,7 +167,7 @@ object TermExpr {
                 (if (index == i) 0 else 1)
             }
           }.sum
-      case DisjunctE(index, total, term, tExpr) ⇒ disjunctionPermutationScore(term)
+      case DisjunctE(_, _, term, _) ⇒ disjunctionPermutationScore(term)
     }
   }
 
@@ -179,6 +179,7 @@ sealed trait TermExpr[+T] {
     , unusedArgs.size
     , unusedTupleParts + unusedMatchClauseVars
     , TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this)
+    , TermExpr.argsMultiUseCountShallow(this)
     , TermExpr.argsMultiUseCountDeep(this)
   )
 

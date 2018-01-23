@@ -263,4 +263,19 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
   }
 
+  it should "check example from chapter 4 problem 6" in {
+    sealed trait Result[A, B]
+    case class P[A, B](a: A, b: B, c: Int) extends Result[A, B]
+    case class Q[A, B](d: Int ⇒ A, e: Int ⇒ B) extends Result[A, B]
+    case class R[A, B](f: A ⇒ A, g: A ⇒ B) extends Result[A, B]
+
+    // Result[A, B] is a functor in B but not in A.
+    def allFmaps[A, B, C] = allOfType[(B ⇒ C) ⇒ Result[A, B] ⇒ Result[A, C]]
+
+    allFmaps[Int, String, Boolean].length shouldEqual 2
+
+    def allFmapsA[A, B, C] = allOfType[(A ⇒ C) ⇒ Result[A, B] ⇒ Result[C, B]]
+
+    allFmapsA[Int, String, Boolean].length shouldEqual 0
+  }
 }

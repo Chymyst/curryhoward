@@ -12,7 +12,7 @@ sealed trait TypeExpr[+T] {
     case BasicT(name) ⇒ s"<c>$name" // well-known constant type such as Int
     case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"
-    case NamedConjunctT(constructor, tParams, _, wrapped) ⇒
+    case NamedConjunctT(constructor, tParams, _, wrapped@_) ⇒
       //      val termString = "(" + wrapped.map(_.prettyPrint).mkString(",") + ")" // Too verbose.
       val typeSuffix = if (caseObjectName.isDefined) ".type" else ""
       s"$constructor${TypeExpr.tParamString(tParams)}$typeSuffix"
