@@ -77,4 +77,12 @@ class OrderingSpec extends FlatSpec with Matchers {
 
     def fmap4[A, B]: (A ⇒ B, ((A, Int) ⇒ String) ⇒ Double) ⇒ ((B, Int) ⇒ String) ⇒ Double = implement
   }
+
+  it should "handle given values with java arg groups" in {
+    def f(x: String, y: Int): Boolean = y.toString == x
+    val b1 = ofType[Boolean](f _, "abc", 123)
+    b1 shouldEqual false
+    val b2 = ofType[Boolean](f _, "123", 123)
+    b2 shouldEqual true
+  }
 }
