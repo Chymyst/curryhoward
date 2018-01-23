@@ -182,6 +182,7 @@ class Macros(val c: whitebox.Context) {
     }
 
     typeExpr match {
+      // TODO: check whether `head` is a ConjunctT, then reify as FunctionN[].
       case head #-> body ⇒ tq"(${reifyType(head)}) ⇒ ${reifyType(body)}"
       case TP(nameT) ⇒ makeTypeName(nameT)
       case BasicT(nameT) ⇒ makeTypeName(nameT)
@@ -257,7 +258,7 @@ class Macros(val c: whitebox.Context) {
         heads.reverse.foldLeft(reifyTermShort(replacedBody)) { case (prevTree, paramE) ⇒
           conjunctHeads.find(_._1 == paramE) match {
             case Some((_, terms)) ⇒
-              q"((..${terms.zipWithIndex.map { case (t, i) ⇒ reifyParam(PropE(conjunctSubstName(paramE, i), t))}}) ⇒ $prevTree)"
+              q"((..${terms.zipWithIndex.map { case (t, i) ⇒ reifyParam(PropE(conjunctSubstName(paramE, i), t)) }}) ⇒ $prevTree)"
             case None ⇒ q"(${reifyParam(paramE)} ⇒ $prevTree)"
           }
         }
