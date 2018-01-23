@@ -227,9 +227,9 @@ class Macros(val c: whitebox.Context) {
       param
   }
 
-  private def reifyTerm(termExpr: TermExpr[String], paramTerms: Map[PropE[String], c.Tree], givenArgs: Map[PropE[String], c.Tree]): c.Tree = {
+  private def reifyTerm(termExpr: TermExpr[String], givenArgs: Map[PropE[String], c.Tree]): c.Tree = {
     // Shortcut for calling this function recursively with all the same arguments.
-    def reifyTermShort(termExpr: TermExpr[String]): c.Tree = reifyTerm(termExpr, paramTerms, givenArgs)
+    def reifyTermShort(termExpr: TermExpr[String]): c.Tree = reifyTerm(termExpr, givenArgs)
 
     def conjunctSubstName(p: PropE[String], i: Int): String = s"${p.name}_$i"
 
@@ -455,9 +455,7 @@ class Macros(val c: whitebox.Context) {
     givenArgs: Map[PropE[String], c.Tree] = Map()
   )(
     transform: TermExpr[String] ⇒ TermExpr[String] = identity
-  ): c.Tree
-
-  = {
+  ): c.Tree = {
     TheoremProver.inhabitInternal(typeStructure) match {
       case Right((messageOpt, foundTerm)) ⇒
         messageOpt.foreach(message ⇒ c.warning(c.enclosingPosition, message))
@@ -469,13 +467,10 @@ class Macros(val c: whitebox.Context) {
 
   }
 
-  private def returnTerm(termFound: TermExpr[String], givenArgs: Map[PropE[String], c.Tree]): c.Tree
-
-  = {
+  private def returnTerm(termFound: TermExpr[String], givenArgs: Map[PropE[String], c.Tree]): c.Tree = {
     val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
     c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
-    val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).map(p ⇒ p → reifyParam(p)).toMap
-    val result = reifyTerm(termFound, paramTerms, givenArgs)
+    val result = reifyTerm(termFound, givenArgs)
     if (debug) c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = true)
 
     result
@@ -486,9 +481,7 @@ class Macros(val c: whitebox.Context) {
     givenArgs: Map[PropE[String], c.Tree]
   )(
     transform: TermExpr[String] ⇒ TermExpr[String]
-  ): c.Tree
-
-  = {
+  ): c.Tree = {
     val terms = TheoremProver.findProofs(typeStructure)._1.map { foundTerm ⇒
       returnTerm(transform(foundTerm), givenArgs)
     }
