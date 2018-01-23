@@ -118,6 +118,7 @@ For a good overview of approaches to IPL theorem proving, see these talk slides:
 - Debugging options are available
 - Support for `Unit` type, constant types, type parameters, function types, tuples, sealed traits / case classes / case objects
 - Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T` can be used
+- Java-style argument groups can be used, e.g. `A => (B, C) => D`, which is not the same as using a tuple type: `A => ((B, C)) => D`
 - When a type can be implemented in more than one way, heuristics ("least information loss") are used to prefer implementations that are more likely to satisfy algebraic laws
 - Signal error when a type can be implemented in more than one way despite using heuristics
 - Tests and a tutorial
@@ -130,8 +131,7 @@ For a good overview of approaches to IPL theorem proving, see these talk slides:
 
 # Known bugs
 
-- Limited support for recursive case classes (including `List`): generated code cannot contain recursive functions
-- No support for the conventional Java-style function types with multiple arguments, e.g. `(T, U) ⇒ T`; tuple types need to be used instead, e.g. `((T, U)) ⇒ T`
+- Limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. Example that fails to generate sensible code: `T => List[T]` (the generated code always returns empty list)
 
 # Examples of working functionality
 

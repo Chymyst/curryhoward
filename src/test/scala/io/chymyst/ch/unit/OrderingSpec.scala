@@ -40,4 +40,21 @@ class OrderingSpec extends FlatSpec with Matchers {
 
     def f2[T](x: Option[Option[T]]): Option[Option[T]] = implement
   }
+
+  behavior of "java arg groups"
+
+  it should "generate identity function for tuples" in {
+    def f1: (Int, String) ⇒ (Int, String) = implement
+
+    f1(1, "abc") shouldEqual ((1, "abc"))
+
+    val Seq(f2a, f2b) = allOfType[ (Int, Int) ⇒ (Int, Int) ]
+
+    f2a(1, 2) shouldEqual ((1, 2))
+    f2b(1, 2) shouldEqual ((2, 1))
+  }
+
+  it should "correctly handle higher-order functions with java arg groups" in {
+    def fmap1[A, B]: (A ⇒ B, ((A, Int) ⇒ String) ⇒ Double) ⇒ ((B, Int) ⇒ String) ⇒ Double = implement
+  }
 }

@@ -251,8 +251,9 @@ class Macros(val c: whitebox.Context) {
             p,
             ConjunctE(termTypes.zipWithIndex.map { case (t, i) ⇒ PropE(conjunctSubstName(p, i), t) }),
             prev
-          )
-        }
+          ).simplify()
+        }.simplify(withEta = true)
+
         heads.reverse.foldLeft(reifyTermShort(replacedBody)) { case (prevTree, paramE) ⇒
           conjunctHeads.find(_._1 == paramE) match {
             case Some((_, terms)) ⇒
