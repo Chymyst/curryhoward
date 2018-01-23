@@ -26,6 +26,7 @@ Now make a small change in your code and run compile in sbt, - IntelliJ should s
  */
 
 /*
+- get rid of `paramTerms` in reifyTerm: all our param names are unique by construction, no need to cache them.
 - streamline LJT so that named conjunctions are directly converted to other sequents, not going through ConjunctT first.
 - probably can simplify data structures by eliminating [T], VarName, and ProofTerm.
 - make sure the alpha-conversion is correct on type parameters! This seems to be a deeper problem.
@@ -82,7 +83,6 @@ class Macros(val c: whitebox.Context) {
     // use something like t.paramLists(0)(0).typeSignature and also .isImplicit to extract types of function parameters
 
     typeName match {
-      //      case name if name matches "(scala\\.)?Tuple[0-9]+" ⇒ ConjunctT(matchedTypeArgs)
       case "scala.Function1" | "Function1" ⇒ matchedTypeArgs.head ->: matchedTypeArgs(1)
       case name if name matches "(scala\\.)?Function[2-9][0-9]*" ⇒
         ConjunctT(matchedTypeArgs.slice(0, matchedTypeArgs.length - 1)) ->: matchedTypeArgs.last
@@ -90,7 +90,7 @@ class Macros(val c: whitebox.Context) {
       case "scala.Nothing" | "Nothing" ⇒ NothingT("Nothing")
       case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
       case _ if matchedTypeArgs.isEmpty && finalType.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(finalType.toString)
-      //      case fullName if t.typeSymbol.isType && t.typeSymbol.asType.isAliasType ⇒ ??? // Not sure `isAliasType()` ever helps. Use .dealias() on a Type?
+
       case _ if typesSeen contains typeName ⇒ RecurseT(typeName, matchedTypeArgs)
       case _ if finalTypeSymbol.isClass ⇒
         // A type constructor, a case class, a sealed trait / abstract class with case classes, or other class.
@@ -230,6 +230,8 @@ class Macros(val c: whitebox.Context) {
     // Shortcut for calling this function recursively with all the same arguments.
     def reifyTermShort(termExpr: TermExpr[String]): c.Tree = reifyTerm(termExpr, paramTerms, givenArgs)
 
+    def conjunctSubstName(p: PropE[String], i: Int): String = s"${p.name}_$i"
+
     termExpr match {
       case p@PropE(name, _) ⇒ givenArgs.getOrElse(p, q"${TermName(name.toString)}")
 
@@ -238,11 +240,27 @@ class Macros(val c: whitebox.Context) {
 
       case AppE(head, arg) ⇒ q"${reifyTermShort(head)}(${reifyTermShort(arg)})"
 
-      // If `heads` = List(x, y, z) and `body` = b then the code must be x => y => z => b
-      case CurriedE(heads, body) ⇒ heads.reverse.foldLeft(reifyTermShort(body)) { case (prevTree, paramE) ⇒
-        val param = paramTerms(paramE) // Look up the parameter in the precomputed table.
-        q"($param ⇒ $prevTree)"
-      }
+      // If `heads` = List(x, y, z) and `body` = b then the generated code will be x ⇒ y ⇒ z ⇒ b.
+      case CurriedE(heads, body) ⇒
+        // If one of the heads is a ConjunctT, we need to do a replacement in the entire body.
+        // It will be too late to do this once we start reifying the terms.
+        val conjunctHeads = heads.collect { case p@PropE(_, ConjunctT(terms)) ⇒ (p, terms) }
+        val conjunctProps = conjunctHeads.map(_._1).toSet
+        val replacedBody = conjunctHeads.foldLeft(body) {
+          case (prev, (p, termTypes)) ⇒ TermExpr.subst(
+            p,
+            ConjunctE(termTypes.zipWithIndex.map { case (t, i) ⇒ PropE(conjunctSubstName(p, i), t) }),
+            prev
+          )
+        }
+        heads.reverse.foldLeft(reifyTermShort(replacedBody)) { case (prevTree, paramE) ⇒
+          conjunctHeads.find(_._1 == paramE) match {
+            case Some((_, terms)) ⇒
+              q"((..${terms.zipWithIndex.map { case (t, i) ⇒ reifyParam(PropE(conjunctSubstName(paramE, i), t))}}) ⇒ $prevTree)"
+            case None ⇒ q"(${reifyParam(paramE)} ⇒ $prevTree)"
+          }
+        }
+
       case UnitE(_) ⇒ q"()"
       case ConjunctE(terms) ⇒ q"(..${terms.map(t ⇒ reifyTermShort(t))})"
       case NamedConjunctE(terms, tExpr) ⇒
@@ -435,7 +453,9 @@ class Macros(val c: whitebox.Context) {
     givenArgs: Map[PropE[String], c.Tree] = Map()
   )(
     transform: TermExpr[String] ⇒ TermExpr[String] = identity
-  ): c.Tree = {
+  ): c.Tree
+
+  = {
     TheoremProver.inhabitInternal(typeStructure) match {
       case Right((messageOpt, foundTerm)) ⇒
         messageOpt.foreach(message ⇒ c.warning(c.enclosingPosition, message))
@@ -447,7 +467,9 @@ class Macros(val c: whitebox.Context) {
 
   }
 
-  private def returnTerm(termFound: TermExpr[String], givenArgs: Map[PropE[String], c.Tree]): c.Tree = {
+  private def returnTerm(termFound: TermExpr[String], givenArgs: Map[PropE[String], c.Tree]): c.Tree
+
+  = {
     val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
     c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
     val paramTerms: Map[PropE[String], c.Tree] = TermExpr.propositions(termFound).map(p ⇒ p → reifyParam(p)).toMap
@@ -462,7 +484,9 @@ class Macros(val c: whitebox.Context) {
     givenArgs: Map[PropE[String], c.Tree]
   )(
     transform: TermExpr[String] ⇒ TermExpr[String]
-  ): c.Tree = {
+  ): c.Tree
+
+  = {
     val terms = TheoremProver.findProofs(typeStructure)._1.map { foundTerm ⇒
       returnTerm(transform(foundTerm), givenArgs)
     }
