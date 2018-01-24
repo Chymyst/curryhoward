@@ -159,7 +159,7 @@ object TermExpr {
 
   // How many times each function uses its argument. Only counts when an argument is used more than once.
   def argsMultiUseCountDeep(inExpr: TermExpr): Int = {
-    implicit val monoidInt = monoidIntStandard
+    implicit val monoidInt: Monoid[Int] = monoidIntStandard
     foldMap(inExpr) {
       case c@CurriedE(_, body) ⇒ argsMultiUseCountShallow(c) + argsMultiUseCountDeep(body)
     }
@@ -346,16 +346,11 @@ sealed trait TermExpr {
     }.distinct
   }
 
-  def varCount(String: String): Int = this match {
-    case PropE(name, _) ⇒ if (name == String) 1 else 0
-    case AppE(head, arg) ⇒ head.varCount(String) + arg.varCount(String)
-    case CurriedE(_, body) ⇒ body.varCount(String)
-    case UnitE(_) ⇒ 0
-    case NamedConjunctE(terms, _) ⇒ terms.map(_.varCount(String)).sum
-    case ConjunctE(terms) ⇒ terms.map(_.varCount(String)).sum
-    case ProjectE(_, term) ⇒ term.varCount(String)
-    case MatchE(term, cases) ⇒ term.varCount(String) + cases.map(_.varCount(String)).sum
-    case DisjunctE(_, _, term, _) ⇒ term.varCount(String)
+  def varCount(varName: String): Int = {
+    implicit val monoidInt: Monoid[Int] = TermExpr.monoidIntStandard
+    TermExpr.foldMap(this) {
+      case PropE(name, _) ⇒ if (name == varName) 1 else 0
+    }
   }
 
   // Rename all variable at once *everywhere* in the expression. (This is not the alpha-conversion!)

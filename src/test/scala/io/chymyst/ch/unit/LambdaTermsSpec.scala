@@ -72,6 +72,24 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     appl1 shouldEqual readerTerm
   }
 
+  it should "symbolically lambda-verify composition law for map on Reader monad" in {
+    type R[X, A] = X ⇒ A
+
+    def fmapReader[X, A, B] = ofType[R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B]]
+
+    val fmapReaderTerm = TermExpr.lambdaTerm(fmapReader).get
+
+    fmapReaderTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ b (a c)"
+
+    val readerTerm = PropE("rxa", TP("X") ->: TP("A"))
+
+    val f1Term = PropE("f1", TP("A") ->: TP("B"))
+    val f2Term = PropE("f2", TP("B") ->: TP("C"))
+
+    val appl1 = TermExpr.simplifyWithEtaUntilStable()
+    appl1 shouldEqual readerTerm
+  }
+
   it should "return lambda terms together with the function" in {
     def f2[A]: Unit ⇒ Either[A ⇒ A, Unit] = implement
 

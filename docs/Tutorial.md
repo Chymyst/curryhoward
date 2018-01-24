@@ -122,7 +122,7 @@ Here is the applicative `map2` function for the Reader monad:
 
 ```scala
 scala> def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
-<console>:15: Returning term: (b ⇒ d ⇒ a ⇒ c ⇒ a (b c) (d c)) readerA readerB f
+<console>:15: Returning term: (a ⇒ b ⇒ c ⇒ d ⇒ c (a d) (b d)) readerA readerB f
        def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
                                                                                    ^
 map2: [E, A, B, C](readerA: E => A, readerB: E => B, f: A => (B => C))E => C
@@ -223,12 +223,12 @@ As an example, consider the `map` function for the State monad:
 
 ```scala
 scala> def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
-<console>:15: warning: type (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ S ⇒ (B, S) has 2 implementations (laws need checking?):
- b ⇒ a ⇒ c ⇒ (a b c._1, b c._2) [score: ((),0,0.0,0.0,2)];
- b ⇒ a ⇒ c ⇒ (a b c._1, c) [score: ((),0,1.0,0.0,1)].
+<console>:15: warning: type (S ⇒ Tuple2[A,S]) ⇒ (A ⇒ B) ⇒ S ⇒ Tuple2[B,S] has 2 implementations (laws need checking?):
+ a ⇒ b ⇒ c ⇒ Tuple2(b a c._1, a c._2) [score: ((),0,0.0,0.0,2,2)];
+ a ⇒ b ⇒ c ⇒ Tuple2(b a c._1, c) [score: ((),0,1.0,0.0,1,1)].
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
-<console>:15: Returning term: b ⇒ a ⇒ c ⇒ (a b c._1, b c._2)
+<console>:15: Returning term: a ⇒ b ⇒ c ⇒ Tuple2(b a c._1, a c._2)
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
 map: [S, A, B]=> (S => (A, S)) => ((A => B) => (S => (B, S)))
@@ -251,8 +251,8 @@ If there are several such implementations, no sensible choice is possible, and t
 ```scala
 scala> def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
 <console>:15: error: type A ⇒ A ⇒ (A ⇒ B) ⇒ B can be implemented in 2 inequivalent ways:
- c ⇒ b ⇒ a ⇒ a b [score: ((),1,0.0,0.0,0)];
- b ⇒ c ⇒ a ⇒ a b [score: ((),1,0.0,0.0,0)].
+ a ⇒ b ⇒ c ⇒ c b [score: ((),1,0.0,0.0,0,0)];
+ a ⇒ b ⇒ c ⇒ c a [score: ((),1,0.0,0.0,0,0)].
        def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
                                            ^
 ```
@@ -268,13 +268,13 @@ As a simple example, consider a function of type `Int ⇒ Int ⇒ Int`:
 
 ```scala
 scala> val fs = allOfType[Int ⇒ Int ⇒ Int]
-<console>:15: Returning term: b ⇒ a ⇒ a
+<console>:15: Returning term: a ⇒ b ⇒ b
        val fs = allOfType[Int ⇒ Int ⇒ Int]
                          ^
 <console>:15: Returning term: a ⇒ b ⇒ a
        val fs = allOfType[Int ⇒ Int ⇒ Int]
                          ^
-fs: Seq[Int => (Int => Int)] = List(<function1>, <function1>)
+fs: Seq[io.chymyst.ch.Function1Lambda[Int,Int => Int]] = List(<function1>, <function1>)
 
 scala> fs.map(f ⇒ f(1)(2))
 res4: Seq[Int] = List(2, 1)
