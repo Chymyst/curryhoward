@@ -43,6 +43,32 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     f2.length shouldEqual 2
     f2.map(_.prettyPrint) shouldEqual Seq("(Left(a ⇒ a) + 0)", "(Right(1) + 0)")
+
+    def f3[A] = lambdaTerms[(A, A) ⇒ A]
+
+    f3.length shouldEqual 2
+    f3.map(_.prettyPrint) shouldEqual Seq("a ⇒ a._1", "a ⇒ a._2")
   }
 
+  it should "symbolically lambda-verify identity law for map on Reader monad" in {
+    type R[X, A] = X ⇒ A
+
+    def mapReaderTerms[X, A, B] = lambdaTerms[R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B]]
+
+    mapReaderTerms.length shouldEqual 1
+
+    val mapReaderTerm = mapReaderTerms.head
+
+    mapReaderTerm.prettyPrint shouldEqual "b ⇒ a ⇒ c ⇒ a (b c)"
+
+    def identityTerm[A] = lambdaTerms[A ⇒ A].head
+
+    identityTerm.prettyPrint shouldEqual "a ⇒ a"
+
+    val readerTerm = PropE("rxa", TP("X") ->: TP("A"))
+
+    val appl1 = TermExpr.simplifyWithEtaUntilStable(AppE(AppE(TermExpr.substTypeVar(TP("B"), TP("A"), mapReaderTerm), readerTerm), identityTerm))
+
+    appl1 shouldEqual readerTerm
+  }
 }

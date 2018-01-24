@@ -69,7 +69,7 @@ package object ch {
     * @return A list of abstract syntax trees representing the (typed) lambda-terms,
     *         each implementing the given type `U`.
     */
-  def lambdaTerms[U]: List[TermExpr[String]] = macro Macros.testReifyTermsImpl[U]
+  def lambdaTerms[U]: List[TermExpr] = macro Macros.testReifyTermsImpl[U]
 }
 
 // Note: for some reason, a macro with arguments cannot properly infer types.

@@ -1,24 +1,53 @@
 package io.chymyst.ch
 
-import io.chymyst.ch.TermExpr.VarName
-
 import scala.annotation.tailrec
 
 object TermExpr {
-  type VarName = String
-  type ProofTerm[T] = TermExpr[T]
-
   @tailrec
-  def simplifyWithEtaUntilStable[T](t: TermExpr[T]): TermExpr[T] = {
+  def simplifyWithEtaUntilStable(t: TermExpr): TermExpr = {
     val simplified = t.simplify(withEta = true)
     if (t == simplified) t else simplifyWithEtaUntilStable(simplified)
   }
 
-  def propositions[T](termExpr: TermExpr[T]): Seq[PropE[T]] = (termExpr match {
-    case p@PropE(_, _) ⇒ Seq(p.asInstanceOf[PropE[T]]) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
+  def foldMap[R: Monoid](termExpr: TermExpr, p: PartialFunction[TermExpr, R]): R = {
+    if (p isDefinedAt termExpr)
+      p(termExpr)
+    else {
+      import io.chymyst.ch.Monoid.MonoidSyntax
+      lazy val empty = Monoid.empty[R]
+
+      def foldmap(termExpr: TermExpr): R = foldMap(termExpr, p)
+
+      termExpr match {
+        case PropE(_, _) ⇒ empty
+        case AppE(head, arg) ⇒ foldmap(head) combine foldmap(arg)
+        case CurriedE(heads, body) ⇒ heads.map(foldmap).foldLeft(empty)(_ combine _) combine foldmap(body)
+        case UnitE(_) ⇒ empty
+        case NamedConjunctE(terms, _) ⇒ terms.map(foldmap).foldLeft(empty)(_ combine _)
+        case ConjunctE(terms) ⇒ terms.map(foldmap).foldLeft(empty)(_ combine _)
+        case ProjectE(_, term) ⇒ foldmap(term)
+        case MatchE(term, cases) ⇒ foldmap(term) combine cases.map(foldmap).foldLeft(empty)(_ combine _)
+        case DisjunctE(_, _, term, _) ⇒ foldmap(term)
+      }
+    }
+  }
+
+  def size(termExpr: TermExpr): Int = {
+    implicit val monoidIntSum: Monoid[Int] = new Monoid[Int] {
+      override def empty: Int = 0
+
+      override def combine(x: Int, y: Int): Int = x + y
+    }
+    foldMap(termExpr, {
+      case PropE(_, _) | UnitE(_) ⇒ 1
+    })
+  }
+
+  def propositions(termExpr: TermExpr): Seq[PropE] = (termExpr match {
+    case p@PropE(_, _) ⇒ Seq(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
     case AppE(head, arg) ⇒ propositions(head) ++ propositions(arg)
     case CurriedE(heads, body) ⇒ // Can't pattern-match directly for some reason! Some trouble with the type parameter T.
-      heads.asInstanceOf[List[PropE[T]]] ++ propositions(body)
+      heads ++ propositions(body)
     case ConjunctE(terms) ⇒ terms.flatMap(propositions)
     case ProjectE(_, term) ⇒ propositions(term)
     case NamedConjunctE(terms, _) ⇒ terms.flatMap(propositions)
@@ -29,21 +58,21 @@ object TermExpr {
 
   private val freshIdents = new FreshIdents("z")
 
-  private val makeFreshNames: Iterator[VarName] = Iterator.iterate(freshIdents())(_ ⇒ freshIdents())
+  private val makeFreshNames: Iterator[String] = Iterator.iterate(freshIdents())(_ ⇒ freshIdents())
 
-  def allFreshNames(names1: Seq[VarName], names2: Seq[VarName], namesToExclude: Seq[VarName]): Seq[VarName] = {
+  def allFreshNames(names1: Seq[String], names2: Seq[String], namesToExclude: Seq[String]): Seq[String] = {
     val requiredNumber = names1.length
     val allExcluded = (names1 ++ names2 ++ namesToExclude).toSet
     makeFreshNames.filterNot(allExcluded.contains).take(requiredNumber).toSeq
   }
 
   // Apply this term to a number of vars at once.
-  def applyToVars[T](termExpr: TermExpr[T], args: Seq[TermExpr[T]]): TermExpr[T] = {
-    args.foldLeft[TermExpr[T]](termExpr) { case (prev, arg) ⇒ AppE(prev, arg) }
+  def applyToVars(termExpr: TermExpr, args: Seq[TermExpr]): TermExpr = {
+    args.foldLeft[TermExpr](termExpr) { case (prev, arg) ⇒ AppE(prev, arg) }
   }
 
   // Compare terms up to renaming. Note: this is not alpha-conversion yet.
-  def equiv[T](e1: TermExpr[T], e2: TermExpr[T]): Boolean = e1 match {
+  def equiv(e1: TermExpr, e2: TermExpr): Boolean = e1 match {
     case CurriedE(heads1, body1) ⇒ e2 match {
       case CurriedE(heads2, body2) if heads1.lengthCompare(heads2.length) == 0 ⇒
         // rename all vars to new names
@@ -57,20 +86,34 @@ object TermExpr {
     case _ ⇒ e1 == e2
   }
 
-  def subst[T](replaceVar: PropE[T], expr: TermExpr[T], inExpr: TermExpr[T]): TermExpr[T] = inExpr match {
+  def subst(replaceVar: PropE, expr: TermExpr, inExpr: TermExpr): TermExpr = inExpr match {
     case PropE(name, tExpr) if name == replaceVar.name ⇒
       if (tExpr == replaceVar.tExpr) expr else throw new Exception(s"Incorrect type ${replaceVar.tExpr.prettyPrint} in subst($replaceVar, $expr, $inExpr), expected ${tExpr.prettyPrint}")
     case AppE(head, arg) ⇒ AppE(subst(replaceVar, expr, head), subst(replaceVar, expr, arg))
-    case CurriedE(heads, body) ⇒ CurriedE(heads.asInstanceOf[List[PropE[T]]], TermExpr.subst(replaceVar, expr, body))
-    case ConjunctE(terms) ⇒ ConjunctE(terms.map(t ⇒ TermExpr.subst(replaceVar, expr, t)))
-    case NamedConjunctE(terms, tExpr: NamedConjunctT[_]) ⇒ NamedConjunctE(terms.map(t ⇒ TermExpr.subst(replaceVar, expr, t)), tExpr)
-    case ProjectE(index, term) ⇒ ProjectE(index, TermExpr.subst(replaceVar, expr, term))
-    case MatchE(term, cases) ⇒ MatchE(TermExpr.subst(replaceVar, expr, term), cases.map(t ⇒ TermExpr.subst(replaceVar, expr, t)))
-    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, TermExpr.subst(replaceVar, expr, term), tExpr)
+    case CurriedE(heads, body) ⇒ CurriedE(heads, subst(replaceVar, expr, body))
+    case ConjunctE(terms) ⇒ ConjunctE(terms.map(subst(replaceVar, expr, _)))
+    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(subst(replaceVar, expr, _)), tExpr)
+    case ProjectE(index, term) ⇒ ProjectE(index, subst(replaceVar, expr, term))
+    case MatchE(term, cases) ⇒ MatchE(subst(replaceVar, expr, term), cases.map(subst(replaceVar, expr, _)))
+    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, subst(replaceVar, expr, term), tExpr)
     case _ ⇒ inExpr
   }
 
-  def findFirst[T, R](inExpr: TermExpr[T])(pred: PartialFunction[TermExpr[T], R]): Option[R] = {
+  def substTypeVar(replaceTypeVar: TP, newTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = inExpr match {
+    case PropE(name, tExpr) ⇒ PropE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
+    case AppE(head, arg) ⇒ AppE(substTypeVar(replaceTypeVar, newTypeExpr, head), substTypeVar(replaceTypeVar, newTypeExpr, arg))
+    case CurriedE(heads, body) ⇒ CurriedE(heads
+      .map { case PropE(name, tExpr) ⇒ PropE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr)) },
+      substTypeVar(replaceTypeVar, newTypeExpr, body))
+    case ConjunctE(terms) ⇒ ConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)))
+    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)), tExpr)
+    case ProjectE(index, term) ⇒ ProjectE(index, substTypeVar(replaceTypeVar, newTypeExpr, term))
+    case MatchE(term, cases) ⇒ MatchE(substTypeVar(replaceTypeVar, newTypeExpr, term), cases.map(substTypeVar(replaceTypeVar, newTypeExpr, _)))
+    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
+    case _ ⇒ inExpr
+  }
+
+  def findFirst[R](inExpr: TermExpr)(pred: PartialFunction[TermExpr, R]): Option[R] = {
     Some(inExpr).collect(pred).orElse {
       inExpr match {
         case PropE(_, _) ⇒ None
@@ -86,7 +129,7 @@ object TermExpr {
     }
   }
 
-  private def sameConstructor[T](t1: TypeExpr[T], t2: TypeExpr[T]): Boolean = t1 match {
+  private def sameConstructor(t1: TypeExpr, t2: TypeExpr): Boolean = t1 match {
     case NamedConjunctT(c1, _, _, _) ⇒ t2 match {
       case NamedConjunctT(c2, _, _, _) ⇒ c1 == c2
       case _ ⇒ false
@@ -101,7 +144,7 @@ object TermExpr {
   private def atLeastOnce(x: Int): Int = math.max(x - 1, 0)
 
   // How many times each function uses its argument. Only counts when an argument is used more than once.
-  def argsMultiUseCountDeep[T](inExpr: TermExpr[T]): Int = inExpr match {
+  def argsMultiUseCountDeep(inExpr: TermExpr): Int = inExpr match {
     case PropE(_, _) ⇒ 0
     case AppE(head, arg) ⇒ argsMultiUseCountDeep(head) + argsMultiUseCountDeep(arg)
     case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum + argsMultiUseCountDeep(body)
@@ -113,12 +156,12 @@ object TermExpr {
     case DisjunctE(_, _, term, _) ⇒ argsMultiUseCountDeep(term)
   }
 
-  def argsMultiUseCountShallow[T](inExpr: TermExpr[T]): Int = inExpr match {
+  def argsMultiUseCountShallow(inExpr: TermExpr): Int = inExpr match {
     case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum
     case _ ⇒ 0
   }
 
-  def conjunctionPermutationScore[T](inExpr: TermExpr[T]): Double = {
+  def conjunctionPermutationScore(inExpr: TermExpr): Double = {
     inExpr match {
       case PropE(_, _) ⇒ 0
       case AppE(head, arg) ⇒ conjunctionPermutationScore(head) + conjunctionPermutationScore(arg)
@@ -149,7 +192,7 @@ object TermExpr {
     }
   }
 
-  def disjunctionPermutationScore[T](inExpr: TermExpr[T]): Double = {
+  def disjunctionPermutationScore(inExpr: TermExpr): Double = {
     inExpr match {
       case PropE(_, _) ⇒ 0
       case AppE(head, arg) ⇒ disjunctionPermutationScore(head) + disjunctionPermutationScore(arg)
@@ -173,7 +216,7 @@ object TermExpr {
 
 }
 
-sealed trait TermExpr[+T] {
+sealed trait TermExpr {
   def informationLossScore = (
     ()
     , unusedArgs.size
@@ -183,7 +226,7 @@ sealed trait TermExpr[+T] {
     , TermExpr.argsMultiUseCountDeep(this)
   )
 
-  def tExpr: TypeExpr[T]
+  def tExpr: TypeExpr
 
   def prettyPrint: String = prettyRename.prettyPrintWithParentheses(0)
 
@@ -235,7 +278,7 @@ sealed trait TermExpr[+T] {
     letter ← ('a' to 'z').toIterator
   } yield s"$letter$number"
 
-  def prettyRename: TermExpr[T] = {
+  def prettyRename: TermExpr = {
     val oldVars = usedVars // Use a `Seq` here rather than a `Set` for the list of variable names.
     // This achieves deterministic renaming, which is important for checking that different terms are equivalent up to renaming.
     val newVars = prettyVars.take(oldVars.length).toSeq
@@ -248,9 +291,9 @@ sealed trait TermExpr[+T] {
     case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : ${tExpr.prettyPrint} because its type is not a conjunction")
   }
 
-  def simplify(withEta: Boolean = false): TermExpr[T] = this
+  def simplify(withEta: Boolean = false): TermExpr = this
 
-  private[ch] def unusedArgs: Set[VarName] = this match {
+  private[ch] def unusedArgs: Set[String] = this match {
     case PropE(_, _) ⇒ Set()
     case AppE(head, arg) ⇒ head.unusedArgs ++ arg.unusedArgs
     case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVars) ++ body.unusedArgs
@@ -283,15 +326,14 @@ sealed trait TermExpr[+T] {
 
   private[ch] lazy val unusedTupleParts: Int =
     usedTuplePartsSeq
-      .groupBy(_._1) // Map[TermExpr[T], Seq[(TermExpr[Int], Int)]]
-      .mapValues(_.map(_._2).distinct) // Map[TermExpr[T], Seq[Int]]
+      .groupBy(_._1) // Map[TermExpr, Seq[(TermExpr, Int)]]
+      .mapValues(_.map(_._2).distinct) // Map[TermExpr, Seq[Int]]
       .map { case (term, parts) ⇒
       val totalParts = term.tExpr.conjunctSize
       totalParts - parts.length
     }.count(_ > 0)
 
-  // Can't use Set[TermExpr[T]] because of lack of covariance in `Set[A]`.
-  private[ch] lazy val usedTuplePartsSeq: Seq[(TermExpr[T], Int)] = this match {
+  private[ch] lazy val usedTuplePartsSeq: Seq[(TermExpr, Int)] = this match {
     case PropE(_, _) ⇒ Seq()
     case AppE(head, arg) ⇒ head.usedTuplePartsSeq ++ arg.usedTuplePartsSeq
     case CurriedE(_, body) ⇒ body.usedTuplePartsSeq
@@ -303,85 +345,85 @@ sealed trait TermExpr[+T] {
     case DisjunctE(_, _, term, _) ⇒ term.usedTuplePartsSeq
   }
 
-  lazy val freeVars: Seq[VarName] = (this match {
+  lazy val freeVars: Seq[String] = (this match {
     case PropE(name, _) ⇒ Seq(name)
     case AppE(head, arg) ⇒ head.freeVars ++ arg.freeVars
     case CurriedE(heads, body) ⇒ body.freeVars.filterNot(heads.map(_.name).toSet.contains)
     case UnitE(_) ⇒ Seq()
     case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars)
     case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.freeVars)
-    case p: ProjectE[T] ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
+    case p: ProjectE ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
     case MatchE(term, cases) ⇒ term.freeVars ++ cases.flatMap(_.freeVars)
-    case d: DisjunctE[T] ⇒ d.term.freeVars
+    case d: DisjunctE ⇒ d.term.freeVars
   }).distinct
 
-  lazy val usedVars: Seq[VarName] = (this match {
+  lazy val usedVars: Seq[String] = (this match {
     case PropE(name, _) ⇒ Seq(name)
     case AppE(head, arg) ⇒ head.usedVars ++ arg.usedVars
     case CurriedE(heads, body) ⇒ body.usedVars ++ heads.map(_.name)
     case UnitE(_) ⇒ Seq()
     case ConjunctE(terms) ⇒ terms.flatMap(_.usedVars)
     case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.usedVars)
-    case p: ProjectE[T] ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
+    case p: ProjectE ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
     case MatchE(term, cases) ⇒ term.usedVars ++ cases.flatMap(_.usedVars)
-    case d: DisjunctE[T] ⇒ d.term.usedVars
+    case d: DisjunctE ⇒ d.term.usedVars
   }).distinct
 
-  def varCount(varName: VarName): Int = this match {
-    case PropE(name, _) ⇒ if (name == varName) 1 else 0
-    case AppE(head, arg) ⇒ head.varCount(varName) + arg.varCount(varName)
-    case CurriedE(_, body) ⇒ body.varCount(varName)
+  def varCount(String: String): Int = this match {
+    case PropE(name, _) ⇒ if (name == String) 1 else 0
+    case AppE(head, arg) ⇒ head.varCount(String) + arg.varCount(String)
+    case CurriedE(_, body) ⇒ body.varCount(String)
     case UnitE(_) ⇒ 0
-    case NamedConjunctE(terms, _) ⇒ terms.map(_.varCount(varName)).sum
-    case ConjunctE(terms) ⇒ terms.map(_.varCount(varName)).sum
-    case ProjectE(_, term) ⇒ term.varCount(varName)
-    case MatchE(term, cases) ⇒ term.varCount(varName) + cases.map(_.varCount(varName)).sum
-    case DisjunctE(_, _, term, _) ⇒ term.varCount(varName)
+    case NamedConjunctE(terms, _) ⇒ terms.map(_.varCount(String)).sum
+    case ConjunctE(terms) ⇒ terms.map(_.varCount(String)).sum
+    case ProjectE(_, term) ⇒ term.varCount(String)
+    case MatchE(term, cases) ⇒ term.varCount(String) + cases.map(_.varCount(String)).sum
+    case DisjunctE(_, _, term, _) ⇒ term.varCount(String)
   }
 
   // Rename all variable at once *everywhere* in the expression. (This is not the alpha-conversion!)
-  def renameAllVars(oldNames: Seq[VarName], newNames: Seq[VarName]): TermExpr[T] = {
+  def renameAllVars(oldNames: Seq[String], newNames: Seq[String]): TermExpr = {
     renameAllVars(oldNames.zip(newNames).toMap)
   }
 
-  def renameAllVars(oldAndNewNames: Map[VarName, VarName]): TermExpr[T] = {
-    def rename(t: TermExpr[T]): TermExpr[T] = t.renameAllVars(oldAndNewNames)
+  def renameAllVars(oldAndNewNames: Map[String, String]): TermExpr = {
+    def rename(t: TermExpr): TermExpr = t.renameAllVars(oldAndNewNames)
 
     this match {
       case PropE(oldName, tExpr) ⇒
         val replacedName = oldAndNewNames.getOrElse(oldName, oldName)
         PropE(replacedName, tExpr)
       case AppE(head, arg) ⇒ AppE(rename(head), rename(arg))
-      case CurriedE(heads, body) ⇒ CurriedE(heads.map(h ⇒ rename(h).asInstanceOf[PropE[T]]), rename(body))
+      case CurriedE(heads, body) ⇒ CurriedE(heads.map(h ⇒ rename(h).asInstanceOf[PropE]), rename(body))
       case UnitE(_) ⇒ this
       case ConjunctE(terms) ⇒ ConjunctE(terms.map(rename))
       case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms map rename, tExpr)
       case ProjectE(index, term) ⇒ ProjectE(index, rename(term))
       case MatchE(term, cases) ⇒ MatchE(rename(term), cases.map(rename))
-      case d: DisjunctE[T] ⇒ d.copy(term = rename(d.term))
+      case d: DisjunctE ⇒ d.copy(term = rename(d.term))
     }
   }
 }
 
-final case class PropE[T](name: VarName, tExpr: TypeExpr[T]) extends TermExpr[T]
+final case class PropE(name: String, tExpr: TypeExpr) extends TermExpr
 
-final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T] {
+final case class AppE(head: TermExpr, arg: TermExpr) extends TermExpr {
 
   // The type of AppE is computed from the types of its arguments.
   // Make this a `val` to catch bugs early.
-  val tExpr: TypeExpr[T] = head.tExpr match {
+  val tExpr: TypeExpr = head.tExpr match {
     case hd #-> body if hd == arg.tExpr ⇒ body
     case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application $this: `${head.tExpr.prettyPrint}` must be a function with argument type `${arg.tExpr.prettyPrint}`")
   }
 
-  override def simplify(withEta: Boolean): TermExpr[T] = {
+  override def simplify(withEta: Boolean): TermExpr = {
     val headSimpl = head.simplify(withEta)
     val argSimpl = arg.simplify(withEta)
 
     headSimpl match {
       case CurriedE(heads, body) ⇒
         // substitute arg as first variable into body and return CurriedE unless we have no more arguments, else return new body
-        val result: TermExpr[T] = TermExpr.subst(heads.head, argSimpl, body.simplify(withEta)).simplify(withEta)
+        val result: TermExpr = TermExpr.subst(heads.head, argSimpl, body.simplify(withEta)).simplify(withEta)
         heads.drop(1) match {
           case Nil ⇒ result
           case h ⇒ CurriedE(h, result)
@@ -392,13 +434,13 @@ final case class AppE[T](head: TermExpr[T], arg: TermExpr[T]) extends TermExpr[T
 }
 
 // The order of `heads` is straight, so `CurriedE(List(x1, x2, x3), body)` represents the term `x1 -> x2 -> x2 -> body`
-final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends TermExpr[T] {
+final case class CurriedE(heads: List[PropE], body: TermExpr) extends TermExpr {
   private val headsLength = heads.length
 
   // The type is t1 -> t2 -> t3 -> b; here `heads` = List(t1, t2, t3).
-  def tExpr: TypeExpr[T] = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr ->: prev }
+  def tExpr: TypeExpr = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr ->: prev }
 
-  override def simplify(withEta: Boolean): TermExpr[T] = {
+  override def simplify(withEta: Boolean): TermExpr = {
     body.simplify(withEta) match {
       // Check for eta-contraction: simplify x ⇒ y ⇒ ... ⇒ z ⇒ a ⇒ f a into x ⇒ y ⇒ ... ⇒ z ⇒ f.
       // Here fHead = a and fBody = f; the last element of `heads` must be equal to `a`
@@ -422,26 +464,26 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
 
 }
 
-final case class UnitE[T](tExpr: TypeExpr[T]) extends TermExpr[T]
+final case class UnitE(tExpr: TypeExpr) extends TermExpr
 
-final case class NamedConjunctE[T](terms: Seq[TermExpr[T]], tExpr: NamedConjunctT[T]) extends TermExpr[T] {
-  override def simplify(withEta: Boolean): TermExpr[T] = this.copy(terms = terms.map(_.simplify(withEta)))
+final case class NamedConjunctE(terms: Seq[TermExpr], tExpr: NamedConjunctT) extends TermExpr {
+  override def simplify(withEta: Boolean): TermExpr = this.copy(terms = terms.map(_.simplify(withEta)))
 }
 
-final case class ConjunctE[T](terms: Seq[TermExpr[T]]) extends TermExpr[T] {
-  def tExpr: TypeExpr[T] = ConjunctT(terms.map(_.tExpr))
+final case class ConjunctE(terms: Seq[TermExpr]) extends TermExpr {
+  def tExpr: TypeExpr = ConjunctT(terms.map(_.tExpr))
 
-  override def simplify(withEta: Boolean): TermExpr[T] = this.copy(terms = terms.map(_.simplify(withEta)))
+  override def simplify(withEta: Boolean): TermExpr = this.copy(terms = terms.map(_.simplify(withEta)))
 }
 
 // The `term` should be a ConjunctT or a NamedConjunctT
-final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] {
-  def getProjection: Option[TermExpr[T]] = term match {
-    case c: ConjunctE[T] ⇒ Some(c.terms(index))
+final case class ProjectE(index: Int, term: TermExpr) extends TermExpr {
+  def getProjection: Option[TermExpr] = term match {
+    case c: ConjunctE ⇒ Some(c.terms(index))
     case _ ⇒ None
   }
 
-  override def tExpr: TypeExpr[T] = term.tExpr match {
+  override def tExpr: TypeExpr = term.tExpr match {
     case ConjunctT(terms) ⇒ terms(index)
     case NamedConjunctT(constructor, _, _, wrapped) ⇒ wrapped match {
       case Nil if index == 0 ⇒ UnitT(constructor)
@@ -452,7 +494,7 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
     case _ ⇒ throw new Exception(s"Internal error: Invalid projection term $term whose type ${term.tExpr.prettyPrint} is not a conjunction")
   }
 
-  override def simplify(withEta: Boolean): TermExpr[T] = term.simplify(withEta) match {
+  override def simplify(withEta: Boolean): TermExpr = term.simplify(withEta) match {
     case ConjunctE(terms) ⇒ terms(index).simplify(withEta)
     case MatchE(t, cases) ⇒
       MatchE(t, cases.map {
@@ -481,15 +523,14 @@ final case class ProjectE[T](index: Int, term: TermExpr[T]) extends TermExpr[T] 
   * @param cases List of "case functions" of types A1 ⇒ Z, ..., An ⇒ Z.
   *              Each "case function" must be a function of the form CurriedE(PropE(_) :: _, _),
   *              that is, with at least one argument.
-  * @tparam T Type of the internal representation of the term names.
   */
-final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends TermExpr[T] {
-  override def tExpr: TypeExpr[T] = cases match {
+final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr {
+  override def tExpr: TypeExpr = cases match {
     case te :: tail ⇒
       te match {
         case CurriedE(List(_), body) ⇒
           val tpe = body.tExpr
-          if (tail.exists(_.asInstanceOf[CurriedE[T]].body.tExpr != tpe))
+          if (tail.exists(_.asInstanceOf[CurriedE].body.tExpr != tpe))
             throw new Exception(s"Internal error: unequal expression types in cases for $this")
           else
             tpe
@@ -502,7 +543,7 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
     case Nil ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
   }
 
-  override def simplify(withEta: Boolean): TermExpr[T] = {
+  override def simplify(withEta: Boolean): TermExpr = {
     lazy val casesSimplified = cases.map(_.simplify(withEta))
     term.simplify(withEta) match {
       case DisjunctE(index, total, t, _) ⇒
@@ -532,7 +573,7 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
           // Detect the constant pattern:
           // MatchE(_, {f, f, ..., f}) where each clause is the same expression `f`, up to equivalence, and ignores its argument.
           // Then the entire term can be replaced by f.
-          val bodyTerms: Set[Option[TermExpr[T]]] = casesSimplified.map {
+          val bodyTerms: Set[Option[TermExpr]] = casesSimplified.map {
             case c@CurriedE(List(PropE(name, _)), body) if c.unusedArgs contains name ⇒ Some(body)
             case _ ⇒ None
           }.toSet
@@ -551,6 +592,26 @@ final case class MatchE[T](term: TermExpr[T], cases: List[TermExpr[T]]) extends 
 }
 
 // Inject a value into the i-th part of the disjunction of type tExpr.
-final case class DisjunctE[T](index: Int, total: Int, term: TermExpr[T], tExpr: TypeExpr[T]) extends TermExpr[T] {
-  override def simplify(withEta: Boolean): TermExpr[T] = this.copy(term = term.simplify(withEta))
+final case class DisjunctE(index: Int, total: Int, term: TermExpr, tExpr: TypeExpr) extends TermExpr {
+  override def simplify(withEta: Boolean): TermExpr = this.copy(term = term.simplify(withEta))
 }
+
+// Function classes carrying the symbolic term information.
+
+final class Function0Lambda[+Res](f: Function0[Res], val lambdaTerm: TermExpr) extends Function0[Res] {
+  override def apply(): Res = f()
+}
+
+final class Function1Lambda[-Ar, +Res](f: Ar ⇒ Res, val lambdaTerm: TermExpr) extends (Ar ⇒ Res) {
+  override def apply(a: Ar): Res = f(a)
+}
+
+final class Function2Lambda[-Arg1, -Arg2, +Res](f: (Arg1, Arg2) ⇒ Res, val lambdaTerm: TermExpr) extends ((Arg1, Arg2) ⇒ Res) {
+  override def apply(a1: Arg1, a2: Arg2): Res = f(a1, a2)
+}
+
+final class Function3Lambda[-Arg1, -Arg2, -Arg3, +Res](f: (Arg1, Arg2, Arg3) ⇒ Res, val lambdaTerm: TermExpr) extends ((Arg1, Arg2, Arg3) ⇒ Res) {
+  override def apply(a1: Arg1, a2: Arg2, a3: Arg3): Res = f(a1, a2, a3)
+}
+
+// 438 Shotwell St. - new Driver office.
