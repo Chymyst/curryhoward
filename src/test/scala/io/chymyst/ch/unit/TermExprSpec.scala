@@ -54,31 +54,31 @@ class TermExprSpec extends FlatSpec with Matchers {
     val termExpr1a = termExpr1.renameAllVars(Seq("x2", "x3", "x4"), Seq("y2", "y3", "y4"))
     TermExpr.equiv(termExpr1a, termExpr1) shouldEqual true
   }
-//
-//  behavior of "information loss"
-//
-//  it should "compute permutation score for conjunctions" in {
-//    val c = ConjunctE(Seq(PropE("a", TP("A")), PropE("b", TP("B"))))
-//    val t = ConjunctE(Seq(
-//      ProjectE(0, c),
-//      ProjectE(1, c)
-//    ))
-//    t.informationLossScore._3 shouldEqual 0
-//
-//    ConjunctE(Seq(
-//      ProjectE(1, c),
-//      ProjectE(1, c)
-//    )).informationLossScore._3 shouldEqual 1
-//
-//    ConjunctE(Seq(
-//      ProjectE(1, c),
-//      ProjectE(0, c)
-//    )).informationLossScore._3 shouldEqual 2
-//
-//    TermExpr.findFirst(t){
-//      case ProjectE(_, _) ⇒ "abc"
-//    } shouldEqual Some("abc")
-//  }
+
+  behavior of "information loss"
+
+  it should "compute permutation score for conjunctions" in {
+    val c = ConjunctE(Seq(PropE("a", TP("A")), PropE("b", TP("B"))))
+    val t = ConjunctE(Seq(
+      ProjectE(0, c),
+      ProjectE(1, c)
+    ))
+    t.informationLossScore._4 shouldEqual 0
+
+    ConjunctE(Seq(
+      ProjectE(1, c),
+      ProjectE(1, c)
+    )).informationLossScore._4 shouldEqual 1
+
+    ConjunctE(Seq(
+      ProjectE(1, c),
+      ProjectE(0, c)
+    )).informationLossScore._4 shouldEqual 2
+
+    TermExpr.findFirst(t){
+      case ProjectE(_, _) ⇒ "abc"
+    } shouldEqual Some("abc")
+  }
 
   behavior of "TermExpr#simplify"
 
@@ -109,5 +109,13 @@ class TermExprSpec extends FlatSpec with Matchers {
     premiseVars shouldEqual List(PropE("t1", TP(1)), PropE("t2", TP(2)), PropE("t3", TP(3)))
     val term = sequent.constructResultTerm(premiseVars.head)
     term shouldEqual CurriedE(List(PropE("t1", TP(1)), PropE("t2", TP(2)), PropE("t3", TP(3))), PropE("t1", TP(1)))
+  }
+
+  behavior of "reify terms API"
+
+  it should "produce result terms" in {
+//    val terms1 = Macros.testReifyTerms[(Int, Int) ⇒ (Int, Int)]
+//
+//    terms1.length shouldEqual 1
   }
 }

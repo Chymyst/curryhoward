@@ -1,7 +1,7 @@
 package io.chymyst.ch
 
 import scala.language.experimental.macros
-import scala.reflect.macros.blackbox
+//import scala.reflect.macros.blackbox
 import scala.reflect.macros.whitebox
 
 /* http://stackoverflow.com/questions/17494010/debug-scala-macros-with-intellij
@@ -26,13 +26,11 @@ Now make a small change in your code and run compile in sbt, - IntelliJ should s
  */
 
 /*
-- get rid of `paramTerms` in reifyTerm: all our param names are unique by construction, no need to cache them.
 - streamline LJT so that named conjunctions are directly converted to other sequents, not going through ConjunctT first.
 - probably can simplify data structures by eliminating [T], VarName, and ProofTerm.
 - make sure the alpha-conversion is correct on type parameters! This seems to be a deeper problem.
 - think about supporting recursive types beyond the palliative measures implemented currently
 - use blackbox macros instead of whitebox if possible (5) ?? Seems to prevent the " = implement" and "= ofType[]" syntax from working.
-- implement uncurried functions and multiple argument lists as types for additional values in ofType(...).
 - use a special subclass of Function1 that also carries symbolic information about the lambda-term.
 - decide whether we can implement a single function implement[]() that looks up the LHS when the given type is Nothing.
  */
@@ -247,7 +245,6 @@ class Macros(val c: whitebox.Context) {
         // If one of the heads is a ConjunctT, we need to do a replacement in the entire body.
         // It will be too late to do this once we start reifying the terms.
         val conjunctHeads = heads.collect { case p@PropE(_, ConjunctT(terms)) ⇒ (p, terms) }
-        val conjunctProps = conjunctHeads.map(_._1).toSet
         val replacedBody = conjunctHeads.foldLeft(body) {
           case (prev, (p, termTypes)) ⇒ TermExpr.subst(
             p,
@@ -295,12 +292,7 @@ class Macros(val c: whitebox.Context) {
     }
   }
 
-  // This function is for testing only.
-  def testReifyTypeImpl[U: c.WeakTypeTag]: c.Expr[TypeExpr[String]] = {
-    val typeU: c.Type = c.weakTypeOf[U]
-    val result = buildTypeExpr(typeU.resultType)
-    if (debug) c.info(c.enclosingPosition, s"Recognized type from type $typeU is ${result.prettyPrint}", force = true)
-
+  object LiftedAST {
     implicit def liftedNamedConjuct: Liftable[NamedConjunctT[String]] = Liftable[NamedConjunctT[String]] {
       case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, Seq(..$tParams), Seq(..$accessors), $wrapped)"
     }
@@ -316,9 +308,9 @@ class Macros(val c: whitebox.Context) {
       case NothingT(name) ⇒ q"_root_.io.chymyst.ch.NothingT($name)"
       case UnitT(name) ⇒ q"_root_.io.chymyst.ch.UnitT($name)"
       case TP(name) ⇒ q"_root_.io.chymyst.ch.TP($name)"
-      case RecurseT(name, tParams) ⇒ q"_root_.io.chymyst.ch.RecurseT($name, List(..$tParams))"
+      case RecurseT(name, tParams) ⇒ q"_root_.io.chymyst.ch.RecurseT($name, Seq(..$tParams))"
       case BasicT(name) ⇒ q"_root_.io.chymyst.ch.BasicT($name)"
-      case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, List(..$tParams), List(..$accessors), $wrapped)"
+      case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, List(..$tParams), List(..$accessors), List(..$wrapped))"
       case ConstructorT(name) ⇒ q"_root_.io.chymyst.ch.ConstructorT($name)"
     }
 
@@ -334,50 +326,24 @@ class Macros(val c: whitebox.Context) {
       case DisjunctE(index, total, term, tExpr) ⇒ q"_root_.io.chymyst.ch.DisjunctE($index, $total, $term, $tExpr)"
     }
 
+  }
+
+  // This function is for testing only.
+  def testReifyTypeImpl[U: c.WeakTypeTag]: c.Expr[TypeExpr[String]] = {
+    val typeU: c.Type = c.weakTypeOf[U]
+    val result = buildTypeExpr(typeU.resultType)
+    if (debug) c.info(c.enclosingPosition, s"Recognized type from type $typeU is ${result.prettyPrint}", force = true)
+    import LiftedAST._
     c.Expr[TypeExpr[String]](q"$result")
   }
 
-  /* Not used now, but may be used later.
-    def testReifyTermsImpl[U: c.WeakTypeTag]: c.Tree = {
-      val typeU: c.Type = c.weakTypeOf[U]
-      val result = TheoremProver.findProofs(buildTypeExpr(typeU.resultType))._1
+  def testReifyTermsImpl[U: c.WeakTypeTag]: c.Expr[List[TermExpr[String]]] = {
+    val typeU: c.Type = c.weakTypeOf[U]
+    val result: List[TermExpr[String]] = TheoremProver.findProofs(buildTypeExpr(typeU.resultType))._1
+    import LiftedAST._
+    c.Expr[List[TermExpr[String]]](q"$result")
+  }
 
-      implicit def liftedNamedConjuct: Liftable[NamedConjunctT[String]] = Liftable[NamedConjunctT[String]] {
-        case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, Seq(..$tParams), Seq(..$accessors), $wrapped)"
-      }
-
-      implicit def liftedPropE: Liftable[PropE[String]] = Liftable[PropE[String]] {
-        case PropE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.PropE($name, $tExpr)"
-      }
-
-      implicit def liftedTypeExpr: Liftable[TypeExpr[String]] = Liftable[TypeExpr[String]] {
-        case DisjunctT(constructor, tParams, terms) ⇒ q"_root_.io.chymyst.ch.DisjunctT($constructor, Seq(..$tParams), Seq(..$terms))"
-        case ConjunctT(terms) ⇒ q"_root_.io.chymyst.ch.ConjunctT(Seq(..$terms))"
-        case #->(head, body) ⇒ q"_root_.io.chymyst.ch.#->($head, $body)"
-        case NothingT(name) ⇒ q"_root_.io.chymyst.ch.NothingT($name)"
-        case UnitT(name) ⇒ q"_root_.io.chymyst.ch.UnitT($name)"
-        case TP(name) ⇒ q"_root_.io.chymyst.ch.TP($name)"
-        case OtherT(name) ⇒ q"_root_.io.chymyst.ch.OtherT($name)"
-        case BasicT(name) ⇒ q"_root_.io.chymyst.ch.BasicT($name)"
-        case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, List(..$tParams), List(..$accessors), $wrapped)"
-        case ConstructorT(name) ⇒ q"_root_.io.chymyst.ch.ConstructorT($name)"
-      }
-
-      implicit def liftedTermExpr: Liftable[TermExpr[String]] = Liftable[TermExpr[String]] {
-        case PropE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.PropE($name, $tExpr)"
-        case AppE(head, arg) ⇒ q"_root_.io.chymyst.ch.AppE($head, $arg)"
-        case CurriedE(heads, body) ⇒ q"_root_.io.chymyst.ch.CurriedE(List(..$heads), $body)"
-        case UnitE(tExpr) ⇒ q"_root_.io.chymyst.ch.UnitE($tExpr)"
-        case NamedConjunctE(terms, tExpr) ⇒ q"_root_.io.chymyst.ch.NamedConjunctE(Seq(..$terms), $tExpr)"
-        case ConjunctE(terms) ⇒ q"_root_.io.chymyst.ch.ConjunctE(Seq(..$terms))"
-        case ProjectE(index, term) ⇒ q"_root_.io.chymyst.ch.ProjectE($index, $term)"
-        case MatchE(term, cases) ⇒ q"_root_.io.chymyst.ch.MatchE($term, List(..$cases))"
-        case DisjunctE(index, total, term, tExpr) ⇒ q"_root_.io.chymyst.ch.DisjunctE($index, $total, $term, $tExpr)"
-      }
-
-      q"$result"
-    }
-  */
   // This function is for testing buildTypeExpr().
   def testTypeImpl[T: c.WeakTypeTag]: c.Expr[(String, String)] = {
     val typeT: c.Type = c.weakTypeOf[T]
@@ -501,6 +467,8 @@ object Macros {
   private[ch] def testType[U]: (String, String) = macro Macros.testTypeImpl[U]
 
   private[ch] def testReifyType[U]: TypeExpr[String] = macro Macros.testReifyTypeImpl[U]
+
+  private[ch] def testReifyTerms[U]: List[TermExpr[String]] = macro Macros.testReifyTermsImpl[U]
 
   // Not used.
   //  private[ch] def testReifyTerm[U]: List[TermExpr[String]] = macro Macros.testReifyTermsImpl[U]

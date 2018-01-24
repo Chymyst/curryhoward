@@ -57,23 +57,24 @@ object TheoremProver {
     sequentsAlreadyRequested.clear()
     val mainSequent = Sequent[T](List(), typeStructure, freshVar)
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
-    val proofTerms = findProofTerms(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename).prettyRename).distinct
+    val allProofTerms = findProofTerms(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename).prettyRename).distinct
     if (debug || debugTrace) {
-      val prettyPT = proofTerms.map(p ⇒ (p.informationLossScore, s"${p.prettyPrint}; score = ${p.informationLossScore}: ${p.unusedArgs.size} unused args: ${p.unusedArgs}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }}"))
+      val prettyPT = allProofTerms.map(p ⇒ (p.informationLossScore, s"${p.prettyPrint}; score = ${p.informationLossScore}: ${p.unusedArgs.size} unused args: ${p.unusedArgs}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }}"))
         .sortBy(_._1).map(_._2)
       val proofTermsMessage = if (prettyPT.isEmpty) "no final proof terms." else s"${prettyPT.length} final proof terms:\n ${prettyPT.take(maxTermsPrinted).mkString(" ;\n ")} ."
       println(s"DEBUG: for main sequent $mainSequent, obtained $proofTermsMessage This took ${System.currentTimeMillis() - t0} ms")
-//      val sequentsSeenMoreThanOnce = sequentsSeen.filter { case (_, v) ⇒ v.length > 1 }.mapValues(_.length)
-//      if (sequentsSeenMoreThanOnce.nonEmpty) println(s"DEBUG: sequents seen more than once are $sequentsSeenMoreThanOnce")
+      // Very verbose
+      //      val sequentsSeenMoreThanOnce = sequentsSeen.filter { case (_, v) ⇒ v.length > 1 }.mapValues(_.length)
+      //      if (debug && sequentsSeenMoreThanOnce.nonEmpty) println(s"DEBUG: sequents seen more than once are $sequentsSeenMoreThanOnce")
     }
     // Return the group of proofs with the smallest information loss score, and also return all terms found.
-    val chosenTerms = proofTerms
+    val chosenTerms = allProofTerms
       .groupBy(_.informationLossScore) // Map[score, Seq[ProofTerm[T]]]
       .toSeq.sortBy(_._1) // Seq[(score, Seq[ProofTerm[T]])] sorted by increasing score
       .headOption // Option[(score, Seq[ProofTerm[T]])] the first group of terms all having the lowest score
       .map(_._2.toList) // Option[List[ProofTerm[T]]] discard the score value
       .getOrElse(List())
-    (chosenTerms, proofTerms)
+    (chosenTerms, allProofTerms)
   }
 
   // Main recursive function that computes the list of available proofs for a sequent.
@@ -132,24 +133,24 @@ object TheoremProver {
               // and each of these sequents yields a proof if the original formula has a proof.
               // We need to gather and concatenate all these proofs.
               // We proceed to non-invertible rules only if no rules apply at this step.
-//              val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
-//                .flatMap(_.applyTo(sequent))
-//                .flatMap(concatProofs)
-//              if (fromInvertibleAmbiguousRules.nonEmpty) {
-//                fromInvertibleAmbiguousRules ++ fromAxioms
-//              } else {
-                // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
-                // Each non-invertible rule will generate some proofs or none.
-                // If a rule generates no proofs, another rule should be used.
-                // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
-                // If no more rules apply here, we return `fromAxioms`.
-                // Use flatMap to concatenate all results from all applicable non-invertible rules.
-                val fromNoninvertibleRules: Seq[ProofTerm[T]] =
-                  (invertibleAmbiguousRules[T] ++ nonInvertibleRulesForSequent[T](sequent))
+              //              val fromInvertibleAmbiguousRules = invertibleAmbiguousRules[T]
+              //                .flatMap(_.applyTo(sequent))
+              //                .flatMap(concatProofs)
+              //              if (fromInvertibleAmbiguousRules.nonEmpty) {
+              //                fromInvertibleAmbiguousRules ++ fromAxioms
+              //              } else {
+              // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
+              // Each non-invertible rule will generate some proofs or none.
+              // If a rule generates no proofs, another rule should be used.
+              // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
+              // If no more rules apply here, we return `fromAxioms`.
+              // Use flatMap to concatenate all results from all applicable non-invertible rules.
+              val fromNoninvertibleRules: Seq[ProofTerm[T]] =
+                (invertibleAmbiguousRules[T] ++ nonInvertibleRulesForSequent[T](sequent))
                   .flatMap(_.applyTo(sequent))
                   .flatMap(concatProofs)
-                fromNoninvertibleRules ++ fromAxioms
-//              }
+              fromNoninvertibleRules ++ fromAxioms
+            //              }
           }
           val termsFound = fromRules.map(_.simplify()).distinct
           if (debug || debugTrace) {
