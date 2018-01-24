@@ -1,6 +1,7 @@
 package io.chymyst.ch
 
 import scala.annotation.tailrec
+import scala.util.Try
 
 object TermExpr {
   @tailrec
@@ -42,6 +43,15 @@ object TermExpr {
       case PropE(_, _) | UnitE(_) ⇒ 1
     })
   }
+
+  def lambdaTerm(f: Any): Option[TermExpr] =
+    f match {
+      case g: Function0Lambda[_] ⇒ Some(g.lambdaTerm)
+      case g: Function1Lambda[_, _] ⇒ Some(g.lambdaTerm)
+      case g: Function2Lambda[_, _, _] ⇒ Some(g.lambdaTerm)
+      case g: Function3Lambda[_, _, _, _] ⇒ Some(g.lambdaTerm)
+      case _ ⇒ None
+    }
 
   def propositions(termExpr: TermExpr): Seq[PropE] = (termExpr match {
     case p@PropE(_, _) ⇒ Seq(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.

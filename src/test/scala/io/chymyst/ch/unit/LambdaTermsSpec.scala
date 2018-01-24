@@ -71,4 +71,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     appl1 shouldEqual readerTerm
   }
+
+  it should "return lambda terms together with the function" in {
+    def f2[A]: Unit ⇒ Either[A ⇒ A, Unit] = implement
+
+    TermExpr.lambdaTerm(f2).map(_.prettyPrint) shouldEqual Some("a ⇒ (0 + Right(a))")
+  }
 }
