@@ -434,7 +434,7 @@ class Macros(val c: whitebox.Context) {
   private def returnTerm(termFound: TermExpr, givenArgs: Map[PropE, c.Tree], createLambdas: Boolean = true): c.Tree = {
     import LiftedAST._
     val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
-    c.info(c.enclosingPosition, s"Returning term: $prettyTerm -- of size ${TermExpr.size(termFound)}", force = true)
+    c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
     val resultCodeTree = reifyTerm(termFound, givenArgs)
     val result = if (!createLambdas) {
       resultCodeTree

@@ -14,11 +14,11 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val terms2 = lambdaTerms[Int ⇒ Int ⇒ Int]
     terms2.length shouldEqual 2
-    terms2.map(_.prettyPrint) shouldEqual Seq("b ⇒ a ⇒ a", "a ⇒ b ⇒ a")
+    terms2.map(_.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ b", "a ⇒ b ⇒ a")
 
     val terms3 = lambdaTerms[Int ⇒ Int ⇒ (Int, Int)]
     terms3.length shouldEqual 2
-    terms3.map(_.prettyPrint) shouldEqual Seq("b ⇒ a ⇒ Tuple2(a, b)", "a ⇒ b ⇒ Tuple2(a, b)")
+    terms3.map(_.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ Tuple2(b, a)", "a ⇒ b ⇒ Tuple2(a, b)")
 
     val terms4 = lambdaTerms[(Int, Int) ⇒ (Int, Int)]
     terms4.length shouldEqual 2
@@ -59,7 +59,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val mapReaderTerm = mapReaderTerms.head
 
-    mapReaderTerm.prettyPrint shouldEqual "b ⇒ a ⇒ c ⇒ a (b c)"
+    mapReaderTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ b (a c)"
 
     def identityTerm[A] = lambdaTerms[A ⇒ A].head
 

@@ -52,16 +52,9 @@ object TermExpr {
       case _ ⇒ None
     }
 
-  def propositions(termExpr: TermExpr): Seq[PropE] = {
-    implicit val monoidSeq: Monoid[Seq[PropE]] = new Monoid[Seq[PropE]] {
-      override def empty: Seq[PropE] = Seq()
-
-      override def combine(x: Seq[PropE], y: Seq[PropE]): Seq[PropE] = x ++ y
-    }
-    foldMap(termExpr) {
-      case p@PropE(_, _) ⇒ Seq(p)
-    }.distinct
-  }
+  def propositions(termExpr: TermExpr): Seq[PropE] = foldMap(termExpr) {
+    case p@PropE(_, _) ⇒ Seq(p)
+  }.distinct
 
   private val freshIdents = new FreshIdents("z")
 
@@ -152,31 +145,26 @@ object TermExpr {
 
   private def atLeastOnce(x: Int): Int = math.max(x - 1, 0)
 
+  val monoidIntStandard: Monoid[Int] = new Monoid[Int] {
+    override def empty: Int = 0
+
+    override def combine(x: Int, y: Int): Int = x + y
+  }
+
+  implicit def monoidSeq[T]: Monoid[Seq[T]] = new Monoid[Seq[T]] {
+    override def empty: Seq[T] = Seq()
+
+    override def combine(x: Seq[T], y: Seq[T]): Seq[T] = x ++ y
+  }
+
   // How many times each function uses its argument. Only counts when an argument is used more than once.
   def argsMultiUseCountDeep(inExpr: TermExpr): Int = {
-    implicit val monoidInt: Monoid[Int] = new Monoid[Int] {
-      override def empty: Int = 0
-
-      override def combine(x: Int, y: Int): Int = x + y
-    }
+    implicit val monoidInt = monoidIntStandard
     foldMap(inExpr) {
       case c@CurriedE(_, body) ⇒ argsMultiUseCountShallow(c) + argsMultiUseCountDeep(body)
     }
   }
 
-  /*
-    def argsMultiUseCountDeep(inExpr: TermExpr): Int = inExpr match {
-      case PropE(_, _) ⇒ 0
-      case AppE(head, arg) ⇒ argsMultiUseCountDeep(head) + argsMultiUseCountDeep(arg)
-      case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum + argsMultiUseCountDeep(body)
-      case UnitE(_) ⇒ 0
-      case NamedConjunctE(terms, _) ⇒ terms.map(argsMultiUseCountDeep).sum
-      case ConjunctE(terms) ⇒ terms.map(argsMultiUseCountDeep).sum
-      case ProjectE(_, term) ⇒ argsMultiUseCountDeep(term)
-      case MatchE(term, cases) ⇒ argsMultiUseCountDeep(term) + cases.map(argsMultiUseCountDeep).sum
-      case DisjunctE(_, _, term, _) ⇒ argsMultiUseCountDeep(term)
-    }
-  */
   def argsMultiUseCountShallow(inExpr: TermExpr): Int = inExpr match {
     case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum
     case _ ⇒ 0
@@ -222,48 +210,28 @@ object TermExpr {
         }.sum
   }
 
-  /*
-  def conjunctionPermutationScore(inExpr: TermExpr): Double = {
-    inExpr match {
-      case PropE(_, _) ⇒ 0
-      case AppE(head, arg) ⇒ conjunctionPermutationScore(head) + conjunctionPermutationScore(arg)
-      case CurriedE(_, body) ⇒ conjunctionPermutationScore(body)
-      case UnitE(_) ⇒ 0
+  private[ch] def unusedArgs(termExpr: TermExpr): Set[String] = {
+    implicit val monoidSetString: Monoid[Set[String]] = new Monoid[Set[String]] {
+      override def empty: Set[String] = Set()
 
-      case ProjectE(_, term) ⇒ conjunctionPermutationScore(term)
-      case MatchE(term, cases) ⇒ conjunctionPermutationScore(term) + cases.map(conjunctionPermutationScore).sum
-      case DisjunctE(_, _, term, _) ⇒ conjunctionPermutationScore(term)
+      override def combine(x: Set[String], y: Set[String]): Set[String] = x ++ y
     }
-  }
+    foldMap(termExpr) {
+      case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVars) ++ unusedArgs(body)
+      case MatchE(term, cases) ⇒ unusedArgs(term) ++ cases.flatMap {
+        // the unused heads in this CurriedE are counted separately by `unusedMatchClauseVars`
+        case CurriedE(List(_), body) ⇒ unusedArgs(body)
+        case c ⇒ unusedArgs(c)
+      }.toSet
+    }
 
-  def disjunctionPermutationScore(inExpr: TermExpr): Double = {
-    inExpr match {
-      case PropE(_, _) ⇒ 0
-      case AppE(head, arg) ⇒ disjunctionPermutationScore(head) + disjunctionPermutationScore(arg)
-      case CurriedE(_, body) ⇒ disjunctionPermutationScore(body)
-      case UnitE(_) ⇒ 0
-      case NamedConjunctE(terms, _) ⇒ terms.map(disjunctionPermutationScore).sum
-      case ConjunctE(terms) ⇒ terms.map(disjunctionPermutationScore).sum
-      case ProjectE(_, term) ⇒ disjunctionPermutationScore(term)
-      case MatchE(term, cases) ⇒
-        disjunctionPermutationScore(term) +
-          cases.zipWithIndex.flatMap { case (t, i) ⇒
-            // Only count disjunction constructions into terms of exactly the same type as the `term` being matched.
-            findFirst(t) { case DisjunctE(index, _, t2, tExpr) if sameConstructor(term.tExpr, tExpr) ⇒
-              disjunctionPermutationScore(t2) / cases.length.toDouble +
-                (if (index == i) 0 else 1)
-            }
-          }.sum
-      case DisjunctE(_, _, term, _) ⇒ disjunctionPermutationScore(term)
-    }
   }
-*/
 }
 
 sealed trait TermExpr {
   def informationLossScore = (
     ()
-    , unusedArgs.size
+    , TermExpr.unusedArgs(this).size
     , unusedTupleParts + unusedMatchClauseVars
     , TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this)
     , TermExpr.argsMultiUseCountShallow(this)
@@ -337,81 +305,46 @@ sealed trait TermExpr {
 
   def simplify(withEta: Boolean = false): TermExpr = this
 
-  private[ch] def unusedArgs: Set[String] = this match {
-    case PropE(_, _) ⇒ Set()
-    case AppE(head, arg) ⇒ head.unusedArgs ++ arg.unusedArgs
-    case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVars) ++ body.unusedArgs
-    case UnitE(_) ⇒ Set()
-    case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.unusedArgs).toSet
-    case ConjunctE(terms) ⇒ terms.flatMap(_.unusedArgs).toSet
-    case ProjectE(_, term) ⇒ term.unusedArgs
-    case MatchE(term, cases) ⇒ term.unusedArgs ++ cases.flatMap {
-      // the unused heads in this CurriedE are counted separately by `unusedMatchClauseVars`
-      case CurriedE(List(_), body) ⇒ body.unusedArgs
-      case c ⇒ c.unusedArgs
-    }.toSet
-    case DisjunctE(_, _, term, _) ⇒ term.unusedArgs
+  private[ch] def unusedMatchClauseVars: Double = {
+    import TermExpr.monoidDouble
+    TermExpr.foldMap[Double](this) {
+      case MatchE(_, cases) ⇒ cases.map {
+        case CurriedE(List(prop), body) ⇒ if (body.freeVars contains prop.name) 0.0 else 1.0
+        case c ⇒ c.unusedMatchClauseVars
+      }.sum / cases.length.toDouble
+    }
   }
 
-  private[ch] def unusedMatchClauseVars: Double = this match {
-    case PropE(_, _) ⇒ 0
-    case AppE(head, arg) ⇒ head.unusedMatchClauseVars + arg.unusedMatchClauseVars
-    case CurriedE(_, body) ⇒ body.unusedMatchClauseVars
-    case UnitE(_) ⇒ 0
-    case NamedConjunctE(terms, _) ⇒ terms.map(_.unusedMatchClauseVars).sum
-    case ConjunctE(terms) ⇒ terms.map(_.unusedMatchClauseVars).sum
-    case ProjectE(_, term) ⇒ term.unusedMatchClauseVars
-    case MatchE(_, cases) ⇒ cases.map {
-      case CurriedE(List(prop), body) ⇒ if (body.freeVars contains prop.name) 0.0 else 1.0
-      case c ⇒ c.unusedMatchClauseVars
-    }.sum / cases.length.toDouble
-    case DisjunctE(_, _, term, _) ⇒ term.unusedMatchClauseVars
+  private[ch] lazy val unusedTupleParts: Int = usedTuplePartsSeq
+    .groupBy(_._1) // Map[TermExpr, Seq[(TermExpr, Int)]]
+    .mapValues(_.map(_._2).distinct) // Map[TermExpr, Seq[Int]]
+    .map { case (term, parts) ⇒
+    val totalParts = term.tExpr.conjunctSize
+    totalParts - parts.length
+  }.count(_ > 0)
+
+  private[ch] lazy val usedTuplePartsSeq: Seq[(TermExpr, Int)] = {
+    TermExpr.foldMap(this) {
+      case ProjectE(index, term) ⇒ Seq((term, index + 1)) ++ term.usedTuplePartsSeq
+    }
   }
 
-  private[ch] lazy val unusedTupleParts: Int =
-    usedTuplePartsSeq
-      .groupBy(_._1) // Map[TermExpr, Seq[(TermExpr, Int)]]
-      .mapValues(_.map(_._2).distinct) // Map[TermExpr, Seq[Int]]
-      .map { case (term, parts) ⇒
-      val totalParts = term.tExpr.conjunctSize
-      totalParts - parts.length
-    }.count(_ > 0)
-
-  private[ch] lazy val usedTuplePartsSeq: Seq[(TermExpr, Int)] = this match {
-    case PropE(_, _) ⇒ Seq()
-    case AppE(head, arg) ⇒ head.usedTuplePartsSeq ++ arg.usedTuplePartsSeq
-    case CurriedE(_, body) ⇒ body.usedTuplePartsSeq
-    case UnitE(_) ⇒ Seq()
-    case ConjunctE(terms) ⇒ terms.flatMap(_.usedTuplePartsSeq)
-    case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.usedTuplePartsSeq)
-    case ProjectE(index, term) ⇒ Seq((term, index + 1)) ++ term.usedTuplePartsSeq
-    case MatchE(term, cases) ⇒ term.usedTuplePartsSeq ++ cases.flatMap(_.usedTuplePartsSeq)
-    case DisjunctE(_, _, term, _) ⇒ term.usedTuplePartsSeq
+  lazy val freeVars: Seq[String] = {
+    import TermExpr.monoidSeq
+    TermExpr.foldMap(this) {
+      case PropE(name, _) ⇒ Seq(name)
+      case CurriedE(heads, body) ⇒ body.freeVars.filterNot(heads.map(_.name).toSet.contains)
+      case p: ProjectE ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
+    }.distinct
   }
 
-  lazy val freeVars: Seq[String] = (this match {
-    case PropE(name, _) ⇒ Seq(name)
-    case AppE(head, arg) ⇒ head.freeVars ++ arg.freeVars
-    case CurriedE(heads, body) ⇒ body.freeVars.filterNot(heads.map(_.name).toSet.contains)
-    case UnitE(_) ⇒ Seq()
-    case ConjunctE(terms) ⇒ terms.flatMap(_.freeVars)
-    case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.freeVars)
-    case p: ProjectE ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
-    case MatchE(term, cases) ⇒ term.freeVars ++ cases.flatMap(_.freeVars)
-    case d: DisjunctE ⇒ d.term.freeVars
-  }).distinct
-
-  lazy val usedVars: Seq[String] = (this match {
-    case PropE(name, _) ⇒ Seq(name)
-    case AppE(head, arg) ⇒ head.usedVars ++ arg.usedVars
-    case CurriedE(heads, body) ⇒ body.usedVars ++ heads.map(_.name)
-    case UnitE(_) ⇒ Seq()
-    case ConjunctE(terms) ⇒ terms.flatMap(_.usedVars)
-    case NamedConjunctE(terms, _) ⇒ terms.flatMap(_.usedVars)
-    case p: ProjectE ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
-    case MatchE(term, cases) ⇒ term.usedVars ++ cases.flatMap(_.usedVars)
-    case d: DisjunctE ⇒ d.term.usedVars
-  }).distinct
+  lazy val usedVars: Seq[String] = {
+    import TermExpr.monoidSeq
+    TermExpr.foldMap(this) {
+      case PropE(name, _) ⇒ Seq(name)
+      case p: ProjectE ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
+    }.distinct
+  }
 
   def varCount(String: String): Int = this match {
     case PropE(name, _) ⇒ if (name == String) 1 else 0
@@ -431,20 +364,10 @@ sealed trait TermExpr {
   }
 
   def renameAllVars(oldAndNewNames: Map[String, String]): TermExpr = {
-    def rename(t: TermExpr): TermExpr = t.renameAllVars(oldAndNewNames)
-
-    this match {
+    TermExpr.substMap(this) {
       case PropE(oldName, tExpr) ⇒
         val replacedName = oldAndNewNames.getOrElse(oldName, oldName)
         PropE(replacedName, tExpr)
-      case AppE(head, arg) ⇒ AppE(rename(head), rename(arg))
-      case CurriedE(heads, body) ⇒ CurriedE(heads.map(h ⇒ rename(h).asInstanceOf[PropE]), rename(body))
-      case UnitE(_) ⇒ this
-      case ConjunctE(terms) ⇒ ConjunctE(terms.map(rename))
-      case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms map rename, tExpr)
-      case ProjectE(index, term) ⇒ ProjectE(index, rename(term))
-      case MatchE(term, cases) ⇒ MatchE(rename(term), cases.map(rename))
-      case d: DisjunctE ⇒ d.copy(term = rename(d.term))
     }
   }
 }
@@ -618,7 +541,7 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
           // MatchE(_, {f, f, ..., f}) where each clause is the same expression `f`, up to equivalence, and ignores its argument.
           // Then the entire term can be replaced by f.
           val bodyTerms: Set[Option[TermExpr]] = casesSimplified.map {
-            case c@CurriedE(List(PropE(name, _)), body) if c.unusedArgs contains name ⇒ Some(body)
+            case c@CurriedE(List(PropE(name, _)), body) if TermExpr.unusedArgs(c) contains name ⇒ Some(body)
             case _ ⇒ None
           }.toSet
           bodyTerms.headOption match { // Are all elements of the initial sequence the same and equal to Some(body) ?
