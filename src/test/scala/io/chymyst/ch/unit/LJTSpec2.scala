@@ -309,6 +309,5 @@ class LJTSpec2 extends FlatSpec with Matchers {
     allOfType[Either[Int, Unit]].length shouldEqual 1
     allOfType[Either[Int ⇒ Int, String ⇒ String]].length shouldEqual 2
     allOfType[Either[Int ⇒ Int, String]].length shouldEqual 1
-
   }
 }

@@ -110,32 +110,4 @@ class TermExprSpec extends FlatSpec with Matchers {
     val term = sequent.constructResultTerm(premiseVars.head)
     term shouldEqual CurriedE(List(PropE("t1", TP(1)), PropE("t2", TP(2)), PropE("t3", TP(3))), PropE("t1", TP(1)))
   }
-
-  behavior of "reify terms API"
-
-  it should "produce result terms" in {
-    val terms1 = lambdaTerms[Int ⇒ Int]
-    terms1.length shouldEqual 1
-    terms1 shouldEqual Seq(CurriedE(List(PropE("a", BasicT("Int"))), PropE("a", BasicT("Int"))))
-
-    val terms2 = lambdaTerms[Int ⇒ Int ⇒ Int]
-    terms2.length shouldEqual 2
-
-    val terms3 = lambdaTerms[Int ⇒ Int ⇒ (Int, Int)]
-    terms3.length shouldEqual 2
-
-    val terms4 = lambdaTerms[(Int, Int) ⇒ (Int, Int)]
-    terms4.length shouldEqual 2
-
-    def f : Unit = implement
-
-    val t = lambdaTerms[Unit]
-
-    t shouldEqual Seq(UnitE(UnitT("Unit")))
-
-    def f0 = ofType[Unit]
-    def f1 = allOfType[Unit]
-
-    def f2[A] = allOfType[Either[A ⇒ A, Unit]].length shouldEqual 1
-  }
 }
