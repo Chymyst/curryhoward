@@ -58,7 +58,7 @@ object TermExpr {
 
       override def combine(x: Seq[PropE], y: Seq[PropE]): Seq[PropE] = x ++ y
     }
-    foldMap(termExpr){
+    foldMap(termExpr) {
       case p@PropE(_, _) ⇒ Seq(p)
     }.distinct
   }
@@ -96,11 +96,12 @@ object TermExpr {
   def substMap(termExpr: TermExpr)(p: PartialFunction[TermExpr, TermExpr]): TermExpr =
     if (p isDefinedAt termExpr)
       p(termExpr)
-  else    {
+    else {
       def subst(termExpr: TermExpr): TermExpr = substMap(termExpr)(p)
+
       termExpr match {
         case AppE(head, arg) ⇒ AppE(subst(head), subst(arg))
-        case CurriedE(heads, body) ⇒ CurriedE(heads.map(subst).asInstanceOf[List[PropE]], subst (body))
+        case CurriedE(heads, body) ⇒ CurriedE(heads.map(subst).asInstanceOf[List[PropE]], subst(body))
         case ConjunctE(terms) ⇒ ConjunctE(terms.map(subst))
         case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(subst), tExpr)
         case ProjectE(index, term) ⇒ ProjectE(index, subst(term))
@@ -120,34 +121,7 @@ object TermExpr {
     case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)), tExpr)
     case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
   }
-  /*
-  def subst(replaceVar: PropE, expr: TermExpr, inExpr: TermExpr): TermExpr = inExpr match {
-    case PropE(name, tExpr) if name == replaceVar.name ⇒
-      if (tExpr == replaceVar.tExpr) expr else throw new Exception(s"Incorrect type ${replaceVar.tExpr.prettyPrint} in subst($replaceVar, $expr, $inExpr), expected ${tExpr.prettyPrint}")
-    case AppE(head, arg) ⇒ AppE(subst(replaceVar, expr, head), subst(replaceVar, expr, arg))
-    case CurriedE(heads, body) ⇒ CurriedE(heads, subst(replaceVar, expr, body))
-    case ConjunctE(terms) ⇒ ConjunctE(terms.map(subst(replaceVar, expr, _)))
-    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(subst(replaceVar, expr, _)), tExpr)
-    case ProjectE(index, term) ⇒ ProjectE(index, subst(replaceVar, expr, term))
-    case MatchE(term, cases) ⇒ MatchE(subst(replaceVar, expr, term), cases.map(subst(replaceVar, expr, _)))
-    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, subst(replaceVar, expr, term), tExpr)
-    case _ ⇒ inExpr
-  }
 
-  def substTypeVar(replaceTypeVar: TP, newTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = inExpr match {
-    case PropE(name, tExpr) ⇒ PropE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
-    case AppE(head, arg) ⇒ AppE(substTypeVar(replaceTypeVar, newTypeExpr, head), substTypeVar(replaceTypeVar, newTypeExpr, arg))
-    case CurriedE(heads, body) ⇒ CurriedE(heads
-      .map { case PropE(name, tExpr) ⇒ PropE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr)) },
-      substTypeVar(replaceTypeVar, newTypeExpr, body))
-    case ConjunctE(terms) ⇒ ConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)))
-    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)), tExpr)
-    case ProjectE(index, term) ⇒ ProjectE(index, substTypeVar(replaceTypeVar, newTypeExpr, term))
-    case MatchE(term, cases) ⇒ MatchE(substTypeVar(replaceTypeVar, newTypeExpr, term), cases.map(substTypeVar(replaceTypeVar, newTypeExpr, _)))
-    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
-    case _ ⇒ inExpr
-  }
-*/
   def findFirst[R](inExpr: TermExpr)(pred: PartialFunction[TermExpr, R]): Option[R] = {
     Some(inExpr).collect(pred).orElse {
       inExpr match {
@@ -179,48 +153,83 @@ object TermExpr {
   private def atLeastOnce(x: Int): Int = math.max(x - 1, 0)
 
   // How many times each function uses its argument. Only counts when an argument is used more than once.
-  def argsMultiUseCountDeep(inExpr: TermExpr): Int = inExpr match {
-    case PropE(_, _) ⇒ 0
-    case AppE(head, arg) ⇒ argsMultiUseCountDeep(head) + argsMultiUseCountDeep(arg)
-    case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum + argsMultiUseCountDeep(body)
-    case UnitE(_) ⇒ 0
-    case NamedConjunctE(terms, _) ⇒ terms.map(argsMultiUseCountDeep).sum
-    case ConjunctE(terms) ⇒ terms.map(argsMultiUseCountDeep).sum
-    case ProjectE(_, term) ⇒ argsMultiUseCountDeep(term)
-    case MatchE(term, cases) ⇒ argsMultiUseCountDeep(term) + cases.map(argsMultiUseCountDeep).sum
-    case DisjunctE(_, _, term, _) ⇒ argsMultiUseCountDeep(term)
+  def argsMultiUseCountDeep(inExpr: TermExpr): Int = {
+    implicit val monoidInt: Monoid[Int] = new Monoid[Int] {
+      override def empty: Int = 0
+
+      override def combine(x: Int, y: Int): Int = x + y
+    }
+    foldMap(inExpr) {
+      case c@CurriedE(_, body) ⇒ argsMultiUseCountShallow(c) + argsMultiUseCountDeep(body)
+    }
   }
 
+  /*
+    def argsMultiUseCountDeep(inExpr: TermExpr): Int = inExpr match {
+      case PropE(_, _) ⇒ 0
+      case AppE(head, arg) ⇒ argsMultiUseCountDeep(head) + argsMultiUseCountDeep(arg)
+      case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum + argsMultiUseCountDeep(body)
+      case UnitE(_) ⇒ 0
+      case NamedConjunctE(terms, _) ⇒ terms.map(argsMultiUseCountDeep).sum
+      case ConjunctE(terms) ⇒ terms.map(argsMultiUseCountDeep).sum
+      case ProjectE(_, term) ⇒ argsMultiUseCountDeep(term)
+      case MatchE(term, cases) ⇒ argsMultiUseCountDeep(term) + cases.map(argsMultiUseCountDeep).sum
+      case DisjunctE(_, _, term, _) ⇒ argsMultiUseCountDeep(term)
+    }
+  */
   def argsMultiUseCountShallow(inExpr: TermExpr): Int = inExpr match {
     case CurriedE(heads, body) ⇒ heads.map(head ⇒ atLeastOnce(body.varCount(head.name))).sum
     case _ ⇒ 0
   }
 
+  implicit val monoidDouble: Monoid[Double] = new Monoid[Double] {
+    override def empty: Double = 0.0
+
+    override def combine(x: Double, y: Double): Double = x + y
+  }
+
+  def conjunctionPermutationScore(inExpr: TermExpr): Double = foldMap(inExpr) {
+    case NamedConjunctE(terms, tExpr) ⇒
+      terms.map(conjunctionPermutationScore).sum +
+        terms.zipWithIndex.flatMap { case (t, i) ⇒
+          // Only count projections from terms of exactly the same type as this `NamedConjunctE`.
+          findFirst(t) { case ProjectE(index, term) if sameConstructor(term.tExpr, tExpr) ⇒
+            conjunctionPermutationScore(term) / terms.length.toDouble +
+              (if (index == i) 0 else 1)
+          }
+        }.sum
+    case ConjunctE(terms) ⇒
+      terms.zipWithIndex.flatMap { case (t, i) ⇒
+        findFirst(t) { case ProjectE(index, term) if (term.tExpr match {
+          case ConjunctT(_) ⇒ true
+          case _ ⇒ false
+        }) ⇒
+          conjunctionPermutationScore(term) / terms.length.toDouble +
+            (if (index == i) 0 else 1)
+        }
+      }.sum
+  }
+
+  def disjunctionPermutationScore(inExpr: TermExpr): Double = foldMap(inExpr) {
+    case MatchE(term, cases) ⇒
+      disjunctionPermutationScore(term) +
+        cases.zipWithIndex.flatMap { case (t, i) ⇒
+          // Only count disjunction constructions into terms of exactly the same type as the `term` being matched.
+          findFirst(t) { case DisjunctE(index, _, t2, tExpr) if sameConstructor(term.tExpr, tExpr) ⇒
+            disjunctionPermutationScore(t2) / cases.length.toDouble +
+              (if (index == i) 0 else 1)
+          }
+        }.sum
+  }
+
+  /*
   def conjunctionPermutationScore(inExpr: TermExpr): Double = {
     inExpr match {
       case PropE(_, _) ⇒ 0
       case AppE(head, arg) ⇒ conjunctionPermutationScore(head) + conjunctionPermutationScore(arg)
       case CurriedE(_, body) ⇒ conjunctionPermutationScore(body)
       case UnitE(_) ⇒ 0
-      case NamedConjunctE(terms, tExpr) ⇒
-        terms.map(conjunctionPermutationScore).sum +
-          terms.zipWithIndex.flatMap { case (t, i) ⇒
-            // Only count projections from terms of exactly the same type as this `NamedConjunctE`.
-            findFirst(t) { case ProjectE(index, term) if sameConstructor(term.tExpr, tExpr) ⇒
-              conjunctionPermutationScore(term) / terms.length.toDouble +
-                (if (index == i) 0 else 1)
-            }
-          }.sum
-      case ConjunctE(terms) ⇒
-        terms.zipWithIndex.flatMap { case (t, i) ⇒
-          findFirst(t) { case ProjectE(index, term) if (term.tExpr match {
-            case ConjunctT(_) ⇒ true
-            case _ ⇒ false
-          }) ⇒
-            conjunctionPermutationScore(term) / terms.length.toDouble +
-              (if (index == i) 0 else 1)
-          }
-        }.sum
+
       case ProjectE(_, term) ⇒ conjunctionPermutationScore(term)
       case MatchE(term, cases) ⇒ conjunctionPermutationScore(term) + cases.map(conjunctionPermutationScore).sum
       case DisjunctE(_, _, term, _) ⇒ conjunctionPermutationScore(term)
@@ -248,7 +257,7 @@ object TermExpr {
       case DisjunctE(_, _, term, _) ⇒ disjunctionPermutationScore(term)
     }
   }
-
+*/
 }
 
 sealed trait TermExpr {
