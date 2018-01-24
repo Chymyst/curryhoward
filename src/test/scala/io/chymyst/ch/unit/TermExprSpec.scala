@@ -75,7 +75,7 @@ class TermExprSpec extends FlatSpec with Matchers {
       ProjectE(0, c)
     )).informationLossScore._4 shouldEqual 2
 
-    TermExpr.findFirst(t){
+    TermExpr.findFirst(t) {
       case ProjectE(_, _) ⇒ "abc"
     } shouldEqual Some("abc")
   }
@@ -114,8 +114,28 @@ class TermExprSpec extends FlatSpec with Matchers {
   behavior of "reify terms API"
 
   it should "produce result terms" in {
-//    val terms1 = Macros.testReifyTerms[(Int, Int) ⇒ (Int, Int)]
-//
-//    terms1.length shouldEqual 1
+    val terms1 = lambdaTerms[Int ⇒ Int]
+    terms1.length shouldEqual 1
+    terms1 shouldEqual Seq(CurriedE(List(PropE("a", BasicT("Int"))), PropE("a", BasicT("Int"))))
+
+    val terms2 = lambdaTerms[Int ⇒ Int ⇒ Int]
+    terms2.length shouldEqual 2
+
+    val terms3 = lambdaTerms[Int ⇒ Int ⇒ (Int, Int)]
+    terms3.length shouldEqual 2
+
+    val terms4 = lambdaTerms[(Int, Int) ⇒ (Int, Int)]
+    terms4.length shouldEqual 2
+
+    def f : Unit = implement
+
+    val t = lambdaTerms[Unit]
+
+    t shouldEqual Seq(UnitE(UnitT("Unit")))
+
+    def f0 = ofType[Unit]
+    def f1 = allOfType[Unit]
+
+    def f2[A] = allOfType[Either[A ⇒ A, Unit]].length shouldEqual 1
   }
 }

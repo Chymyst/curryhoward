@@ -109,8 +109,6 @@ class Macros(val c: whitebox.Context) {
 
           // Need to assign type parameters to the accessors.
 
-          //  t.decls.toList(0).asMethod.typeSignature.resultType gives A, t.typeSymbol.asClass.typeParams(0) ==  t.decls.toList(0).asMethod.typeSignature.resultType.typeSymbol
-          /* t.typeSymbol.asClass.typeParams gives List(A, B)*/
           val (accessors, typeExprs) = finalType.decls
             .collect { case s: MethodSymbol if s.isCaseAccessor ⇒
               val accessorType = buildTypeExpr(s.typeSignature.resultType, Seq(), typesSeenNow)
@@ -293,14 +291,6 @@ class Macros(val c: whitebox.Context) {
   }
 
   object LiftedAST {
-    implicit def liftedNamedConjuct: Liftable[NamedConjunctT[String]] = Liftable[NamedConjunctT[String]] {
-      case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, Seq(..$tParams), Seq(..$accessors), $wrapped)"
-    }
-
-    implicit def liftedPropE: Liftable[PropE[String]] = Liftable[PropE[String]] {
-      case PropE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.PropE($name, $tExpr)"
-    }
-
     implicit def liftedTypeExpr: Liftable[TypeExpr[String]] = Liftable[TypeExpr[String]] {
       case DisjunctT(constructor, tParams, terms) ⇒ q"_root_.io.chymyst.ch.DisjunctT($constructor, Seq(..$tParams), Seq(..$terms))"
       case ConjunctT(terms) ⇒ q"_root_.io.chymyst.ch.ConjunctT(Seq(..$terms))"
@@ -326,12 +316,19 @@ class Macros(val c: whitebox.Context) {
       case DisjunctE(index, total, term, tExpr) ⇒ q"_root_.io.chymyst.ch.DisjunctE($index, $total, $term, $tExpr)"
     }
 
+    implicit def liftedSubtypeOfTypeExpr[S <: TypeExpr[String]]: Liftable[S] = Liftable[S] {
+      s ⇒ liftedTypeExpr(s)
+    }
+
+    implicit def liftedSubtypeOfTermExpr[S <: TermExpr[String]]: Liftable[S] = Liftable[S] {
+      s ⇒ liftedTermExpr(s)
+    }
   }
 
   // This function is for testing only.
   def testReifyTypeImpl[U: c.WeakTypeTag]: c.Expr[TypeExpr[String]] = {
     val typeU: c.Type = c.weakTypeOf[U]
-    val result = buildTypeExpr(typeU.resultType)
+    val result = buildTypeExpr(typeU)
     if (debug) c.info(c.enclosingPosition, s"Recognized type from type $typeU is ${result.prettyPrint}", force = true)
     import LiftedAST._
     c.Expr[TypeExpr[String]](q"$result")
@@ -339,7 +336,7 @@ class Macros(val c: whitebox.Context) {
 
   def testReifyTermsImpl[U: c.WeakTypeTag]: c.Expr[List[TermExpr[String]]] = {
     val typeU: c.Type = c.weakTypeOf[U]
-    val result: List[TermExpr[String]] = TheoremProver.findProofs(buildTypeExpr(typeU.resultType))._1
+    val result: List[TermExpr[String]] = TheoremProver.findProofs(buildTypeExpr(typeU))._1
     import LiftedAST._
     c.Expr[List[TermExpr[String]]](q"$result")
   }
@@ -349,7 +346,7 @@ class Macros(val c: whitebox.Context) {
     val typeT: c.Type = c.weakTypeOf[T]
     val enclosingType = c.internal.enclosingOwner.typeSignature
 
-    val s1 = buildTypeExpr(typeT.resultType).prettyPrint
+    val s1 = buildTypeExpr(typeT).prettyPrint
     val s2 = buildTypeExpr(enclosingType).prettyPrint
 
     c.Expr[(String, String)](q"($s1,$s2)")
@@ -397,8 +394,7 @@ class Macros(val c: whitebox.Context) {
   def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = allOfTypeImplWithValues[U]()
 
   def allOfTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
-    val typeU: c.Type = c.weakTypeOf[U]
-    val typeUT: TypeExpr[String] = buildTypeExpr(typeU)
+    val typeUT: TypeExpr[String] = buildTypeExpr(c.weakTypeOf[U])
     val givenVars: Seq[(PropE[String], c.Tree)] = values.zipWithIndex
       .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
@@ -464,12 +460,8 @@ object Macros {
     */
   private[ch] def options: Set[String] = Option(System.getProperty("curryhoward.log")).getOrElse("").split(",").toSet
 
+  // These methods are for testing only.
   private[ch] def testType[U]: (String, String) = macro Macros.testTypeImpl[U]
 
   private[ch] def testReifyType[U]: TypeExpr[String] = macro Macros.testReifyTypeImpl[U]
-
-  private[ch] def testReifyTerms[U]: List[TermExpr[String]] = macro Macros.testReifyTermsImpl[U]
-
-  // Not used.
-  //  private[ch] def testReifyTerm[U]: List[TermExpr[String]] = macro Macros.testReifyTermsImpl[U]
 }

@@ -415,7 +415,8 @@ final case class CurriedE[T](heads: List[PropE[T]], body: TermExpr[T]) extends T
 
       // Simplify nested CurriedE(CurriedE()) into a flat CurriedE().
       case CurriedE(heads1, body1) ⇒ CurriedE(heads ++ heads1, body1)
-      case simplifiedBody ⇒ this.copy(body = simplifiedBody)
+
+      case simplifiedBody ⇒ if (heads.isEmpty) simplifiedBody else this.copy(body = simplifiedBody)
     }
   }
 

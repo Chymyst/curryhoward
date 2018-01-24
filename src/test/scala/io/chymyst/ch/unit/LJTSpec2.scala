@@ -278,4 +278,37 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
     allFmapsA[Int, String, Boolean].length shouldEqual 0
   }
+
+  it should "generate a disjunction value with no premises" in {
+    allOfType[Either[Int, String]].length shouldEqual 0
+
+    def f0[A] = allOfType[(A ⇒ A, Int)].length
+
+    f0[String] shouldEqual 0
+
+    def f0u[A] = allOfType[(A ⇒ A, Unit)].length
+
+    f0u[String] shouldEqual 1
+
+    def f1[A] = allOfType[(A ⇒ A, Int ⇒ Int)].length
+
+    f1[String] shouldEqual 1
+
+    allOfType[(Int, String) ⇒ Int].length shouldEqual 1
+
+    allOfType[((Int, String)) ⇒ Int].length shouldEqual 1
+
+    final case class A(x: Int, y: String)
+
+    allOfType[A ⇒ Int].length shouldEqual 1
+
+    allOfType[Either[Int, String] ⇒ (Int ⇒ Boolean) ⇒ (String ⇒ Boolean) ⇒ Boolean].length shouldEqual 1
+
+    def f2[A] = allOfType[Either[A ⇒ A, Unit]].length shouldEqual 1
+
+    allOfType[Either[Int, Unit]].length shouldEqual 1
+    allOfType[Either[Int ⇒ Int, String ⇒ String]].length shouldEqual 2
+    allOfType[Either[Int ⇒ Int, String]].length shouldEqual 1
+
+  }
 }
