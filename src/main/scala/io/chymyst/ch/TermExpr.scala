@@ -93,6 +93,34 @@ object TermExpr {
     case _ ⇒ e1 == e2
   }
 
+  def substMap(termExpr: TermExpr)(p: PartialFunction[TermExpr, TermExpr]): TermExpr =
+    if (p isDefinedAt termExpr)
+      p(termExpr)
+  else    {
+      def subst(termExpr: TermExpr): TermExpr = substMap(termExpr)(p)
+      termExpr match {
+        case AppE(head, arg) ⇒ AppE(subst(head), subst(arg))
+        case CurriedE(heads, body) ⇒ CurriedE(heads.map(subst).asInstanceOf[List[PropE]], subst (body))
+        case ConjunctE(terms) ⇒ ConjunctE(terms.map(subst))
+        case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(subst), tExpr)
+        case ProjectE(index, term) ⇒ ProjectE(index, subst(term))
+        case MatchE(term, cases) ⇒ MatchE(subst(term), cases.map(subst))
+        case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, subst(term), tExpr)
+        case _ ⇒ termExpr
+      }
+    }
+
+  def subst(replaceVar: PropE, expr: TermExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
+    case PropE(name, tExpr) if name == replaceVar.name ⇒
+      if (tExpr == replaceVar.tExpr) expr else throw new Exception(s"Incorrect type ${replaceVar.tExpr.prettyPrint} in subst($replaceVar, $expr, $inExpr), expected ${tExpr.prettyPrint}")
+  }
+
+  def substTypeVar(replaceTypeVar: TP, newTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
+    case PropE(name, tExpr) ⇒ PropE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
+    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)), tExpr)
+    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
+  }
+  /*
   def subst(replaceVar: PropE, expr: TermExpr, inExpr: TermExpr): TermExpr = inExpr match {
     case PropE(name, tExpr) if name == replaceVar.name ⇒
       if (tExpr == replaceVar.tExpr) expr else throw new Exception(s"Incorrect type ${replaceVar.tExpr.prettyPrint} in subst($replaceVar, $expr, $inExpr), expected ${tExpr.prettyPrint}")
@@ -119,7 +147,7 @@ object TermExpr {
     case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
     case _ ⇒ inExpr
   }
-
+*/
   def findFirst[R](inExpr: TermExpr)(pred: PartialFunction[TermExpr, R]): Option[R] = {
     Some(inExpr).collect(pred).orElse {
       inExpr match {
