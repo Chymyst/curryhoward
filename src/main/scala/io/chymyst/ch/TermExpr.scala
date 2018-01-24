@@ -1,7 +1,6 @@
 package io.chymyst.ch
 
 import scala.annotation.tailrec
-import scala.util.Try
 
 object TermExpr {
   @tailrec
@@ -10,14 +9,14 @@ object TermExpr {
     if (t == simplified) t else simplifyWithEtaUntilStable(simplified)
   }
 
-  def foldMap[R: Monoid](termExpr: TermExpr, p: PartialFunction[TermExpr, R]): R = {
+  def foldMap[R: Monoid](termExpr: TermExpr)(p: PartialFunction[TermExpr, R]): R = {
     if (p isDefinedAt termExpr)
       p(termExpr)
     else {
       import io.chymyst.ch.Monoid.MonoidSyntax
       lazy val empty = Monoid.empty[R]
 
-      def foldmap(termExpr: TermExpr): R = foldMap(termExpr, p)
+      def foldmap(termExpr: TermExpr): R = foldMap(termExpr)(p)
 
       termExpr match {
         case PropE(_, _) ⇒ empty
@@ -35,13 +34,13 @@ object TermExpr {
 
   def size(termExpr: TermExpr): Int = {
     implicit val monoidIntSum: Monoid[Int] = new Monoid[Int] {
-      override def empty: Int = 0
+      override def empty: Int = -1
 
-      override def combine(x: Int, y: Int): Int = x + y
+      override def combine(x: Int, y: Int): Int = x + y + 1
     }
-    foldMap(termExpr, {
+    foldMap(termExpr) {
       case PropE(_, _) | UnitE(_) ⇒ 1
-    })
+    }
   }
 
   def lambdaTerm(f: Any): Option[TermExpr] =
@@ -53,18 +52,16 @@ object TermExpr {
       case _ ⇒ None
     }
 
-  def propositions(termExpr: TermExpr): Seq[PropE] = (termExpr match {
-    case p@PropE(_, _) ⇒ Seq(p) // Need to specify type parameter in match... `case p@PropE(_)` does not work.
-    case AppE(head, arg) ⇒ propositions(head) ++ propositions(arg)
-    case CurriedE(heads, body) ⇒ // Can't pattern-match directly for some reason! Some trouble with the type parameter T.
-      heads ++ propositions(body)
-    case ConjunctE(terms) ⇒ terms.flatMap(propositions)
-    case ProjectE(_, term) ⇒ propositions(term)
-    case NamedConjunctE(terms, _) ⇒ terms.flatMap(propositions)
-    case MatchE(term, cases) ⇒ propositions(term) ++ cases.flatMap(propositions)
-    case DisjunctE(_, _, term, _) ⇒ propositions(term)
-    case UnitE(_) ⇒ Seq()
-  }).distinct
+  def propositions(termExpr: TermExpr): Seq[PropE] = {
+    implicit val monoidSeq: Monoid[Seq[PropE]] = new Monoid[Seq[PropE]] {
+      override def empty: Seq[PropE] = Seq()
+
+      override def combine(x: Seq[PropE], y: Seq[PropE]): Seq[PropE] = x ++ y
+    }
+    foldMap(termExpr){
+      case p@PropE(_, _) ⇒ Seq(p)
+    }.distinct
+  }
 
   private val freshIdents = new FreshIdents("z")
 
