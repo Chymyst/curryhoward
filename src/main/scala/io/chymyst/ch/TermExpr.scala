@@ -229,7 +229,10 @@ object TermExpr {
 }
 
 sealed trait TermExpr {
+  // Syntax helpers.
   def apply(y: TermExpr): TermExpr = AppE(this, y)
+
+  def equiv(y: TermExpr): Boolean = simplify == y.simplify
 
   def informationLossScore = (
     ()

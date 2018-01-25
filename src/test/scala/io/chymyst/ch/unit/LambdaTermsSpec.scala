@@ -100,19 +100,18 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val mapReaderAA = TermExpr.substTypeVar(TP("B"), TP("A"), mapReaderTerm)
 
     // map(rxa)(id) = rxa
-    val appl1 = mapReaderAA(readerTerm)(idTermA)
-    appl1.simplify shouldEqual readerTerm
+     mapReaderAA(readerTerm)(idTermA).equiv(readerTerm) shouldEqual true
   }
 
   it should "symbolically lambda-verify composition law for fmap on Reader monad" in {
     type R[X, A] = X ⇒ A
 
     def check[X, A, B, C](): Assertion = {
-      val fmapReader = ofType[(A ⇒ B) ⇒ R[X, A] ⇒ R[X, B]]
+      val fmap = ofType[(A ⇒ B) ⇒ R[X, A] ⇒ R[X, B]]
 
-      val fmapReaderTerm = TermExpr.lambdaTerm(fmapReader).get
+      val fmapTerm = TermExpr.lambdaTerm(fmap).get
 
-      fmapReaderTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ a (b c)"
+      fmapTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ a (b c)"
 
       val readerTerm = freshVar[X ⇒ A]
       val aTerm = freshVar[A]
@@ -120,8 +119,8 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
       val f2Term = freshVar[B ⇒ C]
 
       // fmap f1 . fmap f2 = fmap (f1 . f2)
-      val fmapF1 = fmapReaderTerm(f1Term)
-      val fmapAC = TermExpr.substTypeVar(TP("B"), TP("C"), fmapReaderTerm)
+      val fmapF1 = fmapTerm(f1Term)
+      val fmapAC = TermExpr.substTypeVar(TP("B"), TP("C"), fmapTerm)
 
       val fmapf1f2rxa = fmapAC(aTerm #> f2Term(f1Term(aTerm)))(readerTerm)
 
@@ -129,13 +128,35 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
       val fmapF2 = fmapBC(f2Term)
 
       val fmapF1fmapF2rxa = fmapF2(fmapF1(readerTerm))
-      val appl1 = fmapf1f2rxa.simplify
-      val appl2 = fmapF1fmapF2rxa.simplify
-      appl1 shouldEqual appl2
+      fmapf1f2rxa.equiv( fmapF1fmapF2rxa) shouldEqual true
     }
 
     check()
+  }
 
+  it should "symbolically lambda-verify associativity law for (A ⇒ A) composition monoid and choose correct implementations" in {
+    type Mon[A] = A ⇒ A
+
+    def check[A, B, C](): Assertion = {
+      val adds = allOfType[Mon[A] ⇒ Mon[A] ⇒ Mon[A]]
+
+      adds.map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ c ⇒ a (b c)", "a ⇒ b ⇒ c ⇒ b (a c)")
+
+      // Associativity law: add x (add y z) == add (add x y) z
+
+      val x = freshVar[Mon[A]]
+      val y = freshVar[Mon[A]]
+      val z = freshVar[Mon[A]]
+
+      val goodImplementations = adds.filter { add ⇒
+        val addT = add.lambdaTerm
+        addT(x)(addT(y)(z)) equiv addT(addT(x)(y))(z)
+      }
+
+      goodImplementations.length shouldEqual 2
+    }
+
+    check()
   }
 
   it should "return lambda terms together with the function when using `ofType` but not when using `implement`" in {
