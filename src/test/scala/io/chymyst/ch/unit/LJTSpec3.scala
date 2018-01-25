@@ -102,7 +102,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
     // Case match expressions should be simplified into identity functions, so we should get one expression here.
     def f2a[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ Either[C, D]]
 
-    f2a[Int, Int, Int, Int, Int].size shouldEqual 1
+    f2a.size shouldEqual 1
 
     def f2b[A, B, C, D, E]: Either[A, B] ⇒ (Either[A, B] ⇒ Either[C, D]) ⇒ Either[C, D] = implement
 
@@ -118,7 +118,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
 
     def f3[A, B, C, D, E] = allOfType[Either[(A, B), C] ⇒ (Either[A, C] ⇒ B ⇒ Either[C, D]) ⇒ (C ⇒ E) ⇒ Either[D, E]]
 
-    f3[Int, Int, Int, Int, Int].size shouldEqual 1
+    f3.size shouldEqual 1
   }
 
   it should "generate methods for Continuation monad with no ambiguity" in {

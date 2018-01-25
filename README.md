@@ -290,6 +290,7 @@ def f[X]: Either[X, X] ⇒ Either[X, X] = implement
 
 # Revision history
 
+- 0.3.0 Experimental API for obtaining lambda-terms. Simplified the internal code by removing the type parameter `T` from AST types.
 - 0.2.4 Support named type aliases and ordering heuristics for conjunctions and disjunctions; bug fixes for conventional function types not involving type parameters and for eta-contraction
 - 0.2.3 Fix stack overflow when using recursive types (code is still not generated for recursive functions); implement loop detection in proof search; bug fixes for alpha-conversion of type-Lambdas
 - 0.2.2 Bug fix for back-transform in rule named-&R

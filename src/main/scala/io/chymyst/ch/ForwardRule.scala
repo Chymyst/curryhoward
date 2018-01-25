@@ -1,15 +1,14 @@
 package io.chymyst.ch
 
 import io.chymyst.ch.ForwardRule.BackTransform
-import io.chymyst.ch.TermExpr.ProofTerm
 
-final case class ForwardRule[T](
+final case class ForwardRule(
   name: String,
-  applyTo: Sequent[T] ⇒ Seq[RuleResult[T]]
+  applyTo: Sequent ⇒ Seq[RuleResult]
 )
 
 object ForwardRule {
-  type BackTransform[T] = Seq[ProofTerm[T]] ⇒ ProofTerm[T]
+  type BackTransform = Seq[TermExpr] ⇒ TermExpr
 }
 
-final case class RuleResult[T](ruleName: String, newSequents: Seq[Sequent[T]], backTransform: BackTransform[T])
+final case class RuleResult(ruleName: String, newSequents: Seq[Sequent], backTransform: BackTransform)

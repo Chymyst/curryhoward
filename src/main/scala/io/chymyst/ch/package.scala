@@ -21,7 +21,8 @@ package object ch {
     *   def f[A,B](x: A ⇒ B, y: B ⇒ A): A ⇒ A = implement
     * }}}
     *
-    * @tparam U Type of the expression to be implemented.
+    * @tparam U Type of the expression to be implemented. Specifying this type parameter is optional.
+    *           If it is not specified, it will be detected automatically by examining the left-hand side of the definition.
     * @return An automatically constructed expression of type `U`.
     */
   def implement[U]: U = macro Macros.inhabitImpl[U]
@@ -61,6 +62,14 @@ package object ch {
     * @return An automatically constructed expression of type `U`.
     */
   def ofType[U](values: Any*): U = macro Macros.ofTypeImplWithValues[U]
+
+  /** Obtain a list of lambda-terms implementing a given type expression.
+    *
+    * @tparam U The type expression to be implemented.
+    * @return A list of abstract syntax trees representing the (typed) lambda-terms,
+    *         each implementing the given type `U`.
+    */
+  def lambdaTerms[U]: List[TermExpr] = macro Macros.testReifyTermsImpl[U]
 }
 
 // Note: for some reason, a macro with arguments cannot properly infer types.
