@@ -1,7 +1,5 @@
 package io.chymyst.ch
 
-import java.util.concurrent.atomic.AtomicInteger
-
 import scala.language.experimental.macros
 //import scala.reflect.macros.blackbox
 import scala.reflect.macros.whitebox
@@ -452,7 +450,7 @@ class Macros(val c: whitebox.Context) {
     result
   }
 
-  val MAX_TERM_SIZE_FOR_LAMBDA_EXPORT = 1024
+  val MAX_TERM_SIZE_FOR_LAMBDA_EXPORT = 256
 
   private def inhabitAllInternal(
     typeStructure: TypeExpr,

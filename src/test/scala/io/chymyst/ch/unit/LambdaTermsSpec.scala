@@ -173,7 +173,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     final case class C[A](d: Option[(A, A)]) {
       // greedy filter on the product
-      def map[B](f: A ⇒ B): C[B] = implement
+      def map[B](f: A ⇒ B): C[B] = ofType[C[B]](d, f)
 
       def withFilter(p: A ⇒ Boolean): C[A] = C(d filter {
         case (x, y) ⇒ p(x) && p(y)
@@ -188,7 +188,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     } yield y
 
     c.map(x ⇒ x * 2) shouldEqual C(Some((246, 912)))
-    d(200) shouldEqual C(None)
-    d(500) shouldEqual C(Some((246, 912)))
+    d(500) shouldEqual C(None)
+    d(200) shouldEqual C(Some((246, 912)))
   }
 }
