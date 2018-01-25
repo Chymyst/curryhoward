@@ -74,9 +74,17 @@ package object ch {
       case g: Function1Lambda[_, _] ⇒ g.lambdaTerm
       case g: Function2Lambda[_, _, _] ⇒ g.lambdaTerm
       case g: Function3Lambda[_, _, _, _] ⇒ g.lambdaTerm
-      case _ ⇒ throw new Exception("Used `.lambdaTerm` on an expression that has no attached lambda-term")
+      case _ ⇒ throw new Exception("Called `.lambdaTerm` on an expression that has no attached lambda-term")
     }
   }
+
+  /** Create a new fresh variable term of given type.
+    *
+    * @tparam X Type expression that will be assigned to the new variable.
+    * @return A new variable.
+    */
+  def freshVar[X]: VarE = macro Macros.freshVarImpl[X]
+
 }
 
 // Note: for some reason, a macro with arguments cannot properly infer types.

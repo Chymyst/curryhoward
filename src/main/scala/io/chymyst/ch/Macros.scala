@@ -183,7 +183,7 @@ class Macros(val c: whitebox.Context) {
     }
 
     implicit def liftedTermExpr: Liftable[TermExpr] = Liftable[TermExpr] {
-      case PropE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.PropE($name, $tExpr)"
+      case VarE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.VarE($name, $tExpr)"
       case AppE(head, arg) ⇒ q"_root_.io.chymyst.ch.AppE($head, $arg)"
       case CurriedE(heads, body) ⇒ q"_root_.io.chymyst.ch.CurriedE(List(..$heads), $body)"
       case UnitE(tExpr) ⇒ q"_root_.io.chymyst.ch.UnitE($tExpr)"
@@ -250,22 +250,22 @@ class Macros(val c: whitebox.Context) {
   }
 
   // Prepare the tree for a function parameter with the specified type.
-  private def reifyParam(term: PropE): c.Tree = term match {
-    case PropE(name, typeExpr) ⇒
+  private def reifyParam(term: VarE): c.Tree = term match {
+    case VarE(name, typeExpr) ⇒
       val tpt = reifyType(typeExpr)
       val termName = TermName(name.toString)
       val param = q"val $termName: $tpt"
       param
   }
 
-  private def reifyTerm(termExpr: TermExpr, givenArgs: Map[PropE, c.Tree]): c.Tree = {
+  private def reifyTerm(termExpr: TermExpr, givenArgs: Map[VarE, c.Tree]): c.Tree = {
     // Shortcut for calling this function recursively with all the same arguments.
     def reifyTermShort(termExpr: TermExpr): c.Tree = reifyTerm(termExpr, givenArgs)
 
-    def conjunctSubstName(p: PropE, i: Int): String = s"${p.name}_$i"
+    def conjunctSubstName(p: VarE, i: Int): String = s"${p.name}_$i"
 
     termExpr match {
-      case p@PropE(name, _) ⇒ givenArgs.getOrElse(p, q"${TermName(name.toString)}")
+      case p@VarE(name, _) ⇒ givenArgs.getOrElse(p, q"${TermName(name.toString)}")
 
       // A function applied to several arguments Java-style.
       case AppE(head, ConjunctE(terms)) ⇒ q"${reifyTermShort(head)}(..${terms.map(reifyTermShort)})"
@@ -276,11 +276,11 @@ class Macros(val c: whitebox.Context) {
       case CurriedE(heads, body) ⇒
         // If one of the heads is a ConjunctT, we need to do a replacement in the entire body.
         // It will be too late to do this once we start reifying the terms.
-        val conjunctHeads = heads.collect { case p@PropE(_, ConjunctT(terms)) ⇒ (p, terms) }
+        val conjunctHeads = heads.collect { case p@VarE(_, ConjunctT(terms)) ⇒ (p, terms) }
         val replacedBody = conjunctHeads.foldLeft(body) {
           case (prev, (p, termTypes)) ⇒ TermExpr.subst(
             p,
-            ConjunctE(termTypes.zipWithIndex.map { case (t, i) ⇒ PropE(conjunctSubstName(p, i), t) }),
+            ConjunctE(termTypes.zipWithIndex.map { case (t, i) ⇒ VarE(conjunctSubstName(p, i), t) }),
             prev
           ).simplify()
         }.simplify(withEta = true)
@@ -289,7 +289,7 @@ class Macros(val c: whitebox.Context) {
         heads.reverse.foldLeft(reifyTermShort(replacedBody)) { case (prevTree, paramE) ⇒
           conjunctHeads.find(_._1 == paramE) match {
             case Some((_, terms)) ⇒
-              val args = terms.zipWithIndex.map { case (t, i) ⇒ reifyParam(PropE(conjunctSubstName(paramE, i), t)) }
+              val args = terms.zipWithIndex.map { case (t, i) ⇒ reifyParam(VarE(conjunctSubstName(paramE, i), t)) }
               q"((..$args) ⇒ $prevTree)"
             case None ⇒ q"(${reifyParam(paramE)} ⇒ $prevTree)"
           }
@@ -312,7 +312,7 @@ class Macros(val c: whitebox.Context) {
         val casesTrees: Seq[c.Tree] = cases.map {
           // However, at this point a MatchE() could contain a CurriedE() with multiple arguments,
           // as a result of possibly simplifying nested CurriedE().
-          case CurriedE(PropE(fvName, fvType) :: rest, body) ⇒
+          case CurriedE(VarE(fvName, fvType) :: rest, body) ⇒
             // Generate cq"$pat => $expr" where pat = pq"Constructor(..$Strings)".
             val pat = fvType.caseObjectName match {
               case Some(constructor) ⇒ pq"_ : ${TermName(constructor)}.type"
@@ -326,13 +326,15 @@ class Macros(val c: whitebox.Context) {
     }
   }
 
-  // This function is for testing only.
-  def testReifyTypeImpl[U: c.WeakTypeTag]: c.Expr[TypeExpr] = {
+  private val freshIdentForFreshVar = new FreshIdents("zZ")
+
+  def freshVarImpl[U: c.WeakTypeTag]: c.Expr[VarE] = {
     val typeU: c.Type = c.weakTypeOf[U]
-    val result = buildTypeExpr(typeU)
-    if (debug) c.info(c.enclosingPosition, s"Recognized type from type $typeU is ${result.prettyPrint}", force = true)
+    val typeUExpr = buildTypeExpr(typeU)
+    if (debug) c.info(c.enclosingPosition, s"Built type expression ${typeUExpr.prettyPrint} from type $typeU", force = true)
+    val ident = freshIdentForFreshVar()
     import LiftedAST._
-    c.Expr[TypeExpr](q"$result")
+    c.Expr[VarE](q"VarE($ident, $typeUExpr)")
   }
 
   // This function is for testing buildTypeExpr().
@@ -353,7 +355,7 @@ class Macros(val c: whitebox.Context) {
     val result = typeU.paramLists match {
       case Nil ⇒ inhabitOneInternal(buildTypeExpr(typeU))()
       case lists ⇒
-        val givenVars = lists.flatten.map(s ⇒ PropE(s.name.decodedName.toString, buildTypeExpr(s.typeSignature)))
+        val givenVars = lists.flatten.map(s ⇒ VarE(s.name.decodedName.toString, buildTypeExpr(s.typeSignature)))
         val resultType = buildTypeExpr(typeU.finalResultType)
         val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.tExpr ->: prev }
         inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
@@ -376,10 +378,10 @@ class Macros(val c: whitebox.Context) {
     // TODO: Perhaps we can support `implement` with a specified type argument and no auto-detection of enclosing owner's type.
 
     // We need to obtain the actual type of the given terms, rather than the `Any` type as specified in the type signature.
-    val givenVars: Seq[(PropE, c.Tree)] = values.zipWithIndex
+    val givenVars: Seq[(VarE, c.Tree)] = values.zipWithIndex
       // The given values will be marked as arguments with name `arg1`, `arg2`, etc.,
       // so that they do not mix with automatic variables in the generated closed term.
-      .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
+      .map { case (v, i) ⇒ (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
     val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
     inhabitOneInternal(typeStructure, givenVars.toMap, createLambdas = true) { term ⇒
@@ -391,8 +393,8 @@ class Macros(val c: whitebox.Context) {
 
   def allOfTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
     val typeUT: TypeExpr = buildTypeExpr(c.weakTypeOf[U])
-    val givenVars: Seq[(PropE, c.Tree)] = values.zipWithIndex
-      .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
+    val givenVars: Seq[(VarE, c.Tree)] = values.zipWithIndex
+      .map { case (v, i) ⇒ (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
     val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
     inhabitAllInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
@@ -412,7 +414,7 @@ class Macros(val c: whitebox.Context) {
     */
   private def inhabitOneInternal(
     typeStructure: TypeExpr,
-    givenArgs: Map[PropE, c.Tree] = Map(),
+    givenArgs: Map[VarE, c.Tree] = Map(),
     createLambdas: Boolean = false
   )(
     transform: TermExpr ⇒ TermExpr = identity
@@ -428,7 +430,7 @@ class Macros(val c: whitebox.Context) {
 
   }
 
-  private def returnTerm(termFound: TermExpr, givenArgs: Map[PropE, c.Tree], createLambdas: Boolean): c.Tree = {
+  private def returnTerm(termFound: TermExpr, givenArgs: Map[VarE, c.Tree], createLambdas: Boolean): c.Tree = {
     import LiftedAST._
     val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
     c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
@@ -437,11 +439,11 @@ class Macros(val c: whitebox.Context) {
       resultCodeTree
     } else {
       termFound match {
-        case CurriedE(PropE(_, ConjunctT(termTypes)) :: _, _) if termTypes.length <= 3 ⇒
+        case CurriedE(VarE(_, ConjunctT(termTypes)) :: _, _) if termTypes.length <= 3 ⇒
           val functionName = TypeName(s"Function${termTypes.length}Lambda")
           val functionNameType = tq"$functionName"
           q"new $functionNameType($resultCodeTree, $termFound)"
-        case CurriedE(PropE(_, _) :: _, _) ⇒ q"new _root_.io.chymyst.ch.Function1Lambda($resultCodeTree, $termFound)"
+        case CurriedE(VarE(_, _) :: _, _) ⇒ q"new _root_.io.chymyst.ch.Function1Lambda($resultCodeTree, $termFound)"
         case _ ⇒ resultCodeTree
       }
     }
@@ -453,7 +455,7 @@ class Macros(val c: whitebox.Context) {
 
   private def inhabitAllInternal(
     typeStructure: TypeExpr,
-    givenArgs: Map[PropE, c.Tree]
+    givenArgs: Map[VarE, c.Tree]
   )(
     transform: TermExpr ⇒ TermExpr
   ): c.Tree = {
@@ -476,6 +478,4 @@ object Macros {
 
   // These methods are for testing only.
   private[ch] def testType[U]: (String, String) = macro Macros.testTypeImpl[U]
-
-  private[ch] def testReifyType[U]: TypeExpr = macro Macros.testReifyTypeImpl[U]
 }

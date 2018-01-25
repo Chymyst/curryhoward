@@ -1,6 +1,7 @@
 package io.chymyst.ch
 
 import scala.annotation.tailrec
+import scala.util.Try
 
 object TermExpr {
   @tailrec
@@ -19,7 +20,7 @@ object TermExpr {
       def foldmap(termExpr: TermExpr): R = foldMap(termExpr)(p)
 
       termExpr match {
-        case PropE(_, _) ⇒ empty
+        case VarE(_, _) ⇒ empty
         case AppE(head, arg) ⇒ foldmap(head) combine foldmap(arg)
         case CurriedE(heads, body) ⇒ heads.map(foldmap).foldLeft(empty)(_ combine _) combine foldmap(body)
         case UnitE(_) ⇒ empty
@@ -39,11 +40,11 @@ object TermExpr {
       override def combine(x: Int, y: Int): Int = x + y + 1
     }
     foldMap(termExpr) {
-      case PropE(_, _) | UnitE(_) ⇒ 1
+      case VarE(_, _) | UnitE(_) ⇒ 1
     }
   }
 
-  def lambdaTerm(f: Any): Option[TermExpr] =
+  def lambdaTerm(f: Any): Option[TermExpr] = //Try(WithLambdaTerm(f).lambdaTerm).toOption fails to compile
     f match {
       case g: Function0Lambda[_] ⇒ Some(g.lambdaTerm)
       case g: Function1Lambda[_, _] ⇒ Some(g.lambdaTerm)
@@ -52,8 +53,8 @@ object TermExpr {
       case _ ⇒ None
     }
 
-  def propositions(termExpr: TermExpr): Seq[PropE] = foldMap(termExpr) {
-    case p@PropE(_, _) ⇒ Seq(p)
+  def propositions(termExpr: TermExpr): Seq[VarE] = foldMap(termExpr) {
+    case p@VarE(_, _) ⇒ Seq(p)
   }.distinct
 
   private val freshIdents = new FreshIdents("z")
@@ -94,7 +95,7 @@ object TermExpr {
 
       termExpr match {
         case AppE(head, arg) ⇒ AppE(subst(head), subst(arg))
-        case CurriedE(heads, body) ⇒ CurriedE(heads.map(subst).asInstanceOf[List[PropE]], subst(body))
+        case CurriedE(heads, body) ⇒ CurriedE(heads.map(subst).asInstanceOf[List[VarE]], subst(body))
         case ConjunctE(terms) ⇒ ConjunctE(terms.map(subst))
         case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(subst), tExpr)
         case ProjectE(index, term) ⇒ ProjectE(index, subst(term))
@@ -104,13 +105,13 @@ object TermExpr {
       }
     }
 
-  def subst(replaceVar: PropE, expr: TermExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
-    case PropE(name, tExpr) if name == replaceVar.name ⇒
+  def subst(replaceVar: VarE, expr: TermExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
+    case VarE(name, tExpr) if name == replaceVar.name ⇒
       if (tExpr == replaceVar.tExpr) expr else throw new Exception(s"Incorrect type ${replaceVar.tExpr.prettyPrint} in subst($replaceVar, $expr, $inExpr), expected ${tExpr.prettyPrint}")
   }
 
   def substTypeVar(replaceTypeVar: TP, newTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
-    case PropE(name, tExpr) ⇒ PropE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
+    case VarE(name, tExpr) ⇒ VarE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
     case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)), tExpr)
     case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
   }
@@ -118,7 +119,7 @@ object TermExpr {
   def findFirst[R](inExpr: TermExpr)(pred: PartialFunction[TermExpr, R]): Option[R] = {
     Some(inExpr).collect(pred).orElse {
       inExpr match {
-        case PropE(_, _) ⇒ None
+        case VarE(_, _) ⇒ None
         case AppE(head, arg) ⇒ findFirst(head)(pred).orElse(findFirst(arg)(pred))
         case CurriedE(_, body) ⇒ findFirst(body)(pred)
         case UnitE(_) ⇒ None
@@ -243,7 +244,7 @@ sealed trait TermExpr {
   def prettyPrint: String = prettyRename.prettyPrintWithParentheses(0)
 
   override lazy val toString: String = this match {
-    case PropE(name, _) ⇒ s"$name"
+    case VarE(name, _) ⇒ s"$name"
     case AppE(head, arg) ⇒ s"($head $arg)"
     case CurriedE(heads, body) ⇒ s"\\(${heads.map(h ⇒ "(" + h.name + ":" + h.tExpr.prettyPrint + ")").mkString(" ⇒ ")} ⇒ $body)"
     case UnitE(_) ⇒ "()"
@@ -262,7 +263,7 @@ sealed trait TermExpr {
   }
 
   private[ch] def prettyPrintWithParentheses(level: Int): String = this match {
-    case PropE(name, _) ⇒ s"$name"
+    case VarE(name, _) ⇒ s"$name"
     case AppE(head, arg) ⇒
       val h = head.prettyPrintWithParentheses(1)
       val b = arg.prettyPrintWithParentheses(2)
@@ -332,7 +333,7 @@ sealed trait TermExpr {
   lazy val freeVars: Seq[String] = {
     import TermExpr.monoidSeq
     TermExpr.foldMap(this) {
-      case PropE(name, _) ⇒ Seq(name)
+      case VarE(name, _) ⇒ Seq(name)
       case CurriedE(heads, body) ⇒ body.freeVars.filterNot(heads.map(_.name).toSet.contains)
       case p: ProjectE ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
     }.distinct
@@ -341,7 +342,7 @@ sealed trait TermExpr {
   lazy val usedVars: Seq[String] = {
     import TermExpr.monoidSeq
     TermExpr.foldMap(this) {
-      case PropE(name, _) ⇒ Seq(name)
+      case VarE(name, _) ⇒ Seq(name)
       case p: ProjectE ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
     }.distinct
   }
@@ -349,7 +350,7 @@ sealed trait TermExpr {
   def varCount(varName: String): Int = {
     implicit val monoidInt: Monoid[Int] = TermExpr.monoidIntStandard
     TermExpr.foldMap(this) {
-      case PropE(name, _) ⇒ if (name == varName) 1 else 0
+      case VarE(name, _) ⇒ if (name == varName) 1 else 0
     }
   }
 
@@ -360,14 +361,14 @@ sealed trait TermExpr {
 
   def renameAllVars(oldAndNewNames: Map[String, String]): TermExpr = {
     TermExpr.substMap(this) {
-      case PropE(oldName, tExpr) ⇒
+      case VarE(oldName, tExpr) ⇒
         val replacedName = oldAndNewNames.getOrElse(oldName, oldName)
-        PropE(replacedName, tExpr)
+        VarE(replacedName, tExpr)
     }
   }
 }
 
-final case class PropE(name: String, tExpr: TypeExpr) extends TermExpr
+final case class VarE(name: String, tExpr: TypeExpr) extends TermExpr
 
 final case class AppE(head: TermExpr, arg: TermExpr) extends TermExpr {
 
@@ -396,7 +397,7 @@ final case class AppE(head: TermExpr, arg: TermExpr) extends TermExpr {
 }
 
 // The order of `heads` is straight, so `CurriedE(List(x1, x2, x3), body)` represents the term `x1 -> x2 -> x2 -> body`
-final case class CurriedE(heads: List[PropE], body: TermExpr) extends TermExpr {
+final case class CurriedE(heads: List[VarE], body: TermExpr) extends TermExpr {
   private val headsLength = heads.length
 
   // The type is t1 -> t2 -> t3 -> b; here `heads` = List(t1, t2, t3).
@@ -519,7 +520,7 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
       case t ⇒
         if (cases.nonEmpty && {
           casesSimplified.zipWithIndex.forall {
-            case (CurriedE(List(head@PropE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
+            case (CurriedE(List(head@VarE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
               val result = len == cases.length && ind == i && headT == conjT &&
                 projectionTerms.zipWithIndex.forall {
                   case (ProjectE(k, head1), j) if k == j && head1 == head ⇒ true
@@ -537,7 +538,7 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
           // MatchE(_, {f, f, ..., f}) where each clause is the same expression `f`, up to equivalence, and ignores its argument.
           // Then the entire term can be replaced by f.
           val bodyTerms: Set[Option[TermExpr]] = casesSimplified.map {
-            case c@CurriedE(List(PropE(name, _)), body) if TermExpr.unusedArgs(c) contains name ⇒ Some(body)
+            case c@CurriedE(List(VarE(name, _)), body) if TermExpr.unusedArgs(c) contains name ⇒ Some(body)
             case _ ⇒ None
           }.toSet
           bodyTerms.headOption match { // Are all elements of the initial sequence the same and equal to Some(body) ?

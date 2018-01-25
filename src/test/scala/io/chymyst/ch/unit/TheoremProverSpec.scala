@@ -13,15 +13,15 @@ class TheoremProverSpec extends FlatSpec with Matchers {
     val sequent = Sequent(List(BasicT("1"), BasicT("2")), BasicT("1"), freshVar)
     val terms = TheoremProver.findTermExprs(sequent)
     terms.length shouldEqual 1
-    TermExpr.equiv(terms.head, CurriedE(List(PropE("a", BasicT("1")), PropE("b", BasicT("2"))), PropE("a", BasicT("1")))) shouldEqual true
+    TermExpr.equiv(terms.head, CurriedE(List(VarE("a", BasicT("1")), VarE("b", BasicT("2"))), VarE("a", BasicT("1")))) shouldEqual true
   }
 
   it should "treat constant types as unique type variables and obtain two implementations" in {
     val sequent = Sequent(List(BasicT("1"), BasicT("1")), BasicT("1"), freshVar)
     val terms = TheoremProver.findTermExprs(sequent)
     terms.length shouldEqual 2
-    TermExpr.equiv(terms.head, CurriedE(List(PropE("a", BasicT("1")), PropE("b", BasicT("1"))), PropE("a", BasicT("1")))) shouldEqual true
-    TermExpr.equiv(terms(1), CurriedE(List(PropE("a", BasicT("1")), PropE("b", BasicT("1"))), PropE("b", BasicT("1")))) shouldEqual true
+    TermExpr.equiv(terms.head, CurriedE(List(VarE("a", BasicT("1")), VarE("b", BasicT("1"))), VarE("a", BasicT("1")))) shouldEqual true
+    TermExpr.equiv(terms(1), CurriedE(List(VarE("a", BasicT("1")), VarE("b", BasicT("1"))), VarE("b", BasicT("1")))) shouldEqual true
   }
 
   behavior of "named conjunctions"

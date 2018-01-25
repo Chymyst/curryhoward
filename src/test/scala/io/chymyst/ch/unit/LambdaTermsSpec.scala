@@ -9,7 +9,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
   it should "produce result terms" in {
     val terms1 = ofType[Int ⇒ Int]
-    terms1.lambdaTerm shouldEqual CurriedE(List(PropE("a", BasicT("Int"))), PropE("a", BasicT("Int")))
+    terms1.lambdaTerm shouldEqual CurriedE(List(VarE("a", BasicT("Int"))), VarE("a", BasicT("Int")))
 
     val terms2 = allOfType[Int ⇒ Int ⇒ Int]
     terms2.length shouldEqual 2
@@ -94,7 +94,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     idFunc.lambdaTerm.prettyPrint shouldEqual "a ⇒ a"
 
-    val readerTerm = PropE("rxa", TP("X") ->: TP("A"))
+    val readerTerm = VarE("rxa", TP("X") ->: TP("A"))
 
     val appl1 = TermExpr.simplifyWithEtaUntilStable(AppE(AppE(TermExpr.substTypeVar(TP("B"), TP("A"), mapReaderTerm), readerTerm), idFunc.lambdaTerm))
 
@@ -110,11 +110,11 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     fmapReaderTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ a (b c)"
 
-    val readerTerm = PropE("rxa", TP("X") ->: TP("A"))
-    val aTerm = PropE("a", TP("A"))
+    val readerTerm = VarE("rxa", TP("X") ->: TP("A"))
+    val aTerm = VarE("a", TP("A"))
 
-    val f1Term = PropE("f1", TP("A") ->: TP("B"))
-    val f2Term = PropE("f2", TP("B") ->: TP("C"))
+    val f1Term = VarE("f1", TP("A") ->: TP("B"))
+    val f2Term = VarE("f2", TP("B") ->: TP("C"))
 
     // fmap f1 . fmap f2 = fmap (f1 . f2)
     val fmapF1 = AppE(fmapReaderTerm, f1Term)
