@@ -335,13 +335,6 @@ class Macros(val c: whitebox.Context) {
     c.Expr[TypeExpr](q"$result")
   }
 
-  def testReifyTermsImpl[U: c.WeakTypeTag]: c.Expr[List[TermExpr]] = {
-    val typeU: c.Type = c.weakTypeOf[U]
-    val result: List[TermExpr] = TheoremProver.findProofs(buildTypeExpr(typeU))._1
-    import LiftedAST._
-    c.Expr[List[TermExpr]](q"$result")
-  }
-
   // This function is for testing buildTypeExpr().
   def testTypeImpl[T: c.WeakTypeTag]: c.Expr[(String, String)] = {
     val typeT: c.Type = c.weakTypeOf[T]

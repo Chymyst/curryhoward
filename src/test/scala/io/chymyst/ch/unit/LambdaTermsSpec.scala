@@ -8,28 +8,24 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   behavior of "lambdaTerms API"
 
   it should "produce result terms" in {
-    val terms1 = lambdaTerms[Int ⇒ Int]
-    terms1.length shouldEqual 1
-    terms1 shouldEqual Seq(CurriedE(List(PropE("a", BasicT("Int"))), PropE("a", BasicT("Int"))))
+    val terms1 = ofType[Int ⇒ Int]
+    terms1.lambdaTerm shouldEqual CurriedE(List(PropE("a", BasicT("Int"))), PropE("a", BasicT("Int")))
 
-    val terms2 = lambdaTerms[Int ⇒ Int ⇒ Int]
+    val terms2 = allOfType[Int ⇒ Int ⇒ Int]
     terms2.length shouldEqual 2
-    terms2.map(_.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ b", "a ⇒ b ⇒ a")
+    terms2.map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ b", "a ⇒ b ⇒ a")
 
-    val terms3 = lambdaTerms[Int ⇒ Int ⇒ (Int, Int)]
+    val terms3 = allOfType[Int ⇒ Int ⇒ (Int, Int)]
     terms3.length shouldEqual 2
-    terms3.map(_.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ Tuple2(b, a)", "a ⇒ b ⇒ Tuple2(a, b)")
+    terms3.map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ Tuple2(b, a)", "a ⇒ b ⇒ Tuple2(a, b)")
 
-    val terms4 = lambdaTerms[(Int, Int) ⇒ (Int, Int)]
+    val terms4 = allOfType[(Int, Int) ⇒ (Int, Int)]
     terms4.length shouldEqual 2
-    terms4.map(_.prettyPrint) shouldEqual Seq("a ⇒ Tuple2(a._1, a._2)", "a ⇒ Tuple2(a._2, a._1)")
+    terms4.map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ Tuple2(a._1, a._2)", "a ⇒ Tuple2(a._2, a._1)")
 
     val u: Unit = implement
 
     u shouldEqual (())
-
-    val ut = lambdaTerms[Unit]
-    ut shouldEqual Seq(UnitE(UnitT("Unit")))
 
     val u0 = ofType[Unit]
 
@@ -39,25 +35,40 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     u0s shouldEqual Seq(())
 
-    def f2[A] = lambdaTerms[Either[A ⇒ A, Unit]]
+    def f2[A] = allOfType[Either[A ⇒ A, Unit]]
 
     f2.length shouldEqual 2
-    f2.map(_.prettyPrint) shouldEqual Seq("(Left(a ⇒ a) + 0)", "(Right(1) + 0)")
 
-    def f3[A] = lambdaTerms[(A, A) ⇒ A]
+    // Check that we have no attached lambda-terms, since the result is not a function.
+
+    // Obligatory type parameter here, or else lambdaTerm does not work.
+    f2[Int].forall(TermExpr.lambdaTerm(_).isEmpty) shouldEqual true
+
+    // Check that the returned terms are "(Left(a ⇒ a) + 0)", "(Right(1) + 0)".
+    val Seq(f2a, f2b) = f2[String]
+
+    f2a match {
+      case Left(x) ⇒ x("abc") shouldEqual "abc"
+    }
+
+    f2b match {
+      case Right(y) ⇒ y shouldEqual (())
+    }
+
+    def f3[A] = allOfType[(A, A) ⇒ A]
 
     f3.length shouldEqual 2
-    f3.map(_.prettyPrint) shouldEqual Seq("a ⇒ a._1", "a ⇒ a._2")
+    f3[Int].map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ a._1", "a ⇒ a._2")
   }
 
   it should "produce result terms for functions of 2 and 3 arguments" in {
-    val terms1 = lambdaTerms[(Int, Int) ⇒ Int]
+    val terms1 = allOfType[(Int, Int) ⇒ Int]
     terms1.length shouldEqual 2
 
     val f1 = allOfType[(Int, Int) ⇒ Int]
     f1.flatMap(TermExpr.lambdaTerm).length shouldEqual 2
 
-    val terms2 = lambdaTerms[(Int, Int, Int) ⇒ Int]
+    val terms2 = allOfType[(Int, Int, Int) ⇒ Int]
     terms2.length shouldEqual 3
 
     val f2 = allOfType[(Int, Int, Int) ⇒ Int]
@@ -73,21 +84,19 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   it should "symbolically lambda-verify identity law for map on Reader monad" in {
     type R[X, A] = X ⇒ A
 
-    def mapReaderTerms[X, A, B] = lambdaTerms[R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B]]
+    def mapReader[X, A, B] = ofType[R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B]]
 
-    mapReaderTerms.length shouldEqual 1
-
-    val mapReaderTerm = mapReaderTerms.head
+    val mapReaderTerm = mapReader.lambdaTerm
 
     mapReaderTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ b (a c)"
 
-    def identityTerm[A] = lambdaTerms[A ⇒ A].head
+    def idFunc[A] = ofType[A ⇒ A]
 
-    identityTerm.prettyPrint shouldEqual "a ⇒ a"
+    idFunc.lambdaTerm.prettyPrint shouldEqual "a ⇒ a"
 
     val readerTerm = PropE("rxa", TP("X") ->: TP("A"))
 
-    val appl1 = TermExpr.simplifyWithEtaUntilStable(AppE(AppE(TermExpr.substTypeVar(TP("B"), TP("A"), mapReaderTerm), readerTerm), identityTerm))
+    val appl1 = TermExpr.simplifyWithEtaUntilStable(AppE(AppE(TermExpr.substTypeVar(TP("B"), TP("A"), mapReaderTerm), readerTerm), idFunc.lambdaTerm))
 
     appl1 shouldEqual readerTerm
   }
