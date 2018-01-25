@@ -81,14 +81,14 @@ class LJTSpec extends FlatSpec with Matchers {
     followsFromAxioms(Sequent(List(TP("3"), TP("2"), TP("1")), TP("0"), freshVar)) shouldEqual ((Seq(), Seq()))
 
     followsFromAxioms(Sequent(List(TP("3"), TP("2"), TP("1")), TP("1"), freshVar)) shouldEqual ((Seq(
-      CurriedE(List(PropE("x4", TP("3")), PropE("x5", TP("2")), PropE("x6", TP("1"))), PropE("x6", TP("1")))
+      CurriedE(List(VarE("x4", TP("3")), VarE("x5", TP("2")), VarE("x6", TP("1"))), VarE("x6", TP("1")))
     ), Seq()))
   }
 
   it should "produce several proofs from the Id axiom" in {
     followsFromAxioms(Sequent(List(TP("1"), TP("2"), TP("1")), TP("1"), freshVar)) shouldEqual ((Seq(
-      CurriedE(List(PropE("x7", TP("1")), PropE("x8", TP("2")), PropE("x9", TP("1"))), PropE("x7", TP("1"))),
-      CurriedE(List(PropE("x7", TP("1")), PropE("x8", TP("2")), PropE("x9", TP("1"))), PropE("x9", TP("1")))
+      CurriedE(List(VarE("x7", TP("1")), VarE("x8", TP("2")), VarE("x9", TP("1"))), VarE("x7", TP("1"))),
+      CurriedE(List(VarE("x7", TP("1")), VarE("x8", TP("2")), VarE("x9", TP("1"))), VarE("x9", TP("1")))
     ), Seq()))
   }
 
@@ -96,13 +96,13 @@ class LJTSpec extends FlatSpec with Matchers {
     val sequent = Sequent(List(TP("1")), TP("1"), freshVar)
     val terms = TheoremProver.findTermExprs(sequent)
     terms.length shouldEqual 1
-    TermExpr.equiv(terms.head, CurriedE(List(PropE("x1", TP("1"))), PropE("x1", TP("1")))) shouldEqual true
+    TermExpr.equiv(terms.head, CurriedE(List(VarE("x1", TP("1"))), VarE("x1", TP("1")))) shouldEqual true
 
     val sequent2 = Sequent(List(TP("3"), TP("2"), TP("1")), TP("2"), freshVar)
     val terms2 = TheoremProver.findTermExprs(sequent2)
     terms2.length shouldEqual 1
     TermExpr.equiv(terms2.head,
-      CurriedE(List(PropE("x2", TP("3")), PropE("x3", TP("2")), PropE("x4", TP("1"))), PropE("x3", TP("2")))
+      CurriedE(List(VarE("x2", TP("3")), VarE("x3", TP("2")), VarE("x4", TP("1"))), VarE("x3", TP("2")))
     ) shouldEqual true
   }
 
@@ -110,7 +110,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val sequent = Sequent(List(TP("1"), TP("2")), TP("1"), freshVar)
     val terms = TheoremProver.findTermExprs(sequent)
     terms.length shouldEqual 1
-    TermExpr.equiv(terms.head, CurriedE(List(PropE("a", TP("1")), PropE("b", TP("2"))), PropE("a", TP("1")))) shouldEqual true
+    TermExpr.equiv(terms.head, CurriedE(List(VarE("a", TP("1")), VarE("b", TP("2"))), VarE("a", TP("1")))) shouldEqual true
   }
 
   behavior of "proof search - high-level API, rule ->R"
@@ -119,7 +119,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val typeExpr = TP("1") ->: TP("1")
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP("1"))), PropE("x", TP("1")))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("1"))), VarE("x", TP("1")))) shouldEqual true
   }
 
   it should "find proof term for the K combinator using rule ->R" in {
@@ -127,7 +127,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
     println(proofs.head)
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP("1")), PropE("y", TP("2"))), PropE("x", TP("1")))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("1")), VarE("y", TP("2"))), VarE("x", TP("1")))) shouldEqual true
   }
 
   it should "find proof term for the flipped K combinator using rule ->R" in {
@@ -135,7 +135,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
     println(proofs.head)
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP("2")), PropE("y", TP("1"))), PropE("y", TP("1")))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("2")), VarE("y", TP("1"))), VarE("y", TP("1")))) shouldEqual true
   }
 
   it should "find proof term for the constant function with 2 arguments using rule ->R" in {
@@ -143,7 +143,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
     println(proofs.head)
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP("0")), PropE("y", TP("1")), PropE("z", TP("2"))), PropE("x", TP("0")))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("0")), VarE("y", TP("1")), VarE("z", TP("2"))), VarE("x", TP("0")))) shouldEqual true
   }
 
   it should "find proof term for the 1-switched constant function with 2 arguments using rule ->R" in {
@@ -151,7 +151,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
     println(proofs.head)
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP("0")), PropE("y", TP("1")), PropE("z", TP("2"))), PropE("y", TP("1")))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("0")), VarE("y", TP("1")), VarE("z", TP("2"))), VarE("y", TP("1")))) shouldEqual true
   }
 
   it should "find proof term for the 2-switched constant function with 2 arguments using rule ->R" in {
@@ -159,7 +159,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
     println(proofs.head)
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP("0")), PropE("y", TP("1")), PropE("z", TP("2"))), PropE("z", TP("2")))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("0")), VarE("y", TP("1")), VarE("z", TP("2"))), VarE("z", TP("2")))) shouldEqual true
   }
 
   behavior of "proof search - high-level API, rule +Rn"
@@ -169,7 +169,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val typeExpr = TP("1") ->: disjunctT
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP("1"))), DisjunctE(0, 2, PropE("x", TP("1")), disjunctT))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("1"))), DisjunctE(0, 2, VarE("x", TP("1")), disjunctT))) shouldEqual true
   }
 
   it should "find proof term for simple instance of +Rn with several disjuncts" in {
@@ -177,7 +177,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val typeExpr = TP("2") ->: disjunctT
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
-    TermExpr.equiv(proofs.head, CurriedE(List(PropE("x", TP("2"))), DisjunctE(1, 3, PropE("x", TP("2")), disjunctT))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("2"))), DisjunctE(1, 3, VarE("x", TP("2")), disjunctT))) shouldEqual true
   }
 
   it should "inhabit type using +Rn" in {

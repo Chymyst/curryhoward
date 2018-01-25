@@ -63,13 +63,28 @@ package object ch {
     */
   def ofType[U](values: Any*): U = macro Macros.ofTypeImplWithValues[U]
 
-  /** Obtain a list of lambda-terms implementing a given type expression.
+  /** Obtain the lambda-term from an enriched expression that results from `ofType`.
+    * Will throw an exception if the expression is not obtained from `ofType` or `allOfType`.
     *
-    * @tparam U The type expression to be implemented.
-    * @return A list of abstract syntax trees representing the (typed) lambda-terms,
-    *         each implementing the given type `U`.
+    * @param x An expression that was automatically produced by `ofType` or `allOfType`.
     */
-  def lambdaTerms[U]: List[TermExpr] = macro Macros.testReifyTermsImpl[U]
+  implicit class WithLambdaTerm(val x: Any) extends AnyVal {
+    def lambdaTerm: TermExpr = x match {
+      case g: Function0Lambda[_] ⇒ g.lambdaTerm
+      case g: Function1Lambda[_, _] ⇒ g.lambdaTerm
+      case g: Function2Lambda[_, _, _] ⇒ g.lambdaTerm
+      case g: Function3Lambda[_, _, _, _] ⇒ g.lambdaTerm
+      case _ ⇒ throw new Exception("Called `.lambdaTerm` on an expression that has no attached lambda-term")
+    }
+  }
+
+  /** Create a new fresh variable term of given type.
+    *
+    * @tparam X Type expression that will be assigned to the new variable.
+    * @return A new variable.
+    */
+  def freshVar[X]: VarE = macro Macros.freshVarImpl[X]
+
 }
 
 // Note: for some reason, a macro with arguments cannot properly infer types.

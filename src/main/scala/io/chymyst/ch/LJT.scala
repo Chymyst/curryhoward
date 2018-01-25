@@ -110,8 +110,8 @@ object LJT {
           // This rule expects several different proof terms.
           val thePremiseVarAB = sequent.premiseVars(i) // of type A+B
 
-          val oldPremisesWithoutI: List[PropE] = omitPremise(sequent.premiseVars.zipWithIndex, i)
-          val freshVarsAB = heads.map(PropE(sequent.freshVar(), _)).toList
+          val oldPremisesWithoutI: List[VarE] = omitPremise(sequent.premiseVars.zipWithIndex, i)
+          val freshVarsAB = heads.map(VarE(sequent.freshVar(), _)).toList
           // Each part of the disjunction is matched with a function of the form fv ⇒ TermExpr(fv, other_premises).
           val subTerms = TermExprs.zip(freshVarsAB)
             .map { case (pt, fv) ⇒ (fv.tExpr, CurriedE(List(fv), TermExpr.applyToVars(pt, fv :: oldPremisesWithoutI))) }
@@ -127,7 +127,7 @@ object LJT {
   }
   )
 
-  final case class UniRuleLogic(additionalPremises: Seq[TypeExpr], produceAdditionalTerms: (Sequent, PropE) ⇒ List[TermExpr])
+  final case class UniRuleLogic(additionalPremises: Seq[TypeExpr], produceAdditionalTerms: (Sequent, VarE) ⇒ List[TermExpr])
 
   // Uniform rules: delete one premise, add one or more new premises, do not change the goal, generate only one new sequent.
 
@@ -147,7 +147,7 @@ object LJT {
 
             val additionalValues: List[TermExpr] = produceAdditionalTerms(sequent, thePremiseVar) // The terms P1, P2, ..., Pn.
 
-            val oldPremisesWithoutI: List[PropE] = omitPremise(sequent.premiseVars.zipWithIndex, i)
+            val oldPremisesWithoutI: List[VarE] = omitPremise(sequent.premiseVars.zipWithIndex, i)
             val result = TermExpr.applyToVars(proofTerm, additionalValues ++ oldPremisesWithoutI)
             sequent.constructResultTerm(result) // The proof term for the sequent (G*, P1, P2, ..., Pn) |- C.
           }
@@ -167,7 +167,7 @@ object LJT {
   // (G*, (A & B) ⇒ C) |- D when (G*, A ⇒ B ⇒ C) |- D  -- rule ->L2
   private def ruleImplicationAtLeft2 = uniformRule("->L2") {
     case ConjunctT(heads) #-> argC ⇒ UniRuleLogic(Seq(heads.reverse.foldLeft(argC) { case (prev, h) ⇒ h ->: prev }), { (sequent, premiseVar) ⇒
-      val freshVarsAB = heads.map(PropE(sequent.freshVar(), _)).toList
+      val freshVarsAB = heads.map(VarE(sequent.freshVar(), _)).toList
       val func_A_B_to_C = CurriedE(freshVarsAB, AppE(premiseVar, ConjunctE(freshVarsAB)))
       List(func_A_B_to_C)
     })
@@ -176,7 +176,7 @@ object LJT {
   // (G*, (A + B) ⇒ C) |- D when (G*, A ⇒ C, B ⇒ C) |- D  - rule ->L3
   private def ruleImplicationAtLeft3 = uniformRule("->L3") {
     case (disjunctT@DisjunctT(_, _, heads)) #-> argC ⇒ UniRuleLogic(heads.map(_ ->: argC), { (sequent, premiseVar) ⇒
-      val freshVarsAB = heads.map(PropE(sequent.freshVar(), _))
+      val freshVarsAB = heads.map(VarE(sequent.freshVar(), _))
       val functionsAC_BC = freshVarsAB.zipWithIndex.map { case (fv, ind) ⇒
         CurriedE(List(fv), AppE(premiseVar, DisjunctE(ind, heads.length, fv, disjunctT)))
       }
@@ -312,7 +312,7 @@ object LJT {
         case _ ⇒ wrapped
       })
       UniRuleLogic(Seq(unwrapped ->: argC), { (sequent, premiseVar) ⇒
-        val fv = PropE(sequent.freshVar(), unwrapped)
+        val fv = VarE(sequent.freshVar(), unwrapped)
         // Need to produce a term termAB_C : (A & B) ⇒ C, given premiseVar : Named(A, B) ⇒ C.
         // Use the free variable fv : A & B. We first construct namedAB : Named(A, B) using fv, and then apply premiseVar to it.
         // The resulting term is fv ⇒ premiseVar namedAB
@@ -366,8 +366,8 @@ object LJT {
         val oldPremisesWithoutImplPremise = omitPremise(sequent.premiseVars.zipWithIndex, i)
 
         // Using the lemma |-  ((A ⇒ B) ⇒ C) ⇒ B ⇒ C, construct the proof of the original sequent.
-        val varB = PropE(sequent.freshVar(), b)
-        val varDummyA = PropE(sequent.freshVar(), a)
+        val varB = VarE(sequent.freshVar(), b)
+        val varDummyA = VarE(sequent.freshVar(), a)
         val valueConstAB = CurriedE(List(varDummyA), varB)
         val valueBC = CurriedE(List(varB), AppE(implPremiseVarABC, valueConstAB))
         val valueAB = TermExpr.applyToVars(termBCAB, valueBC :: oldPremisesWithoutImplPremise)
