@@ -1,7 +1,5 @@
 package io.chymyst.ch
 
-import java.util.concurrent.atomic.AtomicInteger
-
 import scala.language.experimental.macros
 //import scala.reflect.macros.blackbox
 import scala.reflect.macros.whitebox
@@ -334,7 +332,6 @@ class Macros(val c: whitebox.Context) {
     val typeUExpr = buildTypeExpr(typeU)
     if (debug) c.info(c.enclosingPosition, s"Built type expression ${typeUExpr.prettyPrint} from type $typeU", force = true)
     val ident: String = Macros.freshIdentForFreshVar()
-    c.info(c.enclosingPosition, s"debug - freshVar output VarE($ident, $typeUExpr)", force = true)
     import LiftedAST._
     c.Expr[VarE](q"VarE($ident, $typeUExpr)")
   }
@@ -453,7 +450,7 @@ class Macros(val c: whitebox.Context) {
     result
   }
 
-  val MAX_TERM_SIZE_FOR_LAMBDA_EXPORT = 128
+  val MAX_TERM_SIZE_FOR_LAMBDA_EXPORT = 256
 
   private def inhabitAllInternal(
     typeStructure: TypeExpr,
