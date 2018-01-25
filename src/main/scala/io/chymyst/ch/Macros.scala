@@ -452,7 +452,7 @@ class Macros(val c: whitebox.Context) {
     result
   }
 
-  val MAX_TERM_SIZE_FOR_LAMBDA_EXPORT = 128
+  val MAX_TERM_SIZE_FOR_LAMBDA_EXPORT = 1024
 
   private def inhabitAllInternal(
     typeStructure: TypeExpr,

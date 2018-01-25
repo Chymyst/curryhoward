@@ -170,6 +170,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "support filter syntax" in {
+
     final case class C[A](d: Option[(A, A)]) {
       // greedy filter on the product
       def map[B](f: A ⇒ B): C[B] = implement
