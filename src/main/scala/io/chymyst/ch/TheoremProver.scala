@@ -6,7 +6,7 @@ import scala.collection.mutable
 
 
 object TheoremProver {
-  private def debug = Macros.options contains "prover"
+  private def debug = true // Macros.options contains "prover"
 
   private def debugTrace = Macros.options contains "trace"
 
