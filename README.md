@@ -132,6 +132,7 @@ For a good overview of approaches to IPL theorem proving, see these talk slides:
 # Known bugs
 
 - Limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. Example that fails to generate sensible code: `T => List[T]` (the generated code always returns empty list)
+- Functions with zero arguments are currently not supported, e.g. `ofType[Int => () => Int]` will not compile
 
 # Examples of working functionality
 

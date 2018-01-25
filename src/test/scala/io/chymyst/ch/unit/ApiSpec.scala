@@ -153,4 +153,12 @@ class ApiSpec extends LawChecking {
     f._1(123) shouldEqual 123
     f._2("abc") shouldEqual "abc"
   }
+
+  behavior of "java-style functions"
+
+  it should "handle function with zero arguments" in {
+    // TODO: fix this
+    "val f = ofType[Int ⇒ () ⇒ Int]" shouldNot compile
+//    f(123)() shouldEqual 123
+  }
 }

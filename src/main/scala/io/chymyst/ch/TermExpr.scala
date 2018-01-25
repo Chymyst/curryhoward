@@ -442,6 +442,7 @@ final case class ConjunctE(terms: Seq[TermExpr]) extends TermExpr {
 final case class ProjectE(index: Int, term: TermExpr) extends TermExpr {
   def getProjection: Option[TermExpr] = term match {
     case c: ConjunctE ⇒ Some(c.terms(index))
+    case c: NamedConjunctE ⇒ Some(c.terms(index))
     case _ ⇒ None
   }
 

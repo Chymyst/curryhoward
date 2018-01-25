@@ -389,7 +389,9 @@ class Macros(val c: whitebox.Context) {
       .map { case (v, i) ⇒ (PropE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
     val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
-    inhabitOneInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
+    inhabitOneInternal(typeStructure, givenVars.toMap, createLambdas = true) { term ⇒
+      givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }
+    }
   }
 
   def allOfTypeImpl[U: c.WeakTypeTag]: c.Tree = allOfTypeImplWithValues[U]()
@@ -410,20 +412,22 @@ class Macros(val c: whitebox.Context) {
     *
     * @param typeStructure A type expression to be implemented.
     * @param givenArgs     Available Scala values that can be used while implementing the type.
+    * @param createLambdas Whether to create symbolic lambda-terms together with Scala code (may be slower)
     * @param transform     A final transformation for the implemented expression (e.g. apply it to some given arguments).
     * @return A Scala expression tree for the implemented expression.
     *         Will return `null` if the theorem prover fails to find a single "best" implementation.
     */
   private def inhabitOneInternal(
     typeStructure: TypeExpr,
-    givenArgs: Map[PropE, c.Tree] = Map()
+    givenArgs: Map[PropE, c.Tree] = Map(),
+    createLambdas: Boolean = false
   )(
     transform: TermExpr ⇒ TermExpr = identity
   ): c.Tree = {
     TheoremProver.inhabitInternal(typeStructure) match {
       case Right((messageOpt, foundTerm)) ⇒
         messageOpt.foreach(message ⇒ c.warning(c.enclosingPosition, message))
-        returnTerm(transform(foundTerm), givenArgs)
+        returnTerm(transform(foundTerm), givenArgs, createLambdas)
       case Left(errorMessage) ⇒
         c.error(c.enclosingPosition, errorMessage)
         q"null"
@@ -431,7 +435,7 @@ class Macros(val c: whitebox.Context) {
 
   }
 
-  private def returnTerm(termFound: TermExpr, givenArgs: Map[PropE, c.Tree], createLambdas: Boolean = true): c.Tree = {
+  private def returnTerm(termFound: TermExpr, givenArgs: Map[PropE, c.Tree], createLambdas: Boolean): c.Tree = {
     import LiftedAST._
     val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
     c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)

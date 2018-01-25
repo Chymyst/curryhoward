@@ -50,6 +50,26 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     f3.map(_.prettyPrint) shouldEqual Seq("a ⇒ a._1", "a ⇒ a._2")
   }
 
+  it should "produce result terms for functions of 2 and 3 arguments" in {
+    val terms1 = lambdaTerms[(Int, Int) ⇒ Int]
+    terms1.length shouldEqual 2
+
+    val f1 = allOfType[(Int, Int) ⇒ Int]
+    f1.flatMap(TermExpr.lambdaTerm).length shouldEqual 2
+
+    val terms2 = lambdaTerms[(Int, Int, Int) ⇒ Int]
+    terms2.length shouldEqual 3
+
+    val f2 = allOfType[(Int, Int, Int) ⇒ Int]
+    f2.flatMap(TermExpr.lambdaTerm).length shouldEqual 3
+  }
+
+  it should "produce no lambda-terms when `implement` is used" in {
+    val terms1: Int ⇒ Int = implement
+
+    TermExpr.lambdaTerm(terms1) shouldEqual None
+  }
+
   it should "symbolically lambda-verify identity law for map on Reader monad" in {
     type R[X, A] = X ⇒ A
 
@@ -99,9 +119,13 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     appl1 shouldEqual appl2
   }
 
-  it should "return lambda terms together with the function" in {
-    def f2[A]: Unit ⇒ Either[A ⇒ A, Unit] = implement
+  it should "return lambda terms together with the function when using `ofType` but not when using `implement`" in {
+    def f2[A] = ofType[Unit ⇒ Either[A ⇒ A, Unit]]
 
     TermExpr.lambdaTerm(f2).map(_.prettyPrint) shouldEqual Some("a ⇒ (0 + Right(a))")
+
+    def f2a[A]: Unit ⇒ Either[A ⇒ A, Unit] = implement
+
+    TermExpr.lambdaTerm(f2a) shouldEqual None
   }
 }
