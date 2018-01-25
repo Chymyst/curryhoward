@@ -1,7 +1,7 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{Assertion, FlatSpec, Matchers}
 
 class LJTSpec4 extends FlatSpec with Matchers {
 
@@ -9,5 +9,6 @@ class LJTSpec4 extends FlatSpec with Matchers {
   behavior of "misc. tests"
 
   it should "work" in {
+
   }
 }

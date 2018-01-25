@@ -1,5 +1,7 @@
 package io.chymyst.ch
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import scala.language.experimental.macros
 //import scala.reflect.macros.blackbox
 import scala.reflect.macros.whitebox
@@ -168,6 +170,7 @@ class Macros(val c: whitebox.Context) {
     }
   }
 
+  // These implicits are required for generating type expressions and term expressions as values.
   object LiftedAST {
     implicit def liftedTypeExpr: Liftable[TypeExpr] = Liftable[TypeExpr] {
       case DisjunctT(constructor, tParams, terms) ⇒ q"_root_.io.chymyst.ch.DisjunctT($constructor, Seq(..$tParams), Seq(..$terms))"
@@ -326,13 +329,12 @@ class Macros(val c: whitebox.Context) {
     }
   }
 
-  private val freshIdentForFreshVar = new FreshIdents("zZ")
-
   def freshVarImpl[U: c.WeakTypeTag]: c.Expr[VarE] = {
     val typeU: c.Type = c.weakTypeOf[U]
     val typeUExpr = buildTypeExpr(typeU)
     if (debug) c.info(c.enclosingPosition, s"Built type expression ${typeUExpr.prettyPrint} from type $typeU", force = true)
-    val ident = freshIdentForFreshVar()
+    val ident: String = Macros.freshIdentForFreshVar()
+    c.info(c.enclosingPosition, s"debug - freshVar output VarE($ident, $typeUExpr)", force = true)
     import LiftedAST._
     c.Expr[VarE](q"VarE($ident, $typeUExpr)")
   }
@@ -469,6 +471,9 @@ class Macros(val c: whitebox.Context) {
 }
 
 object Macros {
+  // Note: this cannot be in the Macros class because that class is instantiated every time a macro is called!
+  private[ch] val freshIdentForFreshVar = new FreshIdents("zZ")
+
   /** The JVM system property `curryhoward.log` can be set to a comma-separated list of words.
     * Each word must be one of `prover`, `macros`, or `terms`.
     *

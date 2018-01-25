@@ -1,11 +1,10 @@
 package io.chymyst.ch
 
 import scala.annotation.tailrec
-import scala.util.Try
 
 object TermExpr {
   @tailrec
-  def simplifyWithEtaUntilStable(t: TermExpr): TermExpr = {
+  private[ch] def simplifyWithEtaUntilStable(t: TermExpr): TermExpr = {
     val simplified = t.simplify(withEta = true)
     if (t == simplified) t else simplifyWithEtaUntilStable(simplified)
   }
@@ -304,7 +303,7 @@ sealed trait TermExpr {
     case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : ${tExpr.prettyPrint} because its type is not a conjunction")
   }
 
-  def simplify(withEta: Boolean = false): TermExpr = this
+  private[ch] def simplify(withEta: Boolean = false): TermExpr = this
 
   private[ch] def unusedMatchClauseVars: Double = {
     import TermExpr.monoidDouble
@@ -379,7 +378,7 @@ final case class AppE(head: TermExpr, arg: TermExpr) extends TermExpr {
     case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application $this: `${head.tExpr.prettyPrint}` must be a function with argument type `${arg.tExpr.prettyPrint}`")
   }
 
-  override def simplify(withEta: Boolean): TermExpr = {
+  private[ch] override def simplify(withEta: Boolean): TermExpr = {
     val headSimpl = head.simplify(withEta)
     val argSimpl = arg.simplify(withEta)
 
@@ -403,7 +402,7 @@ final case class CurriedE(heads: List[VarE], body: TermExpr) extends TermExpr {
   // The type is t1 -> t2 -> t3 -> b; here `heads` = List(t1, t2, t3).
   def tExpr: TypeExpr = heads.reverse.foldLeft(body.tExpr) { case (prev, head) ⇒ head.tExpr ->: prev }
 
-  override def simplify(withEta: Boolean): TermExpr = {
+  private[ch] override def simplify(withEta: Boolean): TermExpr = {
     body.simplify(withEta) match {
       // Check for eta-contraction: simplify x ⇒ y ⇒ ... ⇒ z ⇒ a ⇒ f a into x ⇒ y ⇒ ... ⇒ z ⇒ f.
       // Here fHead = a and fBody = f; the last element of `heads` must be equal to `a`
@@ -430,13 +429,13 @@ final case class CurriedE(heads: List[VarE], body: TermExpr) extends TermExpr {
 final case class UnitE(tExpr: TypeExpr) extends TermExpr
 
 final case class NamedConjunctE(terms: Seq[TermExpr], tExpr: NamedConjunctT) extends TermExpr {
-  override def simplify(withEta: Boolean): TermExpr = this.copy(terms = terms.map(_.simplify(withEta)))
+  private[ch] override def simplify(withEta: Boolean): TermExpr = this.copy(terms = terms.map(_.simplify(withEta)))
 }
 
 final case class ConjunctE(terms: Seq[TermExpr]) extends TermExpr {
   def tExpr: TypeExpr = ConjunctT(terms.map(_.tExpr))
 
-  override def simplify(withEta: Boolean): TermExpr = this.copy(terms = terms.map(_.simplify(withEta)))
+  private[ch] override def simplify(withEta: Boolean): TermExpr = this.copy(terms = terms.map(_.simplify(withEta)))
 }
 
 // The `term` should be a ConjunctT or a NamedConjunctT
@@ -458,7 +457,7 @@ final case class ProjectE(index: Int, term: TermExpr) extends TermExpr {
     case _ ⇒ throw new Exception(s"Internal error: Invalid projection term $term whose type ${term.tExpr.prettyPrint} is not a conjunction")
   }
 
-  override def simplify(withEta: Boolean): TermExpr = term.simplify(withEta) match {
+  private[ch] override def simplify(withEta: Boolean): TermExpr = term.simplify(withEta) match {
     case ConjunctE(terms) ⇒ terms(index).simplify(withEta)
     case MatchE(t, cases) ⇒
       MatchE(t, cases.map {
@@ -507,7 +506,7 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
     case Nil ⇒ throw new Exception(s"Internal error: empty list of cases for $this")
   }
 
-  override def simplify(withEta: Boolean): TermExpr = {
+  private[ch] override def simplify(withEta: Boolean): TermExpr = {
     lazy val casesSimplified = cases.map(_.simplify(withEta))
     term.simplify(withEta) match {
       case DisjunctE(index, total, t, _) ⇒
@@ -557,7 +556,7 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
 
 // Inject a value into the i-th part of the disjunction of type tExpr.
 final case class DisjunctE(index: Int, total: Int, term: TermExpr, tExpr: TypeExpr) extends TermExpr {
-  override def simplify(withEta: Boolean): TermExpr = this.copy(term = term.simplify(withEta))
+  private[ch] override def simplify(withEta: Boolean): TermExpr = this.copy(term = term.simplify(withEta))
 }
 
 // Function classes carrying the symbolic term information.

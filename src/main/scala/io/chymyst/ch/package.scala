@@ -78,6 +78,11 @@ package object ch {
     }
   }
 
+  implicit class WithLambdaCalculus(val x: TermExpr) extends AnyVal {
+    def apply(y: TermExpr): TermExpr = AppE(x, y)
+    
+  }
+
   /** Create a new fresh variable term of given type.
     *
     * @tparam X Type expression that will be assigned to the new variable.
