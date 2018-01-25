@@ -576,4 +576,3 @@ final class Function3Lambda[-Arg1, -Arg2, -Arg3, +Res](f: (Arg1, Arg2, Arg3) ⇒
   override def apply(a1: Arg1, a2: Arg2, a3: Arg3): Res = f(a1, a2, a3)
 }
 
-// 438 Shotwell St. - new Driver office.

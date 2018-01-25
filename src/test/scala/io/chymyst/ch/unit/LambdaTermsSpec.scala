@@ -75,19 +75,28 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   it should "symbolically lambda-verify composition law for map on Reader monad" in {
     type R[X, A] = X ⇒ A
 
-    def fmapReader[X, A, B] = ofType[R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B]]
+    def fmapReader[X, A, B] = ofType[(A ⇒ B) ⇒ R[X, A] ⇒ R[X, B]]
 
     val fmapReaderTerm = TermExpr.lambdaTerm(fmapReader).get
 
-    fmapReaderTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ b (a c)"
+    fmapReaderTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ a (b c)"
 
     val readerTerm = PropE("rxa", TP("X") ->: TP("A"))
+    val aTerm = PropE("a", TP("A"))
 
     val f1Term = PropE("f1", TP("A") ->: TP("B"))
     val f2Term = PropE("f2", TP("B") ->: TP("C"))
 
-    val appl1 = TermExpr.simplifyWithEtaUntilStable()
-    appl1 shouldEqual readerTerm
+    // fmap f1 . fmap f2 = fmap (f1 . f2)
+    val fmapF1 = AppE(fmapReaderTerm, f1Term)
+    val fmapAC = TermExpr.substTypeVar(TP("B"), TP("C"), fmapReaderTerm)
+    val fmapF2 = AppE(TermExpr.substTypeVar(TP("A"), TP("B"), fmapAC), f2Term)
+    val fmapf1f2rxa = AppE(AppE(fmapAC, CurriedE(List(aTerm), AppE(f2Term, AppE(f1Term, aTerm)))), readerTerm)
+
+    val fmapF1fmapF2rxa = AppE(fmapF2, AppE(fmapF1, readerTerm))
+    val appl1 = TermExpr.simplifyWithEtaUntilStable(fmapf1f2rxa)
+    val appl2 = TermExpr.simplifyWithEtaUntilStable(fmapF1fmapF2rxa)
+    appl1 shouldEqual appl2
   }
 
   it should "return lambda terms together with the function" in {
