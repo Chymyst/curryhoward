@@ -13,14 +13,14 @@ final case class Sequent(premises: List[TypeExpr], goal: TypeExpr, freshVar: Fre
     * @param p Proof term to apply to our premises.
     * @return Resulting term.
     */
-  def substituteInto(p: TermExpr): TermExpr = TermExpr.applyToVars(p, premiseVars).simplify()
+  def substituteInto(p: TermExpr): TermExpr = TermExpr.applyToVars(p, premiseVars).simplifyOnce()
 
   /** Construct a function term that takes all the sequent's premises as arguments and returns a given term.
     *
     * @param result A given term that should use the sequent's `premiseVars`.
     * @return A function term.
     */
-  def constructResultTerm(result: TermExpr): TermExpr = CurriedE(premiseVars, result).simplify()
+  def constructResultTerm(result: TermExpr): TermExpr = CurriedE(premiseVars, result).simplifyOnce()
 
   override lazy val toString: String = s"[${premises.map(_.prettyPrint).mkString("; ")} |- ${goal.prettyPrint}]"
 }

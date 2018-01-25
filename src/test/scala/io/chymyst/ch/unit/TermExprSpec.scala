@@ -86,7 +86,7 @@ class TermExprSpec extends FlatSpec with Matchers {
     val termExpr0 = VarE("y", TP("1"))
     val termExpr1 = CurriedE(List(VarE("x", TP("1") ->: TP("1"))), termExpr0) // x: A -> x
     val termExpr2 = AppE(termExpr1, VarE("z", TP("1") ->: TP("1")))
-    termExpr2.simplify() shouldEqual termExpr0 // (x: A -> y)(z) == y
+    termExpr2.simplifyOnce() shouldEqual termExpr0 // (x: A -> y)(z) == y
   }
 
   it should "simplify nested terms" in {
@@ -94,11 +94,11 @@ class TermExprSpec extends FlatSpec with Matchers {
     val x2 = VarE("x2", TP("1") ->: TP("2")) // x2: A → B
     val x3 = VarE("x3", TP("1")) // x3: A
     val t1 = AppE(f1, VarE("y", TP("2")))
-    t1.simplify() shouldEqual CurriedE(List(VarE("x5", TP("1"))), VarE("y", TP("2")))
+    t1.simplifyOnce() shouldEqual CurriedE(List(VarE("x5", TP("1"))), VarE("y", TP("2")))
 
     // x3:A -> (x2:A → B) -> (x4:B  -> x5:A -> x4:B) ( (x2:A → B)(x3:A) ) (x3:A)
     val termExpr4 = CurriedE(List(x3, x2), AppE(AppE(f1, AppE(x2, x3)), x3))
-    termExpr4.simplify() shouldEqual CurriedE(List(x3, x2), AppE(x2, x3))
+    termExpr4.simplifyOnce() shouldEqual CurriedE(List(x3, x2), AppE(x2, x3))
   }
 
   behavior of "Sequent#constructResultTerm"

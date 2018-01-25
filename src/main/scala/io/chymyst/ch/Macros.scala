@@ -285,8 +285,8 @@ class Macros(val c: whitebox.Context) {
             p,
             ConjunctE(termTypes.zipWithIndex.map { case (t, i) ⇒ VarE(conjunctSubstName(p, i), t) }),
             prev
-          ).simplify()
-        }.simplify(withEta = true)
+          ).simplifyOnce()
+        }.simplifyOnce(withEta = true)
 
         // Need to be careful to substitute arguments that are of type ConjunctT, because they represent java-style arg groups.
         heads.reverse.foldLeft(reifyTermShort(replacedBody)) { case (prevTree, paramE) ⇒

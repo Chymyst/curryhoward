@@ -91,7 +91,7 @@ object TheoremProver {
       val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
       val t0 = System.currentTimeMillis()
 
-      val result = transformedProofs.map(_.simplify()).distinct.sortBy(_.informationLossScore).take(maxTermsToSelect(sequent))
+      val result = transformedProofs.map(_.simplifyOnce()).distinct.sortBy(_.informationLossScore).take(maxTermsToSelect(sequent))
       // Note: at this point, it is a mistake to do prettyRename, because we are calling this function recursively.
       // We will call prettyRename() at the very end of the proof search.
       if (debug) {
@@ -151,7 +151,7 @@ object TheoremProver {
               fromNoninvertibleRules ++ fromAxioms
             //              }
           }
-          val termsFound = fromRules.map(_.simplify()).distinct
+          val termsFound = fromRules.map(_.simplifyOnce()).distinct
           if (debug || debugTrace) {
             val termsMessage = termsFound.length match {
               case 0 ⇒ "no terms"

@@ -92,16 +92,19 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     def idFunc[A] = ofType[A ⇒ A]
 
-    idFunc.lambdaTerm.prettyPrint shouldEqual "a ⇒ a"
+    val idTermA = idFunc.lambdaTerm
+    idTermA.prettyPrint shouldEqual "a ⇒ a"
 
     def readerTerm[X, A] = freshVar[X ⇒ A]
 
-    val appl1 = TermExpr.simplifyWithEtaUntilStable(AppE(AppE(TermExpr.substTypeVar(TP("B"), TP("A"), mapReaderTerm), readerTerm), idFunc.lambdaTerm))
+    val mapReaderAA = TermExpr.substTypeVar(TP("B"), TP("A"), mapReaderTerm)
 
-    appl1 shouldEqual readerTerm
+    // map(rxa)(id) = rxa
+    val appl1 = mapReaderAA(readerTerm)(idTermA)
+    appl1.simplify shouldEqual readerTerm
   }
 
-  it should "symbolically lambda-verify composition law for map on Reader monad" in {
+  it should "symbolically lambda-verify composition law for fmap on Reader monad" in {
     type R[X, A] = X ⇒ A
 
     def check[X, A, B, C](): Assertion = {
@@ -112,19 +115,22 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
       fmapReaderTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ a (b c)"
 
       val readerTerm = freshVar[X ⇒ A]
-      val aTerm  = freshVar[A]
-      val f1Term  = freshVar[A ⇒ B]
-      val f2Term  = freshVar[B ⇒ C]
+      val aTerm = freshVar[A]
+      val f1Term = freshVar[A ⇒ B]
+      val f2Term = freshVar[B ⇒ C]
 
       // fmap f1 . fmap f2 = fmap (f1 . f2)
-      val fmapF1 = AppE(fmapReaderTerm, f1Term)
+      val fmapF1 = fmapReaderTerm(f1Term)
       val fmapAC = TermExpr.substTypeVar(TP("B"), TP("C"), fmapReaderTerm)
-      val fmapF2 = AppE(TermExpr.substTypeVar(TP("A"), TP("B"), fmapAC), f2Term)
-      val fmapf1f2rxa = AppE(AppE(fmapAC, CurriedE(List(aTerm), AppE(f2Term, AppE(f1Term, aTerm)))), readerTerm)
 
-      val fmapF1fmapF2rxa = AppE(fmapF2, AppE(fmapF1, readerTerm))
-      val appl1 = TermExpr.simplifyWithEtaUntilStable(fmapf1f2rxa)
-      val appl2 = TermExpr.simplifyWithEtaUntilStable(fmapF1fmapF2rxa)
+      val fmapf1f2rxa = fmapAC(aTerm #> f2Term(f1Term(aTerm)))(readerTerm)
+
+      val fmapBC = TermExpr.substTypeVar(TP("A"), TP("B"), fmapAC)
+      val fmapF2 = fmapBC(f2Term)
+
+      val fmapF1fmapF2rxa = fmapF2(fmapF1(readerTerm))
+      val appl1 = fmapf1f2rxa.simplify
+      val appl2 = fmapF1fmapF2rxa.simplify
       appl1 shouldEqual appl2
     }
 
