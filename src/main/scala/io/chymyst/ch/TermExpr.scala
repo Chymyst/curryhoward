@@ -234,6 +234,11 @@ sealed trait TermExpr {
 
   def equiv(y: TermExpr): Boolean = simplify == y.simplify
 
+  def substTypeVar(from: TermExpr, to: TermExpr): TermExpr = from.tExpr match {
+    case tp@TP(_) ⇒ TermExpr.substTypeVar(tp, to.tExpr, this)
+    case _ ⇒ throw new Exception(s"substTypeVar requires a type variable as type of expression $from, but found ${from.tExpr.prettyPrint}")
+  }
+
   def informationLossScore = (
     TermExpr.unusedArgs(this).size
     , unusedTupleParts + unusedMatchClauseVars

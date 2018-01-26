@@ -239,8 +239,11 @@ representing the different constructions of the simply-typed lambda-calculus (ST
 When the macros `allOfType` and `ofType` are used to create a function type such as `A ⇒ B ⇒ C`, the returned value is actually of a special subclass of `Function1`, `Function2`, or `Function3`.
 These subclasses are called `Function1Lambda`, `Function2Lambda`, `Function3Lambda` and carry not only the function's compiled code but also the STLC term corresponding to the function's code.
 
-An STLC term is generated only if 
-- an expression is generated of a pure function type (not function applied to arguments), and
+## When are lambda-terms available?
+
+An STLC term is generated only if:
+
+- an expression is generated of a pure function type (not function applied to arguments) using `ofType` or `allOfType`, and
 - the generated STLC data structure is not too large (or else the JVM method size limit will break compilation).
 
 The STLC term can be extracted using one of the two methods:
@@ -257,9 +260,11 @@ fs(1).lambdaTerm
 
 ```
 
-There are several ways in which we can use these lambda-terms:
+## What can we do with lambda-terms?
 
-- print them in shorter or in longer form
+There are several ways in which we can use lambda-terms:
+
+- print them in shorter or in longer form:
 
 ```tut
 fs(0).lambdaTerm.prettyPrint
@@ -267,7 +272,7 @@ fs(0).lambdaTerm.toString
 ```
 
 - perform symbolic computations with the lambda-terms, e.g. apply functions to arguments and simplify the resulting terms
-- create fresh new symbolic variables of arbitrary types for use in STLC computations
+- create fresh new symbolic variables of arbitrary types, as well as new symbolic lambda-terms (e.g. functions), for use in STLC computations
 - check whether two lambda-terms are (syntactically) identical after simplification
 
 To illustrate these facilities, let us determine which of the implementations `fs(0)` or `fs(1)` satisfies the law `f(x)(y) = x` for all `x` and `y`.
@@ -276,7 +281,7 @@ We could write unit tests (e.g. using `scalacheck`) for verifying this law on sp
 To perform this symbolic computation, we need to create two symbolic variables `x` and `y` of type `Int`.
 (Note that in STLC all expressions and all variables must have assigned types.)
 
-Creating symbolic variables is easy with the macro `freshVar`:
+Creating symbolic variables with known types is easy with the macro `freshVar`:
 
 ```tut
 val x = freshVar[Int]
@@ -289,14 +294,19 @@ Now we can apply `fs(0)` and `fs(1)` to these variables and obtain the resulting
 val results = fs.map ( f ⇒ f.lambdaTerm(x)(y) )    
 ```
 
-Note that the results are unevaluated STLC terms representing function applications.
-We can use the `.simplify` method to perform symbolic evaluation:
+Note that the results are unevaluated STLC terms representing function applications:
+
+```tut
+results.map(_.prettyPrint)
+```
+
+We can use the `.simplify` method to perform symbolic evaluation of these terms:
 
 ```tut
 results.map(_.simplify)
 ```
 
-To determine whether the required law holds, we can use the `.equiv` method:
+To determine whether the required law holds, we can use the `.equiv` method that automatically performs simplification:
 
 ```tut
 results.filter(r ⇒ r.equiv(x))
@@ -311,4 +321,90 @@ val goodF = fs.find { f ⇒ x equiv f.lambdaTerm(x)(y) }.get
 goodF(123)(456)
 ```
 
+## How to use lambda-terms with type parameters?
+
 Symbolic computations work also on expressions with type parameters, with some caveats.
+The main limitation is that Scala values cannot be parameterized by types.
+Also, STLC is not polymorphic and does not support type variables directly and naturally.
+Nevertheless, these limitations can be overcome with some more work.
+
+To consider an easy example, let us generate the functor method `fmap` for the parameterized type `Either[Int, T]`, and then verify the identity law using symbolic computations with lambda-terms.
+
+We begin by auto-generating `fmap` using the `ofType` method. (The `implement` method will not generate lambda-terms.)
+
+```tut
+def fmap[A, B] = ofType[ (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] ] 
+
+val fmapT = fmap.lambdaTerm // No need to specify type parameters.
+fmapT.prettyPrint
+```
+
+We have thus extracted the STLC term `fmapT` corresponding to the generated code of `fmap`. 
+
+Note that the type parameter names `A` and `B` in the term `fmapT` are fixed by the macro `ofType` at compile time.
+While the Scala method `fmap` has type parameters and can be called `fmap[Int, String]` and so on,
+the term `fmapT` has fixed STLC type names `A` and `B`, which we cannot change by specifying Scala type parameters.
+For this reason, we will have to manipulate these names explicitly in our symbolic computations.
+
+The identity law is `fmap id = id`. To verify this law, we need to apply `fmap` to an identity function of type `A ⇒ A`, and to check that the result is an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
+
+We create an identity function by first creating an STLC variable of type `A`, and then creating a function expression:
+
+```tut
+def a[A] = freshVar[A]
+val idA = a #> a
+```
+
+The type parameter name `A` is fixed in the variable `a` since it is defined via a macro.
+Calling `a[Int]` will return the same variable, still having type `A`.
+
+Let us now apply the lambda-term `fmapT` to `idA`.
+
+```tut:fail
+val result = fmapT(idA)
+```
+
+We get an error because `fmapT` expects an argument of type `A ⇒ B`, while we are giving it an argument `idA` of type `A ⇒ A`.
+In Scala, the compiler would have automatically set `B = A` and resolved the types.
+But the STLC evaluation right now does not support type variables directly in this way.
+
+We need to rename the type variable `B` into `A` in the term `fmapT`.
+To do this, we can use the method `substTypeVar`.
+
+In order to get a handle on the type variables, we need to define some STLC terms (e.g. fresh variables) that have types `A` and `B`.
+We already have `a` of type `A`.
+The type expression of a lambda-term is obtained via the method `.tExpr`:
+
+```tut
+a.tExpr
+```
+
+The type expression printed as `TP("A")` represents the type parameter with name `A`.
+Let us define a variable `b` of type `B` and extract its type:
+
+```tut
+def b[B] = freshVar[B]
+b.tExpr
+```
+
+Now we can rename the type variables in `fmapT` and apply the resulting term to `idA` like this:
+
+```tut
+val fmapAA = fmapT.substTypeVar(b, a)
+val f2 = fmapAA(idA)
+```
+
+It remains to show that the STLC term `f2` is an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
+We can first check that the type of this term is what we expect:
+
+```tut
+f2.tExpr.prettyPrint
+```
+
+The most straightforward way of verifying that `f2` is an identity function is to apply it to an arbitrary term of type `Either[Int, A]`.
+Let us define a new variable of that type and apply `f2` to that variable.
+
+```tut
+def optA[A] = freshVar[Either[Int, A]]
+f2(optA).simplify
+```

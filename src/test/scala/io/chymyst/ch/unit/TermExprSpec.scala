@@ -63,17 +63,17 @@ class TermExprSpec extends FlatSpec with Matchers {
       ProjectE(0, c),
       ProjectE(1, c)
     ))
-    t.informationLossScore._4 shouldEqual 0
+    t.informationLossScore._3 shouldEqual 0
 
     ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(1, c)
-    )).informationLossScore._4 shouldEqual 1
+    )).informationLossScore._3 shouldEqual 1
 
     ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(0, c)
-    )).informationLossScore._4 shouldEqual 2
+    )).informationLossScore._3 shouldEqual 2
 
     TermExpr.findFirst(t) {
       case ProjectE(_, _) ⇒ "abc"
