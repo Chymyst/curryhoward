@@ -459,7 +459,7 @@ We get an error because `fmapT` expects an argument of type `A ⇒ B`, while we 
 In Scala, the compiler would have automatically set `B = A` and resolved the types.
 But the STLC evaluation right now does not support type variables directly in this way.
 
-We need to rename the type variable `B` into `A` in the term `fmapT`.
+We need to rename the type variable `B` into `A` within the term `fmapT`.
 To do this, we can use the method `substTypeVar`.
 
 In order to get a handle on the type variables, we need to define some STLC terms (e.g. fresh variables) that have types `A` and `B`.
@@ -508,5 +508,30 @@ scala> def optA[A] = freshVar[Either[Int, A]]
 optA: [A]=> io.chymyst.ch.VarE
 
 scala> f2(optA).simplify
-res17: io.chymyst.ch.TermExpr = (optA$5 match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right(d.value)))})
+res17: io.chymyst.ch.TermExpr = optA$5
 ```
+
+We see that, after simplification, we obtain the original term `optA`.
+We can verify this more quickly with
+
+```scala
+scala> optA equiv f2(optA)
+res18: Boolean = true
+```
+
+This concludes the verification of the identity law.
+
+## Summary of the lambda-term API
+
+| Function  | Type  | Comment  |
+|---|---|---|
+| `TermExpr.lambdaTerm`  | `Any ⇒ Option[TermExpr]` | extract a lambda-term if present  |
+| `a.lambdaTerm`  | `Any ⇒ TermExpr`  | extract a lambda-term, throw exception if not present  |
+| `t.prettyPrint` | `TermExpr ⇒ String` and `TypeExpr ⇒ String` | produce a more readable string representation than `.toString` |
+| `a.tExpr` | `TermExpr ⇒ TypeExpr` | get the type expression for a given term |
+| `freshVar[T]` | `VarE` | create a STLC variable with assigned type expression `T` |
+| `a #> b` | `VarE ⇒ TermExpr ⇒ TermExpr` | create a STLC function term ("abstraction") |
+| `a(b)` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC application term -- the type of `b` must be the same as the argument type of `a` |
+| `a.simplify` | `TermExpr ⇒ TermExpr` | perform symbolic simplification of STLC term
+| `a equiv b` | `TermExpr ⇒ TermExpr ⇒ Boolean` | check whether two terms are syntactically equal after simplification |
+| `a.substTypeVar(b, c)` | `TermExpr ⇒ (TermExpr, TermExpr) ⇒ TermExpr` | replace the type of `b` by the type of `c` in `a` -- the type of `b` must be a type variable |
