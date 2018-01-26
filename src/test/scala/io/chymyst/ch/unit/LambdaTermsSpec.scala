@@ -169,26 +169,5 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     TermExpr.lambdaTerm(f2a) shouldEqual None
   }
 
-  it should "support filter syntax" in {
 
-    final case class C[A](d: Option[(A, A)]) {
-      // greedy filter on the product
-      def map[B](f: A ⇒ B): C[B] = ofType[C[B]](d, f)
-
-      def withFilter(p: A ⇒ Boolean): C[A] = C(d filter {
-        case (x, y) ⇒ p(x) && p(y)
-      })
-    }
-
-    val c = C(Some((123, 456)))
-    val d: Int ⇒ C[Int] = limit ⇒ for {
-      x ← c
-      y = x * 2
-      if y > limit
-    } yield y
-
-    c.map(x ⇒ x * 2) shouldEqual C(Some((246, 912)))
-    d(500) shouldEqual C(None)
-    d(200) shouldEqual C(Some((246, 912)))
-  }
 }

@@ -331,7 +331,8 @@ class Macros(val c: whitebox.Context) {
     val typeU: c.Type = c.weakTypeOf[U]
     val typeUExpr = buildTypeExpr(typeU)
     if (debug) c.info(c.enclosingPosition, s"Built type expression ${typeUExpr.prettyPrint} from type $typeU", force = true)
-    val ident: String = Macros.freshIdentForFreshVar()
+    val leftSide = c.internal.enclosingOwner.name.decodedName.toString
+    val ident = c.freshName(leftSide).replace(" $macro", "")
     import LiftedAST._
     c.Expr[VarE](q"VarE($ident, $typeUExpr)")
   }
@@ -450,6 +451,7 @@ class Macros(val c: whitebox.Context) {
     result
   }
 
+  // If lambda-terms are too large, the generated code will exceed the JVM method size limit and compilation will fail.
   val MAX_TERM_SIZE_FOR_LAMBDA_EXPORT = 256
 
   private def inhabitAllInternal(

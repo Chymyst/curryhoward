@@ -219,7 +219,7 @@ object TermExpr {
     foldMap(termExpr) {
       case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVars) ++ unusedArgs(body)
       case MatchE(term, cases) ⇒ unusedArgs(term) ++ cases.flatMap {
-        // the unused heads in this CurriedE are counted separately by `unusedMatchClauseVars`
+        // The unused heads in this CurriedE are counted separately by `unusedMatchClauseVars`.
         case CurriedE(List(_), body) ⇒ unusedArgs(body)
         case c ⇒ unusedArgs(c)
       }.toSet
@@ -235,8 +235,7 @@ sealed trait TermExpr {
   def equiv(y: TermExpr): Boolean = simplify == y.simplify
 
   def informationLossScore = (
-    ()
-    , TermExpr.unusedArgs(this).size
+    TermExpr.unusedArgs(this).size
     , unusedTupleParts + unusedMatchClauseVars
     , TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this)
     , TermExpr.argsMultiUseCountShallow(this)
