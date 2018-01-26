@@ -169,26 +169,47 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     TermExpr.lambdaTerm(f2a) shouldEqual None
   }
 
-  it should "support filter syntax" in {
+  it should "verify identity law for Either[Int, T] as in tutorial" in {
+    def fmap[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]]
 
-    final case class C[A](d: Option[(A, A)]) {
-      // greedy filter on the product
-      def map[B](f: A ⇒ B): C[B] = ofType[C[B]](d, f)
+    val fmapT = fmap.lambdaTerm // No need to specify type parameters.
+    def a[A] = freshVar[A]
 
-      def withFilter(p: A ⇒ Boolean): C[A] = C(d filter {
-        case (x, y) ⇒ p(x) && p(y)
-      })
-    }
+    val idA = a #> a
 
-    val c = C(Some((123, 456)))
-    val d: Int ⇒ C[Int] = limit ⇒ for {
-      x ← c
-      y = x * 2
-      if y > limit
-    } yield y
+    def b[B] = freshVar[B]
 
-    c.map(x ⇒ x * 2) shouldEqual C(Some((246, 912)))
-    d(500) shouldEqual C(None)
-    d(200) shouldEqual C(Some((246, 912)))
+    val fmapAA = fmapT.substTypeVar(b, a)
+    val f2 = fmapAA(idA)
+
+    def optA[A] = freshVar[Either[Int, A]]
+
+    f2(optA).simplify shouldEqual optA
   }
+
+  it should "verify identity law for Option[T]" in {
+    def fmap[A, B] = ofType[(A ⇒ B) ⇒ Option[A] ⇒ Option[B]]
+
+    val fmapT = fmap.lambdaTerm // No need to specify type parameters.
+    def a[A] = freshVar[A]
+
+    val idA = a #> a
+
+    val apply1 = idA(a)
+
+    def b[B] = freshVar[B]
+
+    the[Exception] thrownBy idA(b) should have message "Internal error: Invalid head type in application (\\((a$12:A) ⇒ a$12) b$13): `A ⇒ A` must be a function with argument type `B`"
+
+    val fmapAA = fmapT.substTypeVar(b, a)
+
+    val f2 = fmapAA(idA)
+
+    the[Exception] thrownBy fmapT.substTypeVar(idA, a) should have message "substTypeVar requires a type variable as type of expression \\((a$12:A) ⇒ a$12), but found A ⇒ A"
+
+    def optA[A] = freshVar[Option[A]]
+
+    f2(optA).simplify shouldEqual optA
+  }
+
 }

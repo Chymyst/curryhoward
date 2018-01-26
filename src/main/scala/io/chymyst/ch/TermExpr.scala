@@ -111,7 +111,7 @@ object TermExpr {
 
   def substTypeVar(replaceTypeVar: TP, newTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
     case VarE(name, tExpr) ⇒ VarE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
-    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)), tExpr)
+    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)), tExpr.substTypeVar(replaceTypeVar, newTypeExpr).asInstanceOf[NamedConjunctT])
     case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
   }
 
@@ -219,7 +219,7 @@ object TermExpr {
     foldMap(termExpr) {
       case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVars) ++ unusedArgs(body)
       case MatchE(term, cases) ⇒ unusedArgs(term) ++ cases.flatMap {
-        // the unused heads in this CurriedE are counted separately by `unusedMatchClauseVars`
+        // The unused heads in this CurriedE are counted separately by `unusedMatchClauseVars`.
         case CurriedE(List(_), body) ⇒ unusedArgs(body)
         case c ⇒ unusedArgs(c)
       }.toSet
@@ -234,9 +234,13 @@ sealed trait TermExpr {
 
   def equiv(y: TermExpr): Boolean = simplify == y.simplify
 
+  def substTypeVar(from: TermExpr, to: TermExpr): TermExpr = from.tExpr match {
+    case tp@TP(_) ⇒ TermExpr.substTypeVar(tp, to.tExpr, this)
+    case _ ⇒ throw new Exception(s"substTypeVar requires a type variable as type of expression $from, but found ${from.tExpr.prettyPrint}")
+  }
+
   def informationLossScore = (
-    ()
-    , TermExpr.unusedArgs(this).size
+    TermExpr.unusedArgs(this).size
     , unusedTupleParts + unusedMatchClauseVars
     , TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this)
     , TermExpr.argsMultiUseCountShallow(this)
@@ -529,12 +533,11 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
         if (cases.nonEmpty && {
           casesSimplified.zipWithIndex.forall {
             case (CurriedE(List(head@VarE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
-              val result = len == cases.length && ind == i && headT == conjT &&
+              len == cases.length && ind == i && headT == conjT &&
                 projectionTerms.zipWithIndex.forall {
                   case (ProjectE(k, head1), j) if k == j && head1 == head ⇒ true
                   case _ ⇒ false
                 }
-              result
             case _ ⇒ false
           }
         }) {

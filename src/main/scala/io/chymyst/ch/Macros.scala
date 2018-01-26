@@ -30,7 +30,7 @@ Now make a small change in your code and run compile in sbt, - IntelliJ should s
 - make sure the alpha-conversion is correct on type parameters! This seems to be a deeper problem.
 - think about supporting recursive types beyond the palliative measures implemented currently
 - use blackbox macros instead of whitebox if possible (5) ?? Seems to prevent the " = implement" and "= ofType[]" syntax from working.
-- use a special subclass of Function1 that also carries symbolic information about the lambda-term.
+- fix MatchE.simplify so that Option[A] ⇒ Option[A] can be simplified to identity
 - decide whether we can implement a single function implement[]() that looks up the LHS when the given type is Nothing.
  */
 
@@ -331,7 +331,8 @@ class Macros(val c: whitebox.Context) {
     val typeU: c.Type = c.weakTypeOf[U]
     val typeUExpr = buildTypeExpr(typeU)
     if (debug) c.info(c.enclosingPosition, s"Built type expression ${typeUExpr.prettyPrint} from type $typeU", force = true)
-    val ident: String = Macros.freshIdentForFreshVar()
+    val leftSide = c.internal.enclosingOwner.name.decodedName.toString
+    val ident = c.freshName(leftSide).replaceAll(" *\\$macro", "")
     import LiftedAST._
     c.Expr[VarE](q"VarE($ident, $typeUExpr)")
   }
@@ -450,6 +451,7 @@ class Macros(val c: whitebox.Context) {
     result
   }
 
+  // If lambda-terms are too large, the generated code will exceed the JVM method size limit and compilation will fail.
   val MAX_TERM_SIZE_FOR_LAMBDA_EXPORT = 256
 
   private def inhabitAllInternal(
@@ -468,9 +470,6 @@ class Macros(val c: whitebox.Context) {
 }
 
 object Macros {
-  // Note: this cannot be in the Macros class because that class is instantiated every time a macro is called!
-  private[ch] val freshIdentForFreshVar = new FreshIdents("zZ")
-
   /** The JVM system property `curryhoward.log` can be set to a comma-separated list of words.
     * Each word must be one of `prover`, `macros`, or `terms`.
     *
