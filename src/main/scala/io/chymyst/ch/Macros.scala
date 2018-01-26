@@ -470,9 +470,6 @@ class Macros(val c: whitebox.Context) {
 }
 
 object Macros {
-  // Note: this cannot be in the Macros class because that class is instantiated every time a macro is called!
-  private[ch] val freshIdentForFreshVar = new FreshIdents("zZ")
-
   /** The JVM system property `curryhoward.log` can be set to a comma-separated list of words.
     * Each word must be one of `prover`, `macros`, or `terms`.
     *
