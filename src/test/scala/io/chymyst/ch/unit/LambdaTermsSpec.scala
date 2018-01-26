@@ -202,7 +202,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     the[Exception] thrownBy idA(b) should have message "Internal error: Invalid head type in application (\\((a$12:A) ⇒ a$12) b$13): `A ⇒ A` must be a function with argument type `B`"
 
     val fmapAA = fmapT.substTypeVar(b, a)
+
     val f2 = fmapAA(idA)
+
+    the[Exception] thrownBy fmapT.substTypeVar(idA, a) should have message "substTypeVar requires a type variable as type of expression \\((a$12:A) ⇒ a$12), but found A ⇒ A"
 
     def optA[A] = freshVar[Option[A]]
 
