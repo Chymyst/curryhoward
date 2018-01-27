@@ -155,7 +155,7 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 - Functions with zero arguments are currently not supported, e.g. `ofType[Int => () => Int]` will not compile
 - Lambda-terms do not automatically perform alpha-conversions either at value or at type level; alpha-conversions need to be handled manually, as shown in the tutorial
 
-# Examples of working functionality
+# Examples of functionality
 
 The following code examples show how various functions are implemented automatically, given their type.
 
@@ -202,6 +202,23 @@ def eitherAssoc[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = 
 ```
 
 Case objects (and case classes with zero-argument constructors) are treated as named versions of the `Unit` type.
+
+Case classes and sealed traits can be nested and can have type parameters.
+
+Type aliases are supported as well.
+
+Lambda-terms can be obtained and manipulated symbolically.
+
+```scala
+type R[X, A] = X ⇒ A
+
+def mapReader[X, A, B] = ofType[R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B]]
+// mapReader is now a compiled function of the required type
+val mapReaderTerm = mapReader.lambdaTerm
+// mapReaderTerm is a lambda-term representing the code of mapReader
+mapReaderTerm.prettyPrint // returns the string "a ⇒ b ⇒ c ⇒ b (a c)"
+
+```
 
 ## Supported syntax
 
