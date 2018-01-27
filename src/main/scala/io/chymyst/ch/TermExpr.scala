@@ -43,8 +43,7 @@ object TermExpr {
     }
   }
 
-  // Lambda-term syntax helpers.
-
+  // Lambda-term syntax helper.
   def lambdaTerm(f: Any): Option[TermExpr] = //Try(WithLambdaTerm(f).lambdaTerm).toOption fails to compile
     f match {
       case g: Function0Lambda[_] ⇒ Some(g.lambdaTerm)
@@ -53,29 +52,6 @@ object TermExpr {
       case g: Function3Lambda[_, _, _, _] ⇒ Some(g.lambdaTerm)
       case _ ⇒ None
     }
-
-  def conj(givenType: TypeExpr)(args: TermExpr*): NamedConjunctE = givenType match {
-    case nct: NamedConjunctT ⇒
-      val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ nct.wrapped(i) != arg.tExpr }
-      if (invalidTypeArgs.isEmpty)
-        NamedConjunctE(args, nct)
-      else throw new Exception(s"Some arguments [${invalidTypeArgs.map(_._1.prettyPrint).mkString("; ")}] have unexpected types that do not match the types in ${givenType.prettyPrint}")
-    case _ ⇒ throw new Exception(s"Error: the given type ${givenType.prettyPrint} must be a named conjunction")
-  }
-
-  def conj(givenExpr: TermExpr)(args: TermExpr*): NamedConjunctE = conj(givenExpr.tExpr)(args: _*)
-
-  def disj(givenType: TypeExpr): (TermExpr ⇒ DisjunctE) = givenType match {
-    case DisjunctT(_, _, terms) ⇒
-      arg ⇒
-        val index = terms.indexOf(arg.tExpr)
-        if (index >= 0)
-          DisjunctE(index, terms.length, arg, givenType)
-        else throw new Exception(s"Cannot inject into disjunction since the given disjunction type ${givenType.prettyPrint} does not contain the type ${arg.tExpr.prettyPrint} of the given term $arg")
-    case _ ⇒ throw new Exception(s"Cannot inject into disjunction since the given type ${givenType.prettyPrint} is not a disjunction type")
-  }
-
-  def disj(givenExpr: TermExpr)(arg: TermExpr): DisjunctE = disj(givenExpr.tExpr)(arg)
 
   private[ch] def propositions(termExpr: TermExpr): Seq[VarE] = foldMap(termExpr) {
     case p@VarE(_, _) ⇒ Seq(p)
@@ -257,19 +233,18 @@ sealed trait TermExpr {
   // Syntax helpers.
   def apply(terms: TermExpr*): TermExpr = tExpr match {
     case #->(_, _) ⇒ AppE(this, if (terms.length == 1) terms.head else ConjunctE(terms))
-    case ConjunctT(ts) if ts.length == terms.length ⇒ tExpr.apply(terms: _*)
     case NamedConjunctT(_, _, ts, _) if ts.length == terms.length ⇒ tExpr.apply(terms: _*)
     case DisjunctT(_, _, _) ⇒ tExpr.apply(terms: _*)
     case UnitT(_) ⇒ tExpr.apply(terms: _*)
-    case _ ⇒ throw new Exception(s".apply() is not defined for this term $this of type ${tExpr.prettyPrint}")
+    case _ ⇒ throw new Exception(s"t.apply(...) is not defined for this term t=$this of type ${tExpr.prettyPrint}")
   }
 
   def cases(cases: TermExpr*): TermExpr = tExpr match {
-    case DisjunctT(_, _, termTypes) if cases.length == termTypes.length ⇒
+    case DisjunctT(_, _, termTypes) ⇒
       val typesOfCaseBodies = cases.zip(termTypes).collect { case (CurriedE(head :: _, body), t) if head.tExpr == t ⇒ body.tExpr }
-      if (typesOfCaseBodies.length == cases.length && typesOfCaseBodies.toSet.size == 1)
+      if (cases.length == termTypes.length && typesOfCaseBodies.length == cases.length && typesOfCaseBodies.toSet.size == 1)
         MatchE(this, cases.toList)
-      else throw new Exception(s"Case match must use a sequence of ${termTypes.length} functions with matching types of arguments (${termTypes.map(_.prettyPrint).mkString("; ")}) and bodies, but have ${cases.map(_.tExpr.prettyPrint).mkString("; ")}")
+      else throw new Exception(s"Case match on ${tExpr.prettyPrint} must use a sequence of ${termTypes.length} functions with matching types of arguments (${termTypes.map(_.prettyPrint).mkString("; ")}) and bodies, but have ${cases.map(_.tExpr.prettyPrint).mkString("; ")}")
     case _ ⇒ throw new Exception(s".cases() is not defined for this term of type ${tExpr.prettyPrint}")
   }
 
@@ -500,8 +475,6 @@ final case class CurriedE(heads: List[VarE], body: TermExpr) extends TermExpr {
 final case class UnitE(tExpr: TypeExpr) extends TermExpr
 
 final case class NamedConjunctE(terms: Seq[TermExpr], tExpr: NamedConjunctT) extends TermExpr {
-  override def apply(i: Int): TermExpr = terms(i)
-
   private[ch] override def simplifyOnce(withEta: Boolean): TermExpr = {
     val simplifiedTerms = terms.map(_.simplifyOnce(withEta))
     // Detect the identity pattern:

@@ -214,8 +214,9 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
   behavior of "lambda terms manipulation"
 
+  final case class User(fullName: String, id: Long)
+
   it should "correctly handle conjunctions and disjunctions for tutorial" in {
-    final case class User(fullName: String, id: Long)
     val ou = freshVar[Option[User]]
     val n = freshVar[None.type]
     val su = freshVar[Some[User]]
@@ -241,6 +242,42 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val getIdAutoTerm = getIdAuto.lambdaTerm
     getIdAutoTerm.prettyPrint shouldEqual getId.prettyPrint
     getIdAutoTerm equiv getId.prettyRename shouldEqual true
+  }
+
+  it should "generate errors when types do not match" in {
+    val x = freshVar[None.type]
+    the[Exception] thrownBy x(1) should have message ".apply(1) is undefined since this conjunction type has only 0 parts"
+    the[Exception] thrownBy x("a") should have message ".apply(a) is undefined since this conjunction type does not support this accessor (supported accessors: )"
+    the[Exception] thrownBy x(x) should have message "t.apply(...) is not defined for this term t=x$23 of type None.type"
+
+    val noneT1 = x.tExpr()
+
+    the[Exception] thrownBy x.tExpr(x) should have message ".apply() must be called with 0 arguments on this type None.type but it was called with 1 arguments"
+
+    the[Exception] thrownBy noneT1.cases() should have message ".cases() is not defined for this term of type None.type"
+
+    val u1 = freshVar[User]
+    the[Exception] thrownBy u1(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
+    the[Exception] thrownBy u1() should have message "t.apply(...) is not defined for this term t=u1$24 of type User"
+
+    the[Exception] thrownBy u1.tExpr(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
+    the[Exception] thrownBy u1.tExpr() should have message ".apply() must be called with 2 arguments on this type User but it was called with 0 arguments"
+
+    the[Exception] thrownBy u1(100) should have message ".apply(100) is undefined since this conjunction type has only 2 parts"
+
+    the[Exception] thrownBy u1("abc") should have message ".apply(abc) is undefined since this conjunction type does not support this accessor (supported accessors: fullName, id)"
+
+    val e1 = freshVar[Either[String, Int]]
+
+    the[Exception] thrownBy e1.accessor(1) should have message "Internal error: Cannot perform projection for term e1$25 : Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} because its type is not a conjunction"
+
+    the[Exception] thrownBy e1() should have message "Calling .apply() on type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} requires one argument (disjunction injection value)"
+
+    the[Exception] thrownBy e1.tExpr() should have message "Calling .apply() on type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} requires one argument (disjunction injection value)"
+
+    the[Exception] thrownBy e1(x) should have message "Cannot inject into disjunction since the given disjunction type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} does not contain the type None.type of the given term x$23"
+
+    the[Exception] thrownBy e1.cases() should have message "Case match on Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} must use a sequence of 2 functions with matching types of arguments (Left[<c>String,<c>Int]; Right[<c>String,<c>Int]) and bodies, but have "
 
   }
 

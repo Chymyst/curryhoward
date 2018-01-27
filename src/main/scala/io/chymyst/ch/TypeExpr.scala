@@ -1,16 +1,36 @@
 package io.chymyst.ch
 
 sealed trait TypeExpr {
-
   def apply(args: TermExpr*): TermExpr = this match {
-    case _: NamedConjunctT | _: ConjunctT ⇒ TermExpr.conj(this)(args: _*)
-    case _: DisjunctT ⇒ args.headOption match {
-      case Some(arg) if args.length == 1 ⇒ TermExpr.disj(this)(arg)
+    case ConjunctT(terms) ⇒
+      val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !terms.lift(i).contains(arg.tExpr) }
+      if (terms.length != args.length)
+        throw new Exception(s".apply() must be called with ${terms.length} arguments on this type $prettyPrint but it was called with ${args.length} arguments")
+      else if (invalidTypeArgs.isEmpty)
+        ConjunctE(args)
+      else throw new Exception(s"Some arguments have unexpected types [${invalidTypeArgs.map(_._1.tExpr.prettyPrint).mkString("; ")}] that do not match the types in $prettyPrint")
+
+    case nct: NamedConjunctT ⇒
+      val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !nct.wrapped.lift(i).contains(arg.tExpr) }
+      if (nct.accessors.length != args.length)
+        throw new Exception(s".apply() must be called with ${nct.accessors.length} arguments on this type $prettyPrint but it was called with ${args.length} arguments")
+      else if (invalidTypeArgs.isEmpty)
+        NamedConjunctE(args, nct)
+      else throw new Exception(s"Some arguments have unexpected types [${invalidTypeArgs.map(_._1.tExpr.prettyPrint).mkString("; ")}] that do not match the types in $prettyPrint")
+
+    case DisjunctT(_, _, terms) ⇒ args.headOption match {
+      case Some(arg) if args.length == 1 ⇒
+        val index = terms.indexOf(arg.tExpr)
+        if (index >= 0)
+          DisjunctE(index, terms.length, arg, this)
+        else throw new Exception(s"Cannot inject into disjunction since the given disjunction type $prettyPrint does not contain the type ${arg.tExpr.prettyPrint} of the given term $arg")
       case _ ⇒ throw new Exception(s"Calling .apply() on type $prettyPrint requires one argument (disjunction injection value)")
     }
+
     case _: UnitT ⇒ if (args.isEmpty)
       UnitE(this)
     else throw new Exception(s"Calling .apply() on type $prettyPrint requires zero arguments (named unit value)")
+
     case _ ⇒ throw new Exception(s"Cannot call .apply() on type $prettyPrint")
   }
 
