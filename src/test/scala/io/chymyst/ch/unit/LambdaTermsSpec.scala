@@ -245,7 +245,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     the[Exception] thrownBy x(1) should have message ".apply(1) is undefined since this conjunction type has only 0 parts"
     the[Exception] thrownBy x("a") should have message ".apply(a) is undefined since this conjunction type does not support this accessor (supported accessors: )"
-    the[Exception] thrownBy x(x) should have message "t.apply(...) is not defined for this term t=x$23 of type None.type"
+    the[Exception] thrownBy x(x) should have message ".apply() must be called with 0 arguments on this type None.type but it was called with 1 arguments"
 
     val noneT1 = x.tExpr()
 
@@ -260,7 +260,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     u1.tExpr.caseObjectName shouldEqual None
 
     the[Exception] thrownBy u1(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
-    the[Exception] thrownBy u1() should have message "t.apply(...) is not defined for this term t=u1$24 of type User"
+    the[Exception] thrownBy u1() should have message ".apply() must be called with 2 arguments on this type User but it was called with 0 arguments"
 
     the[Exception] thrownBy u1.tExpr(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
     the[Exception] thrownBy u1.tExpr() should have message ".apply() must be called with 2 arguments on this type User but it was called with 0 arguments"
@@ -297,6 +297,14 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     the[Exception] thrownBy f0(123) should have message ".apply(i: Int) is defined only on conjunction types while this is <c>Int ⇒ <c>Int"
     the[Exception] thrownBy f0("abc") should have message ".apply(acc: String) is defined only on conjunction types while this is <c>Int ⇒ <c>Int"
     the[Exception] thrownBy f0.tExpr() should have message "Cannot call .apply() on type <c>Int ⇒ <c>Int"
+
+    val ct = ConjunctT(Seq(e1.tExpr, u0.tExpr))
+    val cte = ct(e1, u0)
+    the[Exception] thrownBy cte(e1) should have message ".apply() must be called with 2 arguments on this type (Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]}, Unit) but it was called with 1 arguments"
+
+    var i = freshVar[Int]
+
+    the[Exception] thrownBy i() should have message "t.apply(...) is not defined for this term t=i$28 of type <c>Int"
   }
 
 }

@@ -233,9 +233,7 @@ sealed trait TermExpr {
   // Syntax helpers.
   def apply(terms: TermExpr*): TermExpr = tExpr match {
     case #->(_, _) ⇒ AppE(this, if (terms.length == 1) terms.head else ConjunctE(terms))
-    case NamedConjunctT(_, _, ts, _) if ts.length == terms.length ⇒ tExpr.apply(terms: _*)
-    case DisjunctT(_, _, _) ⇒ tExpr.apply(terms: _*)
-    case UnitT(_) ⇒ tExpr.apply(terms: _*)
+    case _: ConjunctT | _: NamedConjunctT | _: DisjunctT | _: UnitT ⇒ tExpr.apply(terms: _*)
     case _ ⇒ throw new Exception(s"t.apply(...) is not defined for this term t=$this of type ${tExpr.prettyPrint}")
   }
 

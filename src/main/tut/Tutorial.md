@@ -600,7 +600,7 @@ Therefore, we need to run `prettyRename` on our term `getId` so that it becomes 
 | `a.simplify` | `TermExpr ⇒ TermExpr` | perform symbolic simplification of STLC term |
 | `a equiv b` | `TermExpr ⇒ TermExpr ⇒ Boolean` | check whether two terms are syntactically equal after simplification |
 | `a.substTypeVar(b, c)` | `TermExpr ⇒ (TermExpr, TermExpr) ⇒ TermExpr` | replace the type of `b` by the type of `c` in `a` -- the type of `b` must be a type variable |
-| `u()`  | `TermExpr ⇒ () ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named conjunction term of type `c.tExpr` -- the type of `c` must be a conjunction whose parts match the types of the arguments `x...` |
+| `u()`  | `TermExpr ⇒ () ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named unit term of type `u.tExpr` -- the type of `u` must be a named unit type, e.g. `None.type` |
 | `c(x...)`  | `TermExpr ⇒ TermExpr* ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named conjunction term of type `c.tExpr` -- the type of `c` must be a conjunction whose parts match the types of the arguments `x...` |
 | `d(x)`  |  `TermExpr ⇒ TermExpr ⇒ TermExpr` and `TypeExpr ⇒ TermExpr ⇒ TermExpr` | create a disjunction term of type `d.tExpr` using term `x` -- the type of `x` must match one of the disjunction parts in the type `d`, which must be a disjunction type |
 | `c(i)` | `TermExpr ⇒ Int ⇒ TermExpr` | project a conjunction term onto part with given zero-based index -- the type of `c` must be a conjunction with sufficiently many parts |

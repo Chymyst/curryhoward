@@ -474,10 +474,10 @@ Let us now apply the lambda-term `fmapT` to `idA`.
 ```scala
 scala> val result = fmapT(idA)
 java.lang.Exception: Internal error: Invalid head type in application (\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3)): `(A ⇒ B) ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}` must be a function with argument type `A ⇒ A`
-  at io.chymyst.ch.AppE.<init>(TermExpr.scala:424)
+  at io.chymyst.ch.AppE.<init>(TermExpr.scala:422)
   at io.chymyst.ch.TermExpr.apply(TermExpr.scala:235)
   at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:234)
-  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:445)
+  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:443)
   ... 48 elided
 ```
 
@@ -760,7 +760,7 @@ Therefore, we need to run `prettyRename` on our term `getId` so that it becomes 
 | `a.simplify` | `TermExpr ⇒ TermExpr` | perform symbolic simplification of STLC term |
 | `a equiv b` | `TermExpr ⇒ TermExpr ⇒ Boolean` | check whether two terms are syntactically equal after simplification |
 | `a.substTypeVar(b, c)` | `TermExpr ⇒ (TermExpr, TermExpr) ⇒ TermExpr` | replace the type of `b` by the type of `c` in `a` -- the type of `b` must be a type variable |
-| `u()`  | `TermExpr ⇒ () ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named conjunction term of type `c.tExpr` -- the type of `c` must be a conjunction whose parts match the types of the arguments `x...` |
+| `u()`  | `TermExpr ⇒ () ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named unit term of type `u.tExpr` -- the type of `u` must be a named unit type, e.g. `None.type` |
 | `c(x...)`  | `TermExpr ⇒ TermExpr* ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named conjunction term of type `c.tExpr` -- the type of `c` must be a conjunction whose parts match the types of the arguments `x...` |
 | `d(x)`  |  `TermExpr ⇒ TermExpr ⇒ TermExpr` and `TypeExpr ⇒ TermExpr ⇒ TermExpr` | create a disjunction term of type `d.tExpr` using term `x` -- the type of `x` must match one of the disjunction parts in the type `d`, which must be a disjunction type |
 | `c(i)` | `TermExpr ⇒ Int ⇒ TermExpr` | project a conjunction term onto part with given zero-based index -- the type of `c` must be a conjunction with sufficiently many parts |
