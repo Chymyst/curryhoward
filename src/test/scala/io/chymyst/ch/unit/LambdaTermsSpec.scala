@@ -238,6 +238,11 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
   it should "generate errors when types do not match" in {
     val x = freshVar[None.type]
+
+    x.tExpr.typeParams shouldEqual Seq()
+    x.tExpr.conjunctSize shouldEqual 0
+    x.tExpr.caseObjectName shouldEqual Some("None")
+
     the[Exception] thrownBy x(1) should have message ".apply(1) is undefined since this conjunction type has only 0 parts"
     the[Exception] thrownBy x("a") should have message ".apply(a) is undefined since this conjunction type does not support this accessor (supported accessors: )"
     the[Exception] thrownBy x(x) should have message "t.apply(...) is not defined for this term t=x$23 of type None.type"
@@ -249,6 +254,11 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     the[Exception] thrownBy noneT1.cases() should have message ".cases() is not defined for this term of type None.type"
 
     val u1 = freshVar[User]
+
+    u1.tExpr.typeParams shouldEqual Seq()
+    u1.tExpr.conjunctSize shouldEqual 2
+    u1.tExpr.caseObjectName shouldEqual None
+
     the[Exception] thrownBy u1(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
     the[Exception] thrownBy u1() should have message "t.apply(...) is not defined for this term t=u1$24 of type User"
 
@@ -260,6 +270,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     the[Exception] thrownBy u1("abc") should have message ".apply(abc) is undefined since this conjunction type does not support this accessor (supported accessors: fullName, id)"
 
     val e1 = freshVar[Either[String, Int]]
+    e1.tExpr.conjunctSize shouldEqual 1
+    e1.tExpr.caseObjectName shouldEqual None
+
+    e1.tExpr.typeParams shouldEqual Seq(BasicT("String"), BasicT("Int"))
 
     the[Exception] thrownBy e1.accessor(1) should have message "Internal error: Cannot perform projection for term e1$25 : Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} because its type is not a conjunction"
 
