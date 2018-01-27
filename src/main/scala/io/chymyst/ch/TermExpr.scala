@@ -442,9 +442,21 @@ final case class CurriedE(heads: List[VarE], body: TermExpr) extends TermExpr {
 final case class UnitE(tExpr: TypeExpr) extends TermExpr
 
 final case class NamedConjunctE(terms: Seq[TermExpr], tExpr: NamedConjunctT) extends TermExpr {
-  private[ch] override def simplifyOnce(withEta: Boolean): TermExpr = this.copy(terms = terms.map(_.simplifyOnce(withEta)))
+  private[ch] override def simplifyOnce(withEta: Boolean): TermExpr = {
+    val simplifiedTerms = terms.map(_.simplifyOnce(withEta))
+    // Detect the identity pattern:
+    // NamedConjunctE(Seq(ProjectE(0, t : N), ProjectE(1, t: N), ...), N) with the same term `t`
+    val projectedTerms = simplifiedTerms.zipWithIndex.collect {
+      case (ProjectE(j, t), i) if i == j && t.tExpr == tExpr ⇒ t
+    }
+    projectedTerms.headOption match {
+      case Some(t) if projectedTerms.size == terms.size && projectedTerms.toSet.size == 1 ⇒ t
+      case _ ⇒ this.copy(terms = simplifiedTerms)
+    }
+  }
 }
 
+// This is now used only for java-style arg groups. A tuple is represented by a NamedConjunctE.
 final case class ConjunctE(terms: Seq[TermExpr]) extends TermExpr {
   def tExpr: TypeExpr = ConjunctT(terms.map(_.tExpr))
 
@@ -527,11 +539,15 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
           AppE(cases(index).simplifyOnce(withEta), t).simplifyOnce(withEta)
         } else throw new Exception(s"Internal error: MatchE with ${cases.length} cases applied to DisjunctE with $total parts, but must be of equal size")
 
-      // Detect the identity pattern:
+      // Detect the identity patterns:
+      // MatchE(_, List(a ⇒ DisjunctE(0, total, a, _), a ⇒ DisjunctE(1, total, a, _), ...))
       // MatchE(_, a: T1 ⇒ DisjunctE(i, total, NamedConjunctE(List(ProjectE(0, a), Project(1, a), ...), T1), ...), _)
       case t ⇒
         if (cases.nonEmpty && {
           casesSimplified.zipWithIndex.forall {
+            case (CurriedE(List(head@VarE(_, _)), DisjunctE(i, len, x, _)), ind)
+              if x == head && len == cases.length && ind == i
+            ⇒ true
             case (CurriedE(List(head@VarE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
               len == cases.length && ind == i && headT == conjT &&
                 projectionTerms.zipWithIndex.forall {
