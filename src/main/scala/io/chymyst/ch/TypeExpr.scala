@@ -1,6 +1,38 @@
 package io.chymyst.ch
 
 sealed trait TypeExpr {
+  def apply(args: TermExpr*): TermExpr = this match {
+    case ConjunctT(terms) ⇒
+      val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !terms.lift(i).contains(arg.tExpr) }
+      if (terms.length != args.length)
+        throw new Exception(s".apply() must be called with ${terms.length} arguments on this type $prettyPrint but it was called with ${args.length} arguments")
+      else if (invalidTypeArgs.isEmpty)
+        ConjunctE(args)
+      else throw new Exception(s"Some arguments have unexpected types [${invalidTypeArgs.map(_._1.tExpr.prettyPrint).mkString("; ")}] that do not match the types in $prettyPrint")
+
+    case nct: NamedConjunctT ⇒
+      val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !nct.wrapped.lift(i).contains(arg.tExpr) }
+      if (nct.accessors.length != args.length)
+        throw new Exception(s".apply() must be called with ${nct.accessors.length} arguments on this type $prettyPrint but it was called with ${args.length} arguments")
+      else if (invalidTypeArgs.isEmpty)
+        NamedConjunctE(args, nct)
+      else throw new Exception(s"Some arguments have unexpected types [${invalidTypeArgs.map(_._1.tExpr.prettyPrint).mkString("; ")}] that do not match the types in $prettyPrint")
+
+    case DisjunctT(_, _, terms) ⇒ args.headOption match {
+      case Some(arg) if args.length == 1 ⇒
+        val index = terms.indexOf(arg.tExpr)
+        if (index >= 0)
+          DisjunctE(index, terms.length, arg, this)
+        else throw new Exception(s"Cannot inject into disjunction since the given disjunction type $prettyPrint does not contain the type ${arg.tExpr.prettyPrint} of the given term $arg")
+      case _ ⇒ throw new Exception(s"Calling .apply() on type $prettyPrint requires one argument (disjunction injection value)")
+    }
+
+    case _: UnitT ⇒ if (args.isEmpty)
+      UnitE(this)
+    else throw new Exception(s"Calling .apply() on type $prettyPrint requires zero arguments (named unit value)")
+
+    case _ ⇒ throw new Exception(s"Cannot call .apply() on type $prettyPrint")
+  }
 
   def substTypeVar(typeVar: TP, replaceBy: TypeExpr): TypeExpr = this match {
     case DisjunctT(constructor, tParams, terms) ⇒ DisjunctT(constructor, tParams.map(_.substTypeVar(typeVar, replaceBy)), terms.map(_.substTypeVar(typeVar, replaceBy)))
@@ -23,14 +55,14 @@ sealed trait TypeExpr {
     case head #-> body ⇒
       val r = s"${head.prettyPrintWithParentheses(1)} ⇒ ${body.prettyPrintWithParentheses(0)}"
       if (level == 1) s"($r)" else r
-    case BasicT(name) ⇒ s"<c>$name" // well-known constant type such as Int
+    case BasicT(name) ⇒ s"<c>$name" // a basic, non-parameter type such as Int
     case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"
     case NamedConjunctT(constructor, tParams, _, wrapped@_) ⇒
       //      val termString = "(" + wrapped.map(_.prettyPrint).mkString(",") + ")" // Too verbose.
       val typeSuffix = if (caseObjectName.isDefined) ".type" else ""
       s"$constructor${TypeExpr.tParamString(tParams)}$typeSuffix"
-    case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams)}" // other constant type
+    case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams)}" // recursive instance of type
     case NothingT(_) ⇒ "0"
     case UnitT(name) ⇒ s"$name"
   }

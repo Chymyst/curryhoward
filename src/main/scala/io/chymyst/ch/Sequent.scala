@@ -13,7 +13,7 @@ final case class Sequent(premises: List[TypeExpr], goal: TypeExpr, freshVar: Fre
     * @param p Proof term to apply to our premises.
     * @return Resulting term.
     */
-  def substituteInto(p: TermExpr): TermExpr = TermExpr.applyToVars(p, premiseVars).simplifyOnce()
+  def substituteInto(p: TermExpr): TermExpr = TermExpr.applyCurried(p, premiseVars).simplifyOnce()
 
   /** Construct a function term that takes all the sequent's premises as arguments and returns a given term.
     *
