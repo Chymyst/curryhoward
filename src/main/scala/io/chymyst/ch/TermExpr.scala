@@ -231,6 +231,8 @@ object TermExpr {
 
 sealed trait TermExpr {
   // Syntax helpers.
+  def =>:(y: VarE): TermExpr = CurriedE(List(y), this)
+
   def apply(terms: TermExpr*): TermExpr = tExpr match {
     case #->(_, _) ⇒ AppE(this, if (terms.length == 1) terms.head else ConjunctE(terms))
     case _: ConjunctT | _: NamedConjunctT | _: DisjunctT | _: UnitT ⇒ tExpr.apply(terms: _*)
@@ -409,9 +411,7 @@ sealed trait TermExpr {
   }
 }
 
-final case class VarE(name: String, tExpr: TypeExpr) extends TermExpr {
-  def #>(y: TermExpr): TermExpr = CurriedE(List(this), y)
-}
+final case class VarE(name: String, tExpr: TypeExpr) extends TermExpr
 
 final case class AppE(head: TermExpr, arg: TermExpr) extends TermExpr {
 

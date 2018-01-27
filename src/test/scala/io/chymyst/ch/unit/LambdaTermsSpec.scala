@@ -118,11 +118,15 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
       val f1Term = freshVar[A ⇒ B]
       val f2Term = freshVar[B ⇒ C]
 
+      // This syntax should compile.
+      val aa = aTerm =>: aTerm =>: aTerm
+      aa.isInstanceOf[TermExpr]
+
       // fmap f1 . fmap f2 = fmap (f1 . f2)
       val fmapF1 = fmapTerm(f1Term)
       val fmapAC = TermExpr.substTypeVar(TP("B"), TP("C"), fmapTerm)
 
-      val fmapf1f2rxa = fmapAC(aTerm #> f2Term(f1Term(aTerm)))(readerTerm)
+      val fmapf1f2rxa = fmapAC(aTerm =>: f2Term(f1Term(aTerm)))(readerTerm)
 
       val fmapBC = TermExpr.substTypeVar(TP("A"), TP("B"), fmapAC)
       val fmapF2 = fmapBC(f2Term)
@@ -176,7 +180,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     def b[B] = freshVar[B]
     val fmapAA = fmapT.substTypeVar(b, a)
     def optA[A] = freshVar[Either[Int, A]]
-    fmapAA(a #> a)(optA) equiv optA shouldEqual true
+    fmapAA(a =>: a)(optA) equiv optA shouldEqual true
   }
 
   it should "verify identity law for Option[T]" in {
@@ -185,7 +189,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val fmapT = fmap.lambdaTerm // No need to specify type parameters.
     def a[A] = freshVar[A]
 
-    val idA = a #> a
+    val idA = a =>: a
 
     val apply1 = idA(a)
 
@@ -213,10 +217,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val n = freshVar[None.type]
     val su = freshVar[Some[User]]
     val ol = freshVar[Option[Long]]
-    val case1 = n #> ol(n())
+    val case1 = n =>: ol(n())
     val sl = freshVar[Some[Long]]
-    val case2 = su #> ol.tExpr(sl.tExpr(su(0)("id")))
-    val getId = ou #> ou.cases(case1, case2)
+    val case2 = su =>: ol.tExpr(sl.tExpr(su(0)("id")))
+    val getId = ou =>: ou.cases(case1, case2)
     val dString = freshVar[String]
     var dLong = freshVar[Long]
     val u = freshVar[User]
