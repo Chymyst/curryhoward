@@ -149,10 +149,11 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 - develop better facilities to reason about terms at run time (e.g. check the laws) more easily using `TermExpr` structures
 
-# Known bugs
+# Known limitations
 
-- Limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. Example that fails to generate sensible code: `T => List[T]` (the generated code always returns empty list)
+- Limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. A non-recursive example that fails to generate sensible code: `T => List[T]` (the generated code always returns empty list)
 - Functions with zero arguments are currently not supported, e.g. `ofType[Int => () => Int]` will not compile
+- Lambda-terms do not automatically perform alpha-conversions either at value or at type level; alpha-conversions need to be handled manually, as shown in the tutorial
 
 # Examples of working functionality
 
