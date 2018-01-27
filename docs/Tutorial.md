@@ -474,10 +474,10 @@ Let us now apply the lambda-term `fmapT` to `idA`.
 ```scala
 scala> val result = fmapT(idA)
 java.lang.Exception: Internal error: Invalid head type in application (\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3)): `(A ⇒ B) ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}` must be a function with argument type `A ⇒ A`
-  at io.chymyst.ch.AppE.<init>(TermExpr.scala:449)
-  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:259)
-  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:258)
-  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:470)
+  at io.chymyst.ch.AppE.<init>(TermExpr.scala:424)
+  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:235)
+  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:234)
+  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:445)
   ... 48 elided
 ```
 
@@ -538,7 +538,7 @@ res17: io.chymyst.ch.TermExpr = optA$5
 ```
 
 We see that, after simplification, we obtain the original term `optA`.
-We can verify this more quickly with
+We can check this by using the `.equiv()` method:
 
 ```scala
 scala> optA equiv f2(optA)
@@ -546,6 +546,33 @@ res18: Boolean = true
 ```
 
 This concludes the verification of the identity law.
+Here is the entire code:
+
+```scala
+scala> def fmap[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]]
+<console>:15: Returning term: a ⇒ b ⇒ b match { c ⇒ (Left(c.value) + 0); d ⇒ (0 + Right(a d.value)) }
+       def fmap[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]]
+                              ^
+fmap: [A, B]=> io.chymyst.ch.Function1Lambda[A => B,Either[Int,A] => scala.util.Either[Int,B]]
+
+scala> val fmapT = fmap.lambdaTerm
+fmapT: io.chymyst.ch.TermExpr = \((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))}))
+
+scala> def a[A] = freshVar[A]
+a: [A]=> io.chymyst.ch.VarE
+
+scala> def b[B] = freshVar[B]
+b: [B]=> io.chymyst.ch.VarE
+
+scala> val fmapAA = fmapT.substTypeVar(b, a)
+fmapAA: io.chymyst.ch.TermExpr = \((a:A ⇒ A) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))}))
+
+scala> def optA[A] = freshVar[Either[Int, A]]
+optA: [A]=> io.chymyst.ch.VarE
+
+scala> fmapAA(a #> a)(optA) equiv optA
+res19: Boolean = true
+```
 
 ## How to construct other lambda-terms?
 
@@ -588,7 +615,7 @@ We begin by creating a fresh variable of type `Option[User]`.
 
 ```scala
 scala> val ou = freshVar[Option[User]]
-ou: io.chymyst.ch.VarE = ou$6
+ou: io.chymyst.ch.VarE = ou$9
 
 scala> // val getId = u #> ???
 ```
@@ -615,10 +642,10 @@ For that, we will need to create new fresh variables of these types.
 
 ```scala
      | val n = freshVar[None.type]
-n: io.chymyst.ch.VarE = n$7
+n: io.chymyst.ch.VarE = n$10
 
 scala> val su = freshVar[Some[User]]
-su: io.chymyst.ch.VarE = su$8
+su: io.chymyst.ch.VarE = su$11
 
 scala> // val case1 = n #> ???
      | // val case2 = su #> ???
@@ -637,10 +664,10 @@ This is done in these steps:
 
 ```scala
      | val ol = freshVar[Option[Long]]
-ol: io.chymyst.ch.VarE = ol$9
+ol: io.chymyst.ch.VarE = ol$12
 
 scala> val case1 = n #> ol.tExpr(n.tExpr())
-case1: io.chymyst.ch.TermExpr = \((n$7:None.type) ⇒ (<co>None() + 0))
+case1: io.chymyst.ch.TermExpr = \((n$10:None.type) ⇒ (<co>None() + 0))
 ```
 
 To implement the second case clause, we need to decompose `s` of type `Some[User]`.
@@ -659,20 +686,20 @@ This is done using the following steps:
 
 ```scala
 scala> val sl = freshVar[Some[Long]]
-sl: io.chymyst.ch.VarE = sl$10
+sl: io.chymyst.ch.VarE = sl$13
 
 scala> val case2 = su #> ol.tExpr(sl.tExpr(su(0)("id")))
-case2: io.chymyst.ch.TermExpr = \((su$8:Some[User]) ⇒ (0 + Some(su$8.value.id)))
+case2: io.chymyst.ch.TermExpr = \((su$11:Some[User]) ⇒ (0 + Some(su$11.value.id)))
 ```
 
 Now we are ready to write the match statement, which is done by using the `.cases` function on the disjunction value `u`:
 
 ```scala
 scala> val getId = ou #> ou.cases(case1, case2)
-getId: io.chymyst.ch.TermExpr = \((ou$6:Option[User]{None.type + Some[User]}) ⇒ (ou$6 match { \((n$7:None.type) ⇒ (<co>None() + 0)); \((su$8:Some[User]) ⇒ (0 + Some(su$8.value.id)))}))
+getId: io.chymyst.ch.TermExpr = \((ou$9:Option[User]{None.type + Some[User]}) ⇒ (ou$9 match { \((n$10:None.type) ⇒ (<co>None() + 0)); \((su$11:Some[User]) ⇒ (0 + Some(su$11.value.id)))}))
 
 scala> getId.prettyPrint
-res22: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
+res23: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
 ```
 
 Let us now apply this function term to some data and verify that it works as expected.
@@ -683,19 +710,19 @@ So, `dUser(dString, dLong)` is the same as `dUser.tExpr(dString, dLong)` and con
 
 ```scala
 scala> val dString = freshVar[String]
-dString: io.chymyst.ch.VarE = dString$11
+dString: io.chymyst.ch.VarE = dString$14
 
 scala> var dLong = freshVar[Long]
-dLong: io.chymyst.ch.VarE = dLong$12
+dLong: io.chymyst.ch.VarE = dLong$15
 
 scala> val u = freshVar[User]
-u: io.chymyst.ch.VarE = u$13
+u: io.chymyst.ch.VarE = u$16
 
 scala> val data = ou(su(u(dString, dLong)))
-data: io.chymyst.ch.TermExpr = (0 + Some(User(dString$11, dLong$12)))
+data: io.chymyst.ch.TermExpr = (0 + Some(User(dString$14, dLong$15)))
 
 scala> val result1 = getId(data).simplify
-result1: io.chymyst.ch.TermExpr = (0 + Some(dLong$12))
+result1: io.chymyst.ch.TermExpr = (0 + Some(dLong$15))
 ```
 
 We have obtained the resulting term, and we can see that it is what we expected -- it represents `Some(dLong)` as the right part of the disjunction type `Option[Long]`.
@@ -718,13 +745,13 @@ scala> val getIdAutoTerm = getIdAuto.lambdaTerm
 getIdAutoTerm: io.chymyst.ch.TermExpr = \((a:Option[User]{None.type + Some[User]}) ⇒ (a match { \((b:None.type) ⇒ (<co>None() + 0)); \((c:Some[User]) ⇒ (0 + Some(c.value.id)))}))
 
 scala> getIdAutoTerm.prettyPrint
-res23: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
-
-scala> getId.prettyPrint
 res24: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
 
+scala> getId.prettyPrint
+res25: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
+
 scala> getIdAutoTerm equiv getId.prettyRename
-res25: Boolean = true
+res26: Boolean = true
 ``` 
 
 The `prettyRename` method will rename all variables in a given term to names `a`, `b`, `c`, and so on.

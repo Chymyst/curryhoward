@@ -421,13 +421,25 @@ f2(optA).simplify
 ```
 
 We see that, after simplification, we obtain the original term `optA`.
-We can verify this more quickly with
+We can check this by using the `.equiv()` method:
 
 ```tut
 optA equiv f2(optA)
 ```
 
 This concludes the verification of the identity law.
+Here is the entire code once again, slightly shorter:
+
+```scala
+def fmap[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]]
+val fmapT = fmap.lambdaTerm
+def a[A] = freshVar[A]
+def b[B] = freshVar[B]
+val fmapAA = fmapT.substTypeVar(b, a)
+def optA[A] = freshVar[Either[Int, A]]
+fmapAA(a #> a)(optA) equiv optA
+
+```
 
 ## How to construct other lambda-terms?
 

@@ -200,7 +200,7 @@ object LJT {
               // Note that sequent.premises.length is the number of implications in x ⇒ ... before ⇒ a.
               val newHeads = args.drop(1).take(sequent.premises.length) ++ Seq(args.head) ++ args.drop(sequent.premises.length + 1)
               CurriedE(newHeads, f)
-            case _ ⇒ throw new Exception(s"Internal error: proof term $TermExprs must be a function")
+            case _ ⇒ throw new Exception(s"Internal error: proof term $TermExprs must be a function") // This case is never reached.
           }
         }))
       case _ ⇒ Seq()
@@ -327,7 +327,7 @@ object LJT {
 
   // G* |- A + B when G* |- A  -- rule +R1
   // Generate all such rules for any disjunct.
-  private def ruleDisjunctionAtRight(indexInDisjunct: Int) = ForwardRule(name = "+R1", sequent ⇒
+  private def ruleDisjunctionAtRight(indexInDisjunct: Int) = ForwardRule(name = s"+R$indexInDisjunct", sequent ⇒
     sequent.goal match {
       case disjunctType: DisjunctT ⇒
         val mainExpression = disjunctType.terms(indexInDisjunct)
@@ -342,7 +342,7 @@ object LJT {
           }
         })
         )
-      case _ ⇒ Seq()
+      case _ ⇒ Seq() // This case is never reached.
     }
   )
 

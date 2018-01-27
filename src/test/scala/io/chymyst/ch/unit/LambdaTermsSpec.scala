@@ -171,20 +171,12 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
   it should "verify identity law for Either[Int, T] as in tutorial" in {
     def fmap[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]]
-
-    val fmapT = fmap.lambdaTerm // No need to specify type parameters.
+    val fmapT = fmap.lambdaTerm
     def a[A] = freshVar[A]
-
-    val idA = a #> a
-
     def b[B] = freshVar[B]
-
     val fmapAA = fmapT.substTypeVar(b, a)
-    val f2 = fmapAA(idA)
-
     def optA[A] = freshVar[Either[Int, A]]
-
-    f2(optA).simplify shouldEqual optA
+    fmapAA(a #> a)(optA) equiv optA shouldEqual true
   }
 
   it should "verify identity law for Option[T]" in {
