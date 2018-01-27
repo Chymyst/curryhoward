@@ -114,7 +114,7 @@ object LJT {
           val freshVarsAB = heads.map(VarE(sequent.freshVar(), _)).toList
           // Each part of the disjunction is matched with a function of the form fv ⇒ TermExpr(fv, other_premises).
           val subTerms = TermExprs.zip(freshVarsAB)
-            .map { case (pt, fv) ⇒ (fv.tExpr, CurriedE(List(fv), TermExpr.applyToVars(pt, fv :: oldPremisesWithoutI))) }
+            .map { case (pt, fv) ⇒ (fv.tExpr, CurriedE(List(fv), TermExpr.applyCurried(pt, fv :: oldPremisesWithoutI))) }
             .sortBy(_._1.prettyPrint).map(_._2) // Sort the clauses by type expression.
         // At this point, `subTerms` can be reordered at will since these are mutually exclusive and exhaustive cases in a disjunction.
         val result = MatchE(thePremiseVarAB, subTerms.toList)
@@ -148,7 +148,7 @@ object LJT {
             val additionalValues: List[TermExpr] = produceAdditionalTerms(sequent, thePremiseVar) // The terms P1, P2, ..., Pn.
 
             val oldPremisesWithoutI: List[VarE] = omitPremise(sequent.premiseVars.zipWithIndex, i)
-            val result = TermExpr.applyToVars(proofTerm, additionalValues ++ oldPremisesWithoutI)
+            val result = TermExpr.applyCurried(proofTerm, additionalValues ++ oldPremisesWithoutI)
             sequent.constructResultTerm(result) // The proof term for the sequent (G*, P1, P2, ..., Pn) |- C.
           }
           )
@@ -237,7 +237,7 @@ object LJT {
         val valueA = AppE(implPremiseVar, atomicPremiseVar)
         // The list of vars is (A, P1, P2, ..., X, ... PN)
         val oldPremisesWithoutImplPremiseA = omitPremise(sequent.premiseVars.zipWithIndex, implPremiseI)
-        val result = TermExpr.applyToVars(proofTerm, valueA :: oldPremisesWithoutImplPremiseA)
+        val result = TermExpr.applyCurried(proofTerm, valueA :: oldPremisesWithoutImplPremiseA)
         sequent.constructResultTerm(result)
       })
     }
@@ -370,9 +370,9 @@ object LJT {
         val varDummyA = VarE(sequent.freshVar(), a)
         val valueConstAB = CurriedE(List(varDummyA), varB)
         val valueBC = CurriedE(List(varB), AppE(implPremiseVarABC, valueConstAB))
-        val valueAB = TermExpr.applyToVars(termBCAB, valueBC :: oldPremisesWithoutImplPremise)
+        val valueAB = TermExpr.applyCurried(termBCAB, valueBC :: oldPremisesWithoutImplPremise)
         val valueC = AppE(implPremiseVarABC, valueAB)
-        val result = TermExpr.applyToVars(termCD, valueC :: oldPremisesWithoutImplPremise)
+        val result = TermExpr.applyCurried(termCD, valueC :: oldPremisesWithoutImplPremise)
         sequent.constructResultTerm(result)
       }
       )

@@ -2,6 +2,18 @@ package io.chymyst.ch
 
 sealed trait TypeExpr {
 
+  def apply(args: TermExpr*): TermExpr = this match {
+    case _: NamedConjunctT | _: ConjunctT ⇒ TermExpr.conj(this)(args: _*)
+    case _: DisjunctT ⇒ args.headOption match {
+      case Some(arg) if args.length == 1 ⇒ TermExpr.disj(this)(arg)
+      case _ ⇒ throw new Exception(s"Calling .apply() on type $prettyPrint requires one argument (disjunction injection value)")
+    }
+    case _: UnitT ⇒ if (args.isEmpty)
+      UnitE(this)
+    else throw new Exception(s"Calling .apply() on type $prettyPrint requires zero arguments (named unit value)")
+    case _ ⇒ throw new Exception(s"Cannot call .apply() on type $prettyPrint")
+  }
+
   def substTypeVar(typeVar: TP, replaceBy: TypeExpr): TypeExpr = this match {
     case DisjunctT(constructor, tParams, terms) ⇒ DisjunctT(constructor, tParams.map(_.substTypeVar(typeVar, replaceBy)), terms.map(_.substTypeVar(typeVar, replaceBy)))
     case ConjunctT(terms) ⇒ ConjunctT(terms.map(_.substTypeVar(typeVar, replaceBy)))
@@ -23,14 +35,14 @@ sealed trait TypeExpr {
     case head #-> body ⇒
       val r = s"${head.prettyPrintWithParentheses(1)} ⇒ ${body.prettyPrintWithParentheses(0)}"
       if (level == 1) s"($r)" else r
-    case BasicT(name) ⇒ s"<c>$name" // well-known constant type such as Int
+    case BasicT(name) ⇒ s"<c>$name" // a basic, non-parameter type such as Int
     case ConstructorT(fullExpr) ⇒ s"<tc>$fullExpr" // type constructor with arguments, such as Seq[Int]
     case TP(name) ⇒ s"$name"
     case NamedConjunctT(constructor, tParams, _, wrapped@_) ⇒
       //      val termString = "(" + wrapped.map(_.prettyPrint).mkString(",") + ")" // Too verbose.
       val typeSuffix = if (caseObjectName.isDefined) ".type" else ""
       s"$constructor${TypeExpr.tParamString(tParams)}$typeSuffix"
-    case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams)}" // other constant type
+    case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams)}" // recursive instance of type
     case NothingT(_) ⇒ "0"
     case UnitT(name) ⇒ s"$name"
   }

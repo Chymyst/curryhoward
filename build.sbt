@@ -14,12 +14,13 @@ tutSourceDirectory := (sourceDirectory in curryhoward in Compile).value / "tut"
 tutTargetDirectory := baseDirectory.value / "docs" //(crossTarget in core).value / "tut"
 scalacOptions in Tut := scalacOptions.value.filterNot(disableWarningsForTut.contains)
 
-lazy val disableWarningsForTut = Set("-Ywarn-unused", "-Xlint", "-Ywarn-unused-import")
+lazy val disableWarningsForTut = Set("-Ywarn-unused", "-Xlint", "-Ywarn-unused-import", "-Ywarn-unused:imports")
 
 lazy val errorsForWartRemover = Seq(Wart.EitherProjectionPartial, Wart.Enumeration, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal, Wart.LeakingSealed, Wart.Return, Wart.StringPlusAny, Wart.TryPartial)
 
 lazy val warningsForWartRemover = Seq(Wart.Equals, Wart.JavaConversions, Wart.IsInstanceOf, Wart.OptionPartial, Wart.TraversableOps) //Seq(Wart.Any, Wart.AsInstanceOf, Wart.ImplicitConversion, Wart.Option2Iterable, Wart.NoNeedForMonad, Wart.Nothing, Wart.Product, Wart.Serializable, Wart.ToString, Wart.While)
 
+// See http://tpolecat.github.io/2017/04/25/scalac-flags.html
 lazy val scalacOptionsRobNorris211 = Seq(
   "-deprecation",                      // Emit warning and location for usages of deprecated APIs.
   "-encoding", "utf-8",                // Specify character encoding used by source files.

@@ -5,7 +5,7 @@ import org.scalatest.{Assertion, FlatSpec, Matchers}
 
 class LambdaTermsSpec extends FlatSpec with Matchers {
 
-  behavior of "lambdaTerms API"
+  behavior of ".lambdaTerm API"
 
   it should "produce result terms" in {
     val terms1 = ofType[Int ⇒ Int]
@@ -210,6 +210,38 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     def optA[A] = freshVar[Option[A]]
 
     f2(optA).simplify shouldEqual optA
+  }
+
+  behavior of "lambda terms manipulation"
+
+  it should "correctly handle conjunctions and disjunctions for tutorial" in {
+    final case class User(fullName: String, id: Long)
+    val ou = freshVar[Option[User]]
+    val n = freshVar[None.type]
+    val su = freshVar[Some[User]]
+    val ol = freshVar[Option[Long]]
+    val case1 = n #> ol(n())
+    val sl = freshVar[Some[Long]]
+    val case2 = su #> ol.tExpr(sl.tExpr(su(0)("id")))
+    val getId = ou #> ou.cases(case1, case2)
+    val dString = freshVar[String]
+    var dLong = freshVar[Long]
+    val u = freshVar[User]
+
+    val uData = u(dString, dLong)
+    uData("id").simplify shouldEqual dLong
+
+    val data = ou(su(uData))
+    val result1 = getId(data).simplify
+
+    val expected = ol(sl(dLong))
+    result1 shouldEqual expected
+
+    val getIdAuto = ofType[Option[User] ⇒ Option[Long]]
+    val getIdAutoTerm = getIdAuto.lambdaTerm
+    getIdAutoTerm.prettyPrint shouldEqual getId.prettyPrint
+    getIdAutoTerm equiv getId.prettyRename shouldEqual true
+
   }
 
 }
