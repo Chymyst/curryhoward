@@ -271,6 +271,18 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     the[Exception] thrownBy e1.cases() should have message "Case match on Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} must use a sequence of 2 functions with matching types of arguments (Left[<c>String,<c>Int]; Right[<c>String,<c>Int]) and bodies, but have "
 
+    val u0 = freshVar[Unit]
+    val u00 = u0()
+    val u000 = u0.tExpr()
+    u00 shouldEqual u000
+
+    the[Exception] thrownBy u0(u0) should have message "Calling .apply() on type Unit requires zero arguments (named unit value)"
+
+    val f0 = freshVar[Int ⇒ Int]
+
+    the[Exception] thrownBy f0(123) should have message ".apply(i: Int) is defined only on conjunction types while this is <c>Int ⇒ <c>Int"
+    the[Exception] thrownBy f0("abc") should have message ".apply(acc: String) is defined only on conjunction types while this is <c>Int ⇒ <c>Int"
+    the[Exception] thrownBy f0.tExpr() should have message "Cannot call .apply() on type <c>Int ⇒ <c>Int"
   }
 
 }
