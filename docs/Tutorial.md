@@ -456,18 +456,28 @@ For this reason, we will have to manipulate these names explicitly in our symbol
 
 The identity law is `fmap id = id`. To verify this law, we need to apply `fmap` to an identity function of type `A ⇒ A`, and to check that the result is an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
 
-We create an identity function by first creating an STLC variable of type `A`, and then creating a function expression:
+We create an identity function by first creating an STLC variable of type `A`, and then creating a function expression using the operator `=>:`:
 
 ```scala
 scala> def a[A] = freshVar[A]
 a: [A]=> io.chymyst.ch.VarE
 
-scala> val idA = a #> a
+scala> val idA = a =>: a
 idA: io.chymyst.ch.TermExpr = \((a$3:A) ⇒ a$3)
 ```
 
 The type parameter name `A` is fixed in the variable `a` since it is defined via a macro.
 Calling `a[Int]` will return the same variable, still having type `A`.
+
+The operator `=>:` is right-associative:
+
+```scala
+scala> val b = freshVar[Int]
+b: io.chymyst.ch.VarE = b$4
+
+scala> a =>: b =>: a
+res14: io.chymyst.ch.TermExpr = \((a$3:A) ⇒ \((b$4:<c>Int) ⇒ a$3))
+```
 
 Let us now apply the lambda-term `fmapT` to `idA`.
 
@@ -475,8 +485,8 @@ Let us now apply the lambda-term `fmapT` to `idA`.
 scala> val result = fmapT(idA)
 java.lang.Exception: Internal error: Invalid head type in application (\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3)): `(A ⇒ B) ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}` must be a function with argument type `A ⇒ A`
   at io.chymyst.ch.AppE.<init>(TermExpr.scala:422)
-  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:235)
-  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:234)
+  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:237)
+  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:236)
   at io.chymyst.ch.CurriedE.apply(TermExpr.scala:443)
   ... 48 elided
 ```
@@ -494,7 +504,7 @@ The type expression of a lambda-term is obtained via the method `.tExpr`:
 
 ```scala
 scala> a.tExpr
-res14: io.chymyst.ch.TypeExpr = TP(A)
+res15: io.chymyst.ch.TypeExpr = TP(A)
 ```
 
 The type expression printed as `TP("A")` represents the type parameter with name `A`.
@@ -505,7 +515,7 @@ scala> def b[B] = freshVar[B]
 b: [B]=> io.chymyst.ch.VarE
 
 scala> b.tExpr
-res15: io.chymyst.ch.TypeExpr = TP(B)
+res16: io.chymyst.ch.TypeExpr = TP(B)
 ```
 
 Now we can rename the type variables in `fmapT` and apply the resulting term to `idA` like this:
@@ -523,7 +533,7 @@ We can first check that the type of this term is what we expect:
 
 ```scala
 scala> f2.tExpr.prettyPrint
-res16: String = Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}
+res17: String = Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}
 ```
 
 The most straightforward way of verifying that `f2` is an identity function is to apply it to an arbitrary term of type `Either[Int, A]`.
@@ -534,7 +544,7 @@ scala> def optA[A] = freshVar[Either[Int, A]]
 optA: [A]=> io.chymyst.ch.VarE
 
 scala> f2(optA).simplify
-res17: io.chymyst.ch.TermExpr = optA$5
+res18: io.chymyst.ch.TermExpr = optA$6
 ```
 
 We see that, after simplification, we obtain the original term `optA`.
@@ -542,7 +552,7 @@ We can check this by using the `.equiv()` method:
 
 ```scala
 scala> optA equiv f2(optA)
-res18: Boolean = true
+res19: Boolean = true
 ```
 
 This concludes the verification of the identity law.
@@ -555,7 +565,7 @@ def a[A] = freshVar[A]
 def b[B] = freshVar[B]
 val fmapAA = fmapT.substTypeVar(b, a)
 def optA[A] = freshVar[Either[Int, A]]
-fmapAA(a #> a)(optA) equiv optA
+fmapAA(a =>: a)(optA) equiv optA
 
 ```
 
@@ -600,12 +610,12 @@ We begin by creating a fresh variable of type `Option[User]`.
 
 ```scala
 scala> val ou = freshVar[Option[User]]
-ou: io.chymyst.ch.VarE = ou$6
-
-scala> // val getId = u #> ???
+ou: io.chymyst.ch.VarE = ou$7
 ```
 
 The type `Option[User]` is a disjunction type having two parts: `None.type` and `Some[User]`. 
+
+We would like to define the lambda-term `getId` like this, `val getId = u =>: ...`
 
 The body of the function `getId` must examine the value of `u` and match on the two parts of the disjunction.
 To create the function body, we need to create a lambda-term that matches the value of `u` on the two parts of the disjunction.
@@ -626,33 +636,36 @@ Therefore, the next step for us is to create these functions as lambda-terms.
 For that, we will need to create new fresh variables of these types.
 
 ```scala
-     | val n = freshVar[None.type]
-n: io.chymyst.ch.VarE = n$7
+scala> val n = freshVar[None.type]
+n: io.chymyst.ch.VarE = n$8
 
 scala> val su = freshVar[Some[User]]
-su: io.chymyst.ch.VarE = su$8
+su: io.chymyst.ch.VarE = su$9
+```
 
-scala> // val case1 = n #> ???
-     | // val case2 = su #> ???
+We now need to create the case clauses. We might imagine to write them like this:
+```scala
+val case1 = n =>: ???
+val case2 = su =>: ???
 ```
 
 The first case clause is simple: it takes a value `None` of type `Option[User]` and returns a value `None` of type `Option[Long]`.
-We need to take care to assign correct types to all terms.
-So we cannot just write `val case1 = n #> n` because this function will have the return type `None.type` rather than `Option[Long]`.
+However, we must take care to assign correct types to all terms.
+So we cannot just write `val case1 = n =>: n` because that function would have the return type `None.type` rather than `Option[Long]`.
 We need to inject `None.type` into the disjunction `Option[Long]`.
 
-This is done in these steps:
+This is done in three steps:
 
 - create a fresh variable `n` of type `Option[Long]`
 - create a value of type `None.type` using `n.tExpr()` -- note that `None.type` is essentially a "named `Unit`", and we can always create values of a `Unit` type
-- using the variable `ol`'s type expression, lift the value of type `None.type` into the disjunction type `Option[Long]`
+- using the variable `ol`'s type expression, lift the value of type `None.type` into the disjunction type `Option[Long]` using `ol.tExpr()`
 
 ```scala
-     | val ol = freshVar[Option[Long]]
-ol: io.chymyst.ch.VarE = ol$9
+scala> val ol = freshVar[Option[Long]]
+ol: io.chymyst.ch.VarE = ol$10
 
-scala> val case1 = n #> ol.tExpr(n.tExpr())
-case1: io.chymyst.ch.TermExpr = \((n$7:None.type) ⇒ (<co>None() + 0))
+scala> val case1 = n =>: ol.tExpr(n.tExpr())
+case1: io.chymyst.ch.TermExpr = \((n$8:None.type) ⇒ (<co>None() + 0))
 ```
 
 To implement the second case clause, we need to decompose `s` of type `Some[User]`.
@@ -671,20 +684,20 @@ This is done using the following steps:
 
 ```scala
 scala> val sl = freshVar[Some[Long]]
-sl: io.chymyst.ch.VarE = sl$10
+sl: io.chymyst.ch.VarE = sl$11
 
-scala> val case2 = su #> ol.tExpr(sl.tExpr(su(0)("id")))
-case2: io.chymyst.ch.TermExpr = \((su$8:Some[User]) ⇒ (0 + Some(su$8.value.id)))
+scala> val case2 = su =>: ol.tExpr(sl.tExpr(su(0)("id")))
+case2: io.chymyst.ch.TermExpr = \((su$9:Some[User]) ⇒ (0 + Some(su$9.value.id)))
 ```
 
 Now we are ready to write the match statement, which is done by using the `.cases` function on the disjunction value `u`:
 
 ```scala
-scala> val getId = ou #> ou.cases(case1, case2)
-getId: io.chymyst.ch.TermExpr = \((ou$6:Option[User]{None.type + Some[User]}) ⇒ (ou$6 match { \((n$7:None.type) ⇒ (<co>None() + 0)); \((su$8:Some[User]) ⇒ (0 + Some(su$8.value.id)))}))
+scala> val getId = ou =>: ou.cases(case1, case2)
+getId: io.chymyst.ch.TermExpr = \((ou$7:Option[User]{None.type + Some[User]}) ⇒ (ou$7 match { \((n$8:None.type) ⇒ (<co>None() + 0)); \((su$9:Some[User]) ⇒ (0 + Some(su$9.value.id)))}))
 
 scala> getId.prettyPrint
-res22: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
+res20: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
 ```
 
 Let us now apply this function term to some data and verify that it works as expected.
@@ -695,19 +708,19 @@ So, `dUser(dString, dLong)` is the same as `dUser.tExpr(dString, dLong)` and con
 
 ```scala
 scala> val dString = freshVar[String]
-dString: io.chymyst.ch.VarE = dString$11
+dString: io.chymyst.ch.VarE = dString$12
 
 scala> var dLong = freshVar[Long]
-dLong: io.chymyst.ch.VarE = dLong$12
+dLong: io.chymyst.ch.VarE = dLong$13
 
 scala> val u = freshVar[User]
-u: io.chymyst.ch.VarE = u$13
+u: io.chymyst.ch.VarE = u$14
 
 scala> val data = ou(su(u(dString, dLong)))
-data: io.chymyst.ch.TermExpr = (0 + Some(User(dString$11, dLong$12)))
+data: io.chymyst.ch.TermExpr = (0 + Some(User(dString$12, dLong$13)))
 
 scala> val result1 = getId(data).simplify
-result1: io.chymyst.ch.TermExpr = (0 + Some(dLong$12))
+result1: io.chymyst.ch.TermExpr = (0 + Some(dLong$13))
 ```
 
 We have obtained the resulting term, and we can see that it is what we expected -- it represents `Some(dLong)` as the right part of the disjunction type `Option[Long]`.
@@ -730,13 +743,13 @@ scala> val getIdAutoTerm = getIdAuto.lambdaTerm
 getIdAutoTerm: io.chymyst.ch.TermExpr = \((a:Option[User]{None.type + Some[User]}) ⇒ (a match { \((b:None.type) ⇒ (<co>None() + 0)); \((c:Some[User]) ⇒ (0 + Some(c.value.id)))}))
 
 scala> getIdAutoTerm.prettyPrint
-res23: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
+res21: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
 
 scala> getId.prettyPrint
-res24: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
+res22: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
 
 scala> getIdAutoTerm equiv getId.prettyRename
-res25: Boolean = true
+res23: Boolean = true
 ``` 
 
 The `prettyRename` method will rename all variables in a given term to names `a`, `b`, `c`, and so on.
@@ -755,14 +768,14 @@ Therefore, we need to run `prettyRename` on our term `getId` so that it becomes 
 | `t.prettyRename` | `TermExpr ⇒ TermExpr` | rename variables in a closed term to `a`, `b`, `c`, etc., so that the term becomes more readable |
 | `a.tExpr` | `TermExpr ⇒ TypeExpr` | get the type expression for a given term |
 | `freshVar[T]` | `VarE` | create a STLC variable with assigned type expression `T` |
-| `a #> b` | `VarE ⇒ TermExpr ⇒ TermExpr` | create a STLC function term ("abstraction") |
+| `a =>: b` | `VarE ⇒ TermExpr ⇒ TermExpr` | create a STLC function term ("abstraction") |
 | `a(b)` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` |
 | `a.simplify` | `TermExpr ⇒ TermExpr` | perform symbolic simplification of STLC term |
 | `a equiv b` | `TermExpr ⇒ TermExpr ⇒ Boolean` | check whether two terms are syntactically equal after simplification |
 | `a.substTypeVar(b, c)` | `TermExpr ⇒ (TermExpr, TermExpr) ⇒ TermExpr` | replace the type of `b` by the type of `c` in `a` -- the type of `b` must be a type variable |
-| `u()`  | `TermExpr ⇒ () ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named unit term of type `u.tExpr` -- the type of `u` must be a named unit type, e.g. `None.type` |
+| `u()`  | `TermExpr ⇒ () ⇒ TermExpr` and `TypeExpr ⇒ () ⇒ TermExpr` | create a named unit term of type `u.tExpr` -- the type of `u` must be a named unit type, e.g. `None.type` |
 | `c(x...)`  | `TermExpr ⇒ TermExpr* ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named conjunction term of type `c.tExpr` -- the type of `c` must be a conjunction whose parts match the types of the arguments `x...` |
 | `d(x)`  |  `TermExpr ⇒ TermExpr ⇒ TermExpr` and `TypeExpr ⇒ TermExpr ⇒ TermExpr` | create a disjunction term of type `d.tExpr` using term `x` -- the type of `x` must match one of the disjunction parts in the type `d`, which must be a disjunction type |
 | `c(i)` | `TermExpr ⇒ Int ⇒ TermExpr` | project a conjunction term onto part with given zero-based index -- the type of `c` must be a conjunction with sufficiently many parts |
 | `c("id")` | `TermExpr ⇒ String ⇒ TermExpr` | project a conjunction term onto part with given accessor name -- the type of `c` must be a named conjunction that supports this accessor |
-| `d.cases(x #> ..., y #> ..., ...)` | `TermExpr ⇒ TermExpr* ⇒ TermExpr` | create a term that pattern-matches on the given disjunction term -- the type of `d` must be a disjunction whose arguments match the arguments `x`, `y`, ... of the given case clauses |
+| `d.cases(x =>: ..., y =>: ..., ...)` | `TermExpr ⇒ TermExpr* ⇒ TermExpr` | create a term that pattern-matches on the given disjunction term -- the type of `d` must be a disjunction whose arguments match the arguments `x`, `y`, ... of the given case clauses |
