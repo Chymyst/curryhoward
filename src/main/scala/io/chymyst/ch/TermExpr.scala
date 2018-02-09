@@ -282,7 +282,9 @@ sealed trait TermExpr {
 
   def tExpr: TypeExpr
 
-  def prettyPrint: String = prettyRename.prettyPrintWithParentheses(0)
+  def prettyPrint: String = prettyPrintWithParentheses(0)
+
+  def prettyRenamePrint: String = prettyRename.prettyPrint
 
   override lazy val toString: String = this match {
     case VarE(name, _) ⇒ s"$name"

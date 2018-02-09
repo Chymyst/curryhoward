@@ -37,7 +37,7 @@ class TermExprSpec extends FlatSpec with Matchers {
     // b ⇒ c ⇒ b (a ⇒ a c)  is of type (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B
     val termExpr = CurriedE(List(b, c), AppE(b, CurriedE(List(a), AppE(a, c))))
     termExpr.toString shouldEqual "\\((b:((A ⇒ B) ⇒ B) ⇒ B) ⇒ (c:A) ⇒ (b \\((a:A ⇒ B) ⇒ (a c))))"
-    termExpr.prettyPrint shouldEqual "a ⇒ b ⇒ a (c ⇒ c b)"
+    termExpr.prettyRenamePrint shouldEqual "a ⇒ b ⇒ a (c ⇒ c b)"
   }
 
   behavior of "TermExpr#freeVars"

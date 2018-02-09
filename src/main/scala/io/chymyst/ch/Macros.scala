@@ -320,7 +320,7 @@ class Macros(val c: whitebox.Context) {
               case None ⇒ pq"${TermName(fvName)} : ${reifyType(fvType)}"
             }
             cq"$pat => ${reifyTermShort(if (rest.isEmpty) body else CurriedE(rest, body))}"
-          case cc ⇒ throw new Exception(s"Internal error: `case` term ${cc.prettyPrint} must be a function")
+          case cc ⇒ throw new Exception(s"Internal error: `case` term ${cc.prettyRenamePrint} must be a function")
         }
 
         q"${reifyTermShort(term)} match { case ..$casesTrees }"

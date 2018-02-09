@@ -33,7 +33,7 @@ class TheoremProverSpec extends FlatSpec with Matchers {
     val sequent1 = Sequent(List(wrappedT), aT, freshVar)
     val terms1 = TheoremProver.findTermExprs(sequent1)
     terms1.length shouldEqual 1
-    terms1.head.prettyPrint shouldEqual "a ⇒ a.name"
+    terms1.head.prettyRenamePrint shouldEqual "a ⇒ a.name"
   }
 
   it should "implement trivial wrapping" in {
@@ -43,7 +43,7 @@ class TheoremProverSpec extends FlatSpec with Matchers {
     val sequent2 = Sequent(List(aT), wrappedT, freshVar)
     val terms2 = TheoremProver.findTermExprs(sequent2)
     terms2.length shouldEqual 1
-    terms2.head.prettyPrint shouldEqual "a ⇒ MyWrapper(a)"
+    terms2.head.prettyRenamePrint shouldEqual "a ⇒ MyWrapper(a)"
     terms2.head.toString shouldEqual "\\((x7:1) ⇒ MyWrapper(x7))"
   }
 
@@ -59,6 +59,6 @@ class TheoremProverSpec extends FlatSpec with Matchers {
     val sequent = Sequent(List(wrapped123abT), wrapped123bcT, freshVar)
     val terms = TheoremProver.findTermExprs(sequent)
     terms.length shouldEqual 1
-    terms.head.prettyPrint shouldEqual "a ⇒ MyWrapper123bc(a.ab3.a1, MyWrapper23(a.ab3.b1, a.c3))"
+    terms.head.prettyRenamePrint shouldEqual "a ⇒ MyWrapper123bc(a.ab3.a1, MyWrapper23(a.ab3.b1, a.c3))"
   }
 }

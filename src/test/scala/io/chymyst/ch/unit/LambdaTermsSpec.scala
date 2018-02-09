@@ -13,15 +13,15 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val terms2 = allOfType[Int ⇒ Int ⇒ Int]
     terms2.length shouldEqual 2
-    terms2.map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ b", "a ⇒ b ⇒ a")
+    terms2.map(_.lambdaTerm.prettyRenamePrint) shouldEqual Seq("a ⇒ b ⇒ b", "a ⇒ b ⇒ a")
 
     val terms3 = allOfType[Int ⇒ Int ⇒ (Int, Int)]
     terms3.length shouldEqual 2
-    terms3.map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ Tuple2(b, a)", "a ⇒ b ⇒ Tuple2(a, b)")
+    terms3.map(_.lambdaTerm.prettyRenamePrint) shouldEqual Seq("a ⇒ b ⇒ Tuple2(b, a)", "a ⇒ b ⇒ Tuple2(a, b)")
 
     val terms4 = allOfType[(Int, Int) ⇒ (Int, Int)]
     terms4.length shouldEqual 2
-    terms4.map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ Tuple2(a._1, a._2)", "a ⇒ Tuple2(a._2, a._1)")
+    terms4.map(_.lambdaTerm.prettyRenamePrint) shouldEqual Seq("a ⇒ Tuple2(a._1, a._2)", "a ⇒ Tuple2(a._2, a._1)")
 
     val u: Unit = implement
 
@@ -58,7 +58,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     def f3[A] = allOfType[(A, A) ⇒ A]
 
     f3.length shouldEqual 2
-    f3[Int].map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ a._1", "a ⇒ a._2")
+    f3[Int].map(_.lambdaTerm.prettyRenamePrint) shouldEqual Seq("a ⇒ a._1", "a ⇒ a._2")
   }
 
   it should "produce result terms for functions of 2 and 3 arguments" in {
@@ -88,12 +88,12 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val mapReaderTerm = mapReader.lambdaTerm
 
-    mapReaderTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ b (a c)"
+    mapReaderTerm.prettyRenamePrint shouldEqual "a ⇒ b ⇒ c ⇒ b (a c)"
 
     def idFunc[A] = ofType[A ⇒ A]
 
     val idTermA = idFunc.lambdaTerm
-    idTermA.prettyPrint shouldEqual "a ⇒ a"
+    idTermA.prettyRenamePrint shouldEqual "a ⇒ a"
 
     def readerTerm[X, A] = freshVar[X ⇒ A]
 
@@ -111,7 +111,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
       val fmapTerm = TermExpr.lambdaTerm(fmap).get
 
-      fmapTerm.prettyPrint shouldEqual "a ⇒ b ⇒ c ⇒ a (b c)"
+      fmapTerm.prettyRenamePrint shouldEqual "a ⇒ b ⇒ c ⇒ a (b c)"
 
       val readerTerm = freshVar[X ⇒ A]
       val aTerm = freshVar[A]
@@ -144,7 +144,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     def check[A, B, C](): Assertion = {
       val adds = allOfType[Mon[A] ⇒ Mon[A] ⇒ Mon[A]]
 
-      adds.map(_.lambdaTerm.prettyPrint) shouldEqual Seq("a ⇒ b ⇒ c ⇒ a (b c)", "a ⇒ b ⇒ c ⇒ b (a c)")
+      adds.map(_.lambdaTerm.prettyRenamePrint) shouldEqual Seq("a ⇒ b ⇒ c ⇒ a (b c)", "a ⇒ b ⇒ c ⇒ b (a c)")
 
       // Associativity law: add x (add y z) == add (add x y) z
 
@@ -166,7 +166,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   it should "return lambda terms together with the function when using `ofType` but not when using `implement`" in {
     def f2[A] = ofType[Unit ⇒ Either[A ⇒ A, Unit]]
 
-    TermExpr.lambdaTerm(f2).map(_.prettyPrint) shouldEqual Some("a ⇒ (0 + Right(a))")
+    TermExpr.lambdaTerm(f2).map(_.prettyRenamePrint) shouldEqual Some("a ⇒ (0 + Right(a))")
 
     def f2a[A]: Unit ⇒ Either[A ⇒ A, Unit] = implement
 
@@ -236,7 +236,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val getIdAuto = ofType[Option[User] ⇒ Option[Long]]
     val getIdAutoTerm = getIdAuto.lambdaTerm
-    getIdAutoTerm.prettyPrint shouldEqual getId.prettyPrint
+    getIdAutoTerm.prettyRenamePrint shouldEqual getId.prettyRenamePrint
     getIdAutoTerm equiv getId.prettyRename shouldEqual true
   }
 
