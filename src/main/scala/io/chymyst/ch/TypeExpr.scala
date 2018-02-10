@@ -3,27 +3,27 @@ package io.chymyst.ch
 sealed trait TypeExpr {
   def apply(args: TermExpr*): TermExpr = this match {
     case ConjunctT(terms) ⇒
-      val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !terms.lift(i).contains(arg.tExpr) }
+      val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !terms.lift(i).contains(arg.t) }
       if (terms.length != args.length)
         throw new Exception(s".apply() must be called with ${terms.length} arguments on this type $prettyPrint but it was called with ${args.length} arguments")
       else if (invalidTypeArgs.isEmpty)
         ConjunctE(args)
-      else throw new Exception(s"Some arguments have unexpected types [${invalidTypeArgs.map(_._1.tExpr.prettyPrint).mkString("; ")}] that do not match the types in $prettyPrint")
+      else throw new Exception(s"Some arguments have unexpected types [${invalidTypeArgs.map(_._1.t.prettyPrint).mkString("; ")}] that do not match the types in $prettyPrint")
 
     case nct: NamedConjunctT ⇒
-      val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !nct.wrapped.lift(i).contains(arg.tExpr) }
+      val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !nct.wrapped.lift(i).contains(arg.t) }
       if (nct.accessors.length != args.length)
         throw new Exception(s".apply() must be called with ${nct.accessors.length} arguments on this type $prettyPrint but it was called with ${args.length} arguments")
       else if (invalidTypeArgs.isEmpty)
         NamedConjunctE(args, nct)
-      else throw new Exception(s"Some arguments have unexpected types [${invalidTypeArgs.map(_._1.tExpr.prettyPrint).mkString("; ")}] that do not match the types in $prettyPrint")
+      else throw new Exception(s"Some arguments have unexpected types [${invalidTypeArgs.map(_._1.t.prettyPrint).mkString("; ")}] that do not match the types in $prettyPrint")
 
     case DisjunctT(_, _, terms) ⇒ args.headOption match {
       case Some(arg) if args.length == 1 ⇒
-        val index = terms.indexOf(arg.tExpr)
+        val index = terms.indexOf(arg.t)
         if (index >= 0)
           DisjunctE(index, terms.length, arg, this)
-        else throw new Exception(s"Cannot inject into disjunction since the given disjunction type $prettyPrint does not contain the type ${arg.tExpr.prettyPrint} of the given term $arg")
+        else throw new Exception(s"Cannot inject into disjunction since the given disjunction type $prettyPrint does not contain the type ${arg.t.prettyPrint} of the given term $arg")
       case _ ⇒ throw new Exception(s"Calling .apply() on type $prettyPrint requires one argument (disjunction injection value)")
     }
 
@@ -113,17 +113,17 @@ object TypeExpr {
   private[ch] type UnifyResult = Either[String, Map[TP, TypeExpr]]
 
   /** Obtain type variable substitutions via unification of two type expressions `src` and `dst`.
-    * Unification consists of finding the values for type variables such that the two type expressions match.
+    * Left-Unification consists of finding the values for type variables in `src` such that the two type expressions match.
     *
-    * @param src           The first type expression.
+    * @param src           The first type expression. Type variables in this expression may be substituted in search of unification.
     * @param dst           The second type expression.
     * @param substitutions Previously available substitutions, if any.
     * @return An updated substitution map, or an error message if unification cannot succeed.
     */
-  private[ch] def unifyTypeVariables(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): UnifyResult = {
+  private[ch] def leftUnifyTypeVariables(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): UnifyResult = {
 
     def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): UnifyResult = tuples.foldLeft[UnifyResult](Right(substitutions)) { case (prev, (t, t2)) ⇒
-      prev.flatMap(p ⇒ unifyTypeVariables(t, t2, p))
+      prev.flatMap(p ⇒ leftUnifyTypeVariables(t, t2, p))
     }
 
     val empty: UnifyResult = Right(Map())
@@ -134,14 +134,14 @@ object TypeExpr {
       if (dst.typeParams contains tp)
         Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable $tp is used in the destination type")
       else
-        Right(Map(tp → dst))
+        Right(Map(tp → dst) ++ substitutions)
     }
 
-    (src, dst) match {
+    val result = (src, dst) match {
       case (TP(name1), TP(name2)) if name1 == name2 ⇒ empty
       // A type parameter can unify with anything, as long as it is not free there.
       case (tp@TP(_), _) ⇒ unifyTP(tp, dst)
-      case (_, tp@TP(_)) ⇒ unifyTP(tp, src)
+      //      case (_, tp@TP(_)) ⇒ unifyTP(tp, src)
 
       case (BasicT(name1), BasicT(name2)) if name1 == name2 ⇒ empty
       case (UnitT(name1), UnitT(name2)) if name1 == name2 ⇒ empty
@@ -153,7 +153,7 @@ object TypeExpr {
         if constructor == constructor2 && tParams.length == tParams2.length ⇒ wrapResult(tParams zip tParams2)
 
       case (d@DisjunctT(_, tParams, terms), n@NamedConjunctT(ncName, tParams2, _, _)) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
-      case (n@NamedConjunctT(ncName, tParams2, _, _), d@DisjunctT(_, tParams, terms)) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
+      //      case (n@NamedConjunctT(ncName, tParams2, _, _), d@DisjunctT(_, tParams, terms)) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
 
       case (ConjunctT(terms), ConjunctT(terms2)) if terms.length == terms2.length ⇒ wrapResult(terms zip terms2)
 
@@ -166,6 +166,8 @@ object TypeExpr {
 
       case _ ⇒ error
     }
+    println(s"leftUnifyTypeVariables($src, $dst, $substitutions) returns $result")
+    result
   }
 
   private[ch] def tParamString(tParams: Seq[TypeExpr]): String =

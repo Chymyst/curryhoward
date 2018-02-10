@@ -175,11 +175,17 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
   it should "verify identity law for Either[Int, T] as in tutorial" in {
     def fmap[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]]
+
     val fmapT = fmap.lambdaTerm
+
     def a[A] = freshVar[A]
+
     def b[B] = freshVar[B]
+
     val fmapAA = fmapT.substTypeVar(b, a)
+
     def optA[A] = freshVar[Either[Int, A]]
+
     fmapAA(a =>: a)(optA) equiv optA shouldEqual true
   }
 
@@ -219,7 +225,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val ol = freshVar[Option[Long]]
     val case1 = n =>: ol(n())
     val sl = freshVar[Some[Long]]
-    val case2 = su =>: ol.tExpr(sl.tExpr(su(0)("id")))
+    val case2 = su =>: ol.t(sl.t(su(0)("id")))
     val getId = ou =>: ou.cases(case1, case2)
     val dString = freshVar[String]
     var dLong = freshVar[Long]
@@ -243,47 +249,47 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   it should "generate errors when types do not match" in {
     val x = freshVar[None.type]
 
-    x.tExpr.typeParams shouldEqual Seq()
-    x.tExpr.conjunctSize shouldEqual 0
-    x.tExpr.caseObjectName shouldEqual Some("None")
+    x.t.typeParams shouldEqual Seq()
+    x.t.conjunctSize shouldEqual 0
+    x.t.caseObjectName shouldEqual Some("None")
 
     the[Exception] thrownBy x(1) should have message ".apply(1) is undefined since this conjunction type has only 0 parts"
     the[Exception] thrownBy x("a") should have message ".apply(a) is undefined since this conjunction type does not support this accessor (supported accessors: )"
     the[Exception] thrownBy x(x) should have message ".apply() must be called with 0 arguments on this type None.type but it was called with 1 arguments"
 
-    val noneT1 = x.tExpr()
+    val noneT1 = x.t()
 
-    the[Exception] thrownBy x.tExpr(x) should have message ".apply() must be called with 0 arguments on this type None.type but it was called with 1 arguments"
+    the[Exception] thrownBy x.t(x) should have message ".apply() must be called with 0 arguments on this type None.type but it was called with 1 arguments"
 
     the[Exception] thrownBy noneT1.cases() should have message ".cases() is not defined for the term <co>None() of type None.type"
 
     val u1 = freshVar[User]
 
-    u1.tExpr.typeParams shouldEqual Seq()
-    u1.tExpr.conjunctSize shouldEqual 2
-    u1.tExpr.caseObjectName shouldEqual None
+    u1.t.typeParams shouldEqual Seq()
+    u1.t.conjunctSize shouldEqual 2
+    u1.t.caseObjectName shouldEqual None
 
     the[Exception] thrownBy u1(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
     the[Exception] thrownBy u1() should have message ".apply() must be called with 2 arguments on this type User but it was called with 0 arguments"
 
-    the[Exception] thrownBy u1.tExpr(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
-    the[Exception] thrownBy u1.tExpr() should have message ".apply() must be called with 2 arguments on this type User but it was called with 0 arguments"
+    the[Exception] thrownBy u1.t(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
+    the[Exception] thrownBy u1.t() should have message ".apply() must be called with 2 arguments on this type User but it was called with 0 arguments"
 
     the[Exception] thrownBy u1(100) should have message ".apply(100) is undefined since this conjunction type has only 2 parts"
 
     the[Exception] thrownBy u1("abc") should have message ".apply(abc) is undefined since this conjunction type does not support this accessor (supported accessors: fullName, id)"
 
     val e1 = freshVar[Either[String, Int]]
-    e1.tExpr.conjunctSize shouldEqual 1
-    e1.tExpr.caseObjectName shouldEqual None
+    e1.t.conjunctSize shouldEqual 1
+    e1.t.caseObjectName shouldEqual None
 
-    e1.tExpr.typeParams shouldEqual Seq(BasicT("String"), BasicT("Int"))
+    e1.t.typeParams shouldEqual Seq(BasicT("String"), BasicT("Int"))
 
     the[Exception] thrownBy e1.accessor(1) should have message "Internal error: Cannot perform projection for term e1$25 : Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} because its type is not a conjunction"
 
     the[Exception] thrownBy e1() should have message "Calling .apply() on type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} requires one argument (disjunction injection value)"
 
-    the[Exception] thrownBy e1.tExpr() should have message "Calling .apply() on type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} requires one argument (disjunction injection value)"
+    the[Exception] thrownBy e1.t() should have message "Calling .apply() on type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} requires one argument (disjunction injection value)"
 
     the[Exception] thrownBy e1(x) should have message "Cannot inject into disjunction since the given disjunction type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} does not contain the type None.type of the given term x$23"
 
@@ -291,24 +297,84 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val u0 = freshVar[Unit]
     val u00 = u0()
-    val u000 = u0.tExpr()
+    val u000 = u0.t()
     u00 shouldEqual u000
 
     the[Exception] thrownBy u0(u0) should have message "Calling .apply() on type Unit requires zero arguments (named unit value)"
 
     val f0 = freshVar[Int ⇒ Int]
 
-    the[Exception] thrownBy f0(123) should have message ".apply(i: Int) is defined only on conjunction types while this is <c>Int ⇒ <c>Int"
-    the[Exception] thrownBy f0("abc") should have message ".apply(acc: String) is defined only on conjunction types while this is <c>Int ⇒ <c>Int"
-    the[Exception] thrownBy f0.tExpr() should have message "Cannot call .apply() on type <c>Int ⇒ <c>Int"
+    the[Exception] thrownBy f0(123) should have message ".apply(index: Int) is defined only on conjunction types while this is <c>Int ⇒ <c>Int"
+    the[Exception] thrownBy f0("abc") should have message ".apply(accessor: String) is defined only on conjunction types while this is <c>Int ⇒ <c>Int"
+    the[Exception] thrownBy f0.t() should have message "Cannot call .apply() on type <c>Int ⇒ <c>Int"
 
-    val ct = ConjunctT(Seq(e1.tExpr, u0.tExpr))
+    val ct = ConjunctT(Seq(e1.t, u0.t))
     val cte = ct(e1, u0)
     the[Exception] thrownBy cte(e1) should have message ".apply() must be called with 2 arguments on this type (Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]}, Unit) but it was called with 1 arguments"
 
     var i = freshVar[Int]
 
     the[Exception] thrownBy i() should have message "t.apply(...) is not defined for the term i$28 of type <c>Int"
+  }
+
+  behavior of "automatic alpha-conversion"
+
+  it should "substitute type variables and verify identity law for Reader monad" in {
+    type R[X, A] = X ⇒ A
+
+    def mapReader[X, A, B] = ofType[R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B]]
+
+    val mapReaderTerm = mapReader.lambdaTerm
+
+    def idFunc[A] = ofType[A ⇒ A]
+
+    val idTermA = idFunc.lambdaTerm
+
+    def readerTerm[X, A] = freshVar[X ⇒ A]
+
+    val mapApplied = mapReaderTerm :@ readerTerm
+
+    mapApplied.toString shouldEqual "(\\((a:X ⇒ A) ⇒ (b:A ⇒ B) ⇒ (c:X) ⇒ (b (a c))) readerTerm$29)"
+
+    // map(rxa)(id) = rxa
+    mapReaderTerm :@ readerTerm :@ idTermA equiv readerTerm shouldEqual true
+  }
+
+  it should "substitute type variables and verify composition law for fmap on Reader monad" in {
+    type R[X, A] = X ⇒ A
+
+    def check[X, A, B, C](): Assertion = {
+      val fmap = ofType[(A ⇒ B) ⇒ R[X, A] ⇒ R[X, B]]
+
+      val fmapTerm = TermExpr.lambdaTerm(fmap).get
+
+      fmapTerm.prettyRenamePrint shouldEqual "a ⇒ b ⇒ c ⇒ a (b c)"
+
+      val reader = freshVar[X ⇒ A]
+      val aTerm = freshVar[A]
+      val fAB = freshVar[A ⇒ B]
+      val fBC = freshVar[B ⇒ C]
+
+      // fmap fAB . fmap fBC = fmap (fAB . fBC) as functions on a `reader`
+      (fmapTerm :@ fAB andThen (fmapTerm :@ fBC))(reader) equiv (fmapTerm :@ (fAB andThen fBC))(reader) shouldEqual true
+    }
+
+    check()
+  }
+
+  it should "compute correct substitutions for unification" in {
+    def vA[A] = freshVar[A]
+
+    val vInt = freshVar[Int]
+    val vFloat = freshVar[Float]
+
+    def vB[B] = freshVar[B]
+
+    TypeExpr.leftUnifyTypeVariables((vA =>: vB).t, (vInt =>: vFloat).t) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
+
+    def vC[C] = freshVar[C]
+
+    TypeExpr.leftUnifyTypeVariables((vA =>: vB).t, (vB =>: vC).t) shouldEqual Right(Map(vA.t → vB.t, vB.t → vC.t))
   }
 
 }

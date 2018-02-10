@@ -357,7 +357,7 @@ class Macros(val c: whitebox.Context) {
       case lists ⇒
         val givenVars = lists.flatten.map(s ⇒ VarE(s.name.decodedName.toString, buildTypeExpr(s.typeSignature)))
         val resultType = buildTypeExpr(typeU.finalResultType)
-        val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.tExpr ->: prev }
+        val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.t ->: prev }
         inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
     }
     result
@@ -383,7 +383,7 @@ class Macros(val c: whitebox.Context) {
       // so that they do not mix with automatic variables in the generated closed term.
       .map { case (v, i) ⇒ (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
-    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
+    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.t ->: prev }
     inhabitOneInternal(typeStructure, givenVars.toMap, createLambdas = true) { term ⇒
       givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }
     }
@@ -396,7 +396,7 @@ class Macros(val c: whitebox.Context) {
     val givenVars: Seq[(VarE, c.Tree)] = values.zipWithIndex
       .map { case (v, i) ⇒ (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
-    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.tExpr ->: prev }
+    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.t ->: prev }
     inhabitAllInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
   }
 

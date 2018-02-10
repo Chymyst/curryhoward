@@ -114,7 +114,7 @@ object LJT {
           val freshVarsAB = heads.map(VarE(sequent.freshVar(), _)).toList
           // Each part of the disjunction is matched with a function of the form fv ⇒ TermExpr(fv, other_premises).
           val subTerms = TermExprs.zip(freshVarsAB)
-            .map { case (pt, fv) ⇒ (fv.tExpr, CurriedE(List(fv), TermExpr.applyCurried(pt, fv :: oldPremisesWithoutI))) }
+            .map { case (pt, fv) ⇒ (fv.t, CurriedE(List(fv), TermExpr.applyCurried(pt, fv :: oldPremisesWithoutI))) }
             .sortBy(_._1.prettyPrint).map(_._2) // Sort the clauses by type expression.
         // At this point, `subTerms` can be reordered at will since these are mutually exclusive and exhaustive cases in a disjunction.
         val result = MatchE(thePremiseVarAB, subTerms.toList)
