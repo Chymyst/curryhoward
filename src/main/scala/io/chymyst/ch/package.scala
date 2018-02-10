@@ -78,6 +78,14 @@ package object ch {
     }
   }
 
+  /** Provide :@ syntax for term application with automatic alpha-conversions.
+    *
+    */
+
+  implicit class WithAlphaConversion(val t: TermExpr) extends AnyVal {
+    def :@(terms: TermExpr*): TermExpr = t.applyWithAlpha(terms: _*)
+  }
+
   /** Create a new fresh variable term of given type.
     *
     * @tparam X Type expression that will be assigned to the new variable.

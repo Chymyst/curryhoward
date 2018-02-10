@@ -173,7 +173,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val typeExpr = TP("1") ->: disjunctT
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
-    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("1"))), DisjunctE(0, 2, VarE("x", TP("1")), disjunctT))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("1"))), DisjunctE(0, 2, NamedConjunctE(Seq(VarE("x", TP("1"))), nc1), disjunctT))) shouldEqual true
   }
 
   it should "find proof term for simple instance of +Rn with several disjuncts" in {
@@ -181,7 +181,7 @@ class LJTSpec extends FlatSpec with Matchers {
     val typeExpr = TP("2") ->: disjunctT
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
-    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("2"))), DisjunctE(1, 3, VarE("x", TP("2")), disjunctT))) shouldEqual true
+    TermExpr.equiv(proofs.head, CurriedE(List(VarE("x", TP("2"))), DisjunctE(1, 3, NamedConjunctE(Seq(VarE("x", TP("2"))), nc2), disjunctT))) shouldEqual true
   }
 
   it should "inhabit type using +Rn" in {

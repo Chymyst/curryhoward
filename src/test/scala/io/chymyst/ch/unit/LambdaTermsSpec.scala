@@ -201,7 +201,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val f2 = fmapAA(idA)
 
-    the[Exception] thrownBy fmapT.substTypeVar(idA, a) should have message "substTypeVar requires a type variable as type of expression \\((a$12:A) ⇒ a$12), but found A ⇒ A"
+    the[Exception] thrownBy fmapT.substTypeVar(idA, a) should have message "substTypeVar requires a type variable as type of expression \\((a$12:A) ⇒ a$12), but found type A ⇒ A"
 
     def optA[A] = freshVar[Option[A]]
 
@@ -255,7 +255,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     the[Exception] thrownBy x.tExpr(x) should have message ".apply() must be called with 0 arguments on this type None.type but it was called with 1 arguments"
 
-    the[Exception] thrownBy noneT1.cases() should have message ".cases() is not defined for this term of type None.type"
+    the[Exception] thrownBy noneT1.cases() should have message ".cases() is not defined for the term <co>None() of type None.type"
 
     val u1 = freshVar[User]
 
@@ -308,7 +308,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     var i = freshVar[Int]
 
-    the[Exception] thrownBy i() should have message "t.apply(...) is not defined for this term t=i$28 of type <c>Int"
+    the[Exception] thrownBy i() should have message "t.apply(...) is not defined for the term i$28 of type <c>Int"
   }
 
 }

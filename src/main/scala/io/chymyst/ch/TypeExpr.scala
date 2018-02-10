@@ -110,64 +110,61 @@ object TypeExpr {
     }
   }
 
+  private[ch] type UnifyResult = Either[String, Map[TP, TypeExpr]]
 
-  private[ch] def unifyWith(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): Either[String, Map[TP, TypeExpr]] = {
+  /** Obtain type variable substitutions via unification of two type expressions `src` and `dst`.
+    * Unification consists of finding the values for type variables such that the two type expressions match.
+    *
+    * @param src           The first type expression.
+    * @param dst           The second type expression.
+    * @param substitutions Previously available substitutions, if any.
+    * @return An updated substitution map, or an error message if unification cannot succeed.
+    */
+  private[ch] def unifyTypeVariables(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): UnifyResult = {
 
-    def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): Either[String, Map[TP, TypeExpr]] = tuples.foldLeft[Either[String, Map[TP, TypeExpr]]](Right(substitutions)) { case (prev, (t, t2)) ⇒
-      prev.flatMap(p ⇒ unifyWith(t, t2, p))
+    def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): UnifyResult = tuples.foldLeft[UnifyResult](Right(substitutions)) { case (prev, (t, t2)) ⇒
+      prev.flatMap(p ⇒ unifyTypeVariables(t, t2, p))
     }
 
-    def error: Either[String, Map[TP, TypeExpr]] = Left(s"Cannot unify ${src.prettyPrint} with an incompatible type ${dst.prettyPrint}")
+    val empty: UnifyResult = Right(Map())
 
-    src match {
-      case tp@TP(name) ⇒ // A type parameter can unify with anything, as long as it is not free there.
-        dst match {
-          case TP(`name`) ⇒ Right(Map())
-          case _ ⇒
-            if (dst.typeParams contains tp) Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable $tp is used in the destination type") else Right(Map(tp → dst))
-        }
-      case DisjunctT(constructor, tParams, terms) ⇒
-        // Can unify with the same DisjunctT or with one of the terms.
-        dst match {
-          case DisjunctT(`constructor`, tParams2, _) ⇒ wrapResult(tParams zip tParams2)
-          case NamedConjunctT(ncName, tParams2, _, _) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
-          case _ ⇒ error
-        }
-      case ConjunctT(terms) ⇒ dst match {
-        case ConjunctT(terms2) if terms.length == terms2.length ⇒ wrapResult(terms zip terms2)
-        case _ ⇒ error
-      }
-      case #->(head, body) ⇒ dst match {
-        case #->(head2, body2) ⇒ wrapResult(Seq((head, head2), (body, body2)))
-        case _ ⇒ error
-      }
+    val error: UnifyResult = Left(s"Cannot unify ${src.prettyPrint} with an incompatible type ${dst.prettyPrint}")
 
-      case RecurseT(name, tParams) ⇒ dst match {
-        case RecurseT(`name`, tParams2) ⇒ wrapResult(tParams zip tParams2)
-        case _ ⇒ error
-      }
+    def unifyTP(tp: TP, other: TypeExpr): UnifyResult = {
+      if (dst.typeParams contains tp)
+        Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable $tp is used in the destination type")
+      else
+        Right(Map(tp → dst))
+    }
 
-      case NamedConjunctT(constructor, tParams, _, _) ⇒ dst match {
-        case NamedConjunctT(`constructor`, tParams2, _, _) ⇒ wrapResult(tParams zip tParams2)
-        case _ ⇒ error
-      }
+    (src, dst) match {
+      case (TP(name1), TP(name2)) if name1 == name2 ⇒ empty
+      // A type parameter can unify with anything, as long as it is not free there.
+      case (tp@TP(_), _) ⇒ unifyTP(tp, dst)
+      case (_, tp@TP(_)) ⇒ unifyTP(tp, src)
 
-      case BasicT(name) ⇒ dst match {
-        case BasicT(`name`) ⇒ Right(Map())
-        case _ ⇒ error
-      }
-      case UnitT(name) ⇒ dst match {
-        case UnitT(`name`) ⇒ Right(Map())
-        case _ ⇒ error
-      }
-      case NothingT(name) ⇒ dst match {
-        case NothingT(`name`) ⇒ Right(Map())
-        case _ ⇒ error
-      }
-      case ConstructorT(name) ⇒ dst match {
-        case ConstructorT(`name`) ⇒ Right(Map())
-        case _ ⇒ error
-      }
+      case (BasicT(name1), BasicT(name2)) if name1 == name2 ⇒ empty
+      case (UnitT(name1), UnitT(name2)) if name1 == name2 ⇒ empty
+      case (NothingT(name1), NothingT(name2)) if name1 == name2 ⇒ empty
+      case (ConstructorT(name1), ConstructorT(name2)) if name1 == name2 ⇒ empty
+
+      // Can unify DisjunctT with the same DisjunctT or with one of the terms.
+      case (DisjunctT(constructor, tParams, terms), DisjunctT(constructor2, tParams2, _))
+        if constructor == constructor2 && tParams.length == tParams2.length ⇒ wrapResult(tParams zip tParams2)
+
+      case (d@DisjunctT(_, tParams, terms), n@NamedConjunctT(ncName, tParams2, _, _)) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
+      case (n@NamedConjunctT(ncName, tParams2, _, _), d@DisjunctT(_, tParams, terms)) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
+
+      case (ConjunctT(terms), ConjunctT(terms2)) if terms.length == terms2.length ⇒ wrapResult(terms zip terms2)
+
+      case (#->(head, body), #->(head2, body2)) ⇒ wrapResult(Seq((head, head2), (body, body2)))
+
+      case (RecurseT(name, tParams), RecurseT(name2, tParams2)) if name == name2 ⇒ wrapResult(tParams zip tParams2)
+
+      case (NamedConjunctT(constructor, tParams, _, _), NamedConjunctT(constructor2, tParams2, _, _))
+        if constructor == constructor2 && tParams.length == tParams2.length ⇒ wrapResult(tParams zip tParams2)
+
+      case _ ⇒ error
     }
   }
 

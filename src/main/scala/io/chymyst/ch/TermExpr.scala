@@ -236,33 +236,6 @@ sealed trait TermExpr {
   // Syntax helpers.
   def =>:(y: VarE): TermExpr = CurriedE(List(y), this)
 
-  def apply(terms: TermExpr*): TermExpr = tExpr match {
-    case #->(head, _) ⇒
-      val arguments = if (terms.length == 1) terms.head else ConjunctE(terms)
-      TypeExpr.unifyWith(head, arguments.tExpr) match {
-        case Left(errorMessage) ⇒ throw new Exception(errorMessage)
-        case Right(substitutions) ⇒ AppE(this.substTypeVars(substitutions), arguments)
-      }
-    case _: ConjunctT | _: NamedConjunctT | _: DisjunctT | _: UnitT ⇒ tExpr.apply(terms: _*)
-    case _ ⇒ throw new Exception(s"t.apply(...) is not defined for this term t=$this of type ${tExpr.prettyPrint}")
-  }
-
-  def cases(cases: TermExpr*): TermExpr = tExpr match {
-    case DisjunctT(_, _, termTypes) ⇒
-      val typesOfCaseBodies = cases.zip(termTypes).collect { case (CurriedE(head :: _, body), t) if head.tExpr == t ⇒ body.tExpr }
-      if (cases.length == termTypes.length && typesOfCaseBodies.length == cases.length && typesOfCaseBodies.toSet.size == 1)
-        MatchE(this, cases.toList)
-      else throw new Exception(s"Case match on ${tExpr.prettyPrint} must use a sequence of ${termTypes.length} functions with matching types of arguments (${termTypes.map(_.prettyPrint).mkString("; ")}) and bodies, but have ${cases.map(_.tExpr.prettyPrint).mkString("; ")}")
-    case _ ⇒ throw new Exception(s".cases() is not defined for this term of type ${tExpr.prettyPrint}")
-  }
-
-  def equiv(y: TermExpr): Boolean = simplify == y.simplify
-
-  def substTypeVar(from: TermExpr, to: TermExpr): TermExpr = from.tExpr match {
-    case tp@TP(_) ⇒ TermExpr.substTypeVar(tp, to.tExpr, this)
-    case _ ⇒ throw new Exception(s"substTypeVar requires a type variable as type of expression $from, but found type ${from.tExpr.prettyPrint}")
-  }
-
   def apply(i: Int): TermExpr = tExpr match {
     case NamedConjunctT(_, _, accessors, _) ⇒
       if (i >= 0 && i < accessors.length)
@@ -278,6 +251,40 @@ sealed trait TermExpr {
         ProjectE(i, this)
       else throw new Exception(s".apply($acc) is undefined since this conjunction type does not support this accessor (supported accessors: ${accessors.mkString(", ")})")
     case _ ⇒ throw new Exception(s".apply(acc: String) is defined only on conjunction types while this is ${tExpr.prettyPrint}")
+  }
+
+  def apply(terms: TermExpr*): TermExpr = tExpr match {
+    case #->(head, _) ⇒
+      val arguments = if (terms.length == 1) terms.head else ConjunctE(terms)
+      AppE(this, arguments)
+    case _: ConjunctT | _: NamedConjunctT | _: DisjunctT | _: UnitT ⇒ tExpr.apply(terms: _*)
+    case _ ⇒ throw new Exception(s"t.apply(...) is not defined for the term $this of type ${tExpr.prettyPrint}")
+  }
+
+  def applyWithAlpha(terms: TermExpr*): TermExpr = tExpr match {
+    case #->(head, _) ⇒
+      val arguments = if (terms.length == 1) terms.head else ConjunctE(terms)
+      TypeExpr.unifyTypeVariables(head, arguments.tExpr) match {
+        case Left(errorMessage) ⇒ throw new Exception(errorMessage)
+        case Right(substitutions) ⇒ AppE(this.substTypeVars(substitutions), arguments)
+      }
+    case _ ⇒ throw new Exception(s"t.applyWithAlpha(...) is not defined for the term $this of type ${tExpr.prettyPrint}")
+  }
+
+  def cases(cases: TermExpr*): TermExpr = tExpr match {
+    case DisjunctT(_, _, termTypes) ⇒
+      val typesOfCaseBodies = cases.zip(termTypes).collect { case (CurriedE(head :: _, body), t) if head.tExpr == t ⇒ body.tExpr }
+      if (cases.length == termTypes.length && typesOfCaseBodies.length == cases.length && typesOfCaseBodies.toSet.size == 1)
+        MatchE(this, cases.toList)
+      else throw new Exception(s"Case match on ${tExpr.prettyPrint} must use a sequence of ${termTypes.length} functions with matching types of arguments (${termTypes.map(_.prettyPrint).mkString("; ")}) and bodies, but have ${cases.map(_.tExpr.prettyPrint).mkString("; ")}")
+    case _ ⇒ throw new Exception(s".cases() is not defined for the term $this of type ${tExpr.prettyPrint}")
+  }
+
+  def equiv(y: TermExpr): Boolean = simplify == y.simplify
+
+  def substTypeVar(from: TermExpr, to: TermExpr): TermExpr = from.tExpr match {
+    case tp@TP(_) ⇒ TermExpr.substTypeVar(tp, to.tExpr, this)
+    case _ ⇒ throw new Exception(s"substTypeVar requires a type variable as type of expression $from, but found type ${from.tExpr.prettyPrint}")
   }
 
   def informationLossScore = (
