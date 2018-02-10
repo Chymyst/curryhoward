@@ -35,7 +35,9 @@ sealed trait TypeExpr {
   }
 
   def substTypeVar(typeVar: TP, replaceBy: TypeExpr): TypeExpr = this match {
-    case DisjunctT(constructor, tParams, terms) ⇒ DisjunctT(constructor, tParams.map(_.substTypeVar(typeVar, replaceBy)), terms.map(_.substTypeVar(typeVar, replaceBy)))
+    case DisjunctT(constructor, tParams, terms) ⇒
+      DisjunctT(constructor, tParams.map(_.substTypeVar(typeVar, replaceBy)),
+        terms.map(_.substTypeVar(typeVar, replaceBy)).asInstanceOf[Seq[NamedConjunctT]])
     case ConjunctT(terms) ⇒ ConjunctT(terms.map(_.substTypeVar(typeVar, replaceBy)))
     case #->(head, body) ⇒ #->(head.substTypeVar(typeVar, replaceBy), body.substTypeVar(typeVar, replaceBy))
     case NothingT(_) ⇒ this
@@ -49,7 +51,7 @@ sealed trait TypeExpr {
 
   lazy val prettyPrint: String = prettyPrintWithParentheses(0)
 
-  private def prettyPrintWithParentheses(level: Int): String = this match {
+  private[ch] def prettyPrintWithParentheses(level: Int): String = this match {
     case DisjunctT(constructor, tParams, terms) ⇒ s"$constructor${TypeExpr.tParamString(tParams)}{${terms.map(_.prettyPrintWithParentheses(1)).mkString(" + ")}}"
     case ConjunctT(terms) ⇒ s"(${terms.map(_.prettyPrintWithParentheses(0)).mkString(", ")})"
     case head #-> body ⇒
@@ -96,7 +98,8 @@ object TypeExpr {
     def subst(typeExpr: TypeExpr): TypeExpr = substNames(typeExpr, typeMap)
 
     typeExpr match {
-      case DisjunctT(constructor, tParams, terms) ⇒ DisjunctT(constructor, tParams.map(subst), terms.map(subst))
+      case DisjunctT(constructor, tParams, terms) ⇒
+        DisjunctT(constructor, tParams.map(subst), terms.map(subst).asInstanceOf[Seq[NamedConjunctT]])
       case ConjunctT(terms) ⇒ ConjunctT(terms.map(subst))
       case #->(head, body) ⇒ #->(subst(head), subst(body))
       case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
@@ -104,6 +107,67 @@ object TypeExpr {
       case TP(name) ⇒ typeMap.getOrElse(name, typeExpr)
       case RecurseT(name, tParams) ⇒ RecurseT(name, tParams.map(subst))
       case _ ⇒ typeExpr
+    }
+  }
+
+
+  private[ch] def unifyWith(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): Either[String, Map[TP, TypeExpr]] = {
+
+    def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): Either[String, Map[TP, TypeExpr]] = tuples.foldLeft[Either[String, Map[TP, TypeExpr]]](Right(substitutions)) { case (prev, (t, t2)) ⇒
+      prev.flatMap(p ⇒ unifyWith(t, t2, p))
+    }
+
+    def error: Either[String, Map[TP, TypeExpr]] = Left(s"Cannot unify ${src.prettyPrint} with an incompatible type ${dst.prettyPrint}")
+
+    src match {
+      case tp@TP(name) ⇒ // A type parameter can unify with anything, as long as it is not free there.
+        dst match {
+          case TP(`name`) ⇒ Right(Map())
+          case _ ⇒
+            if (dst.typeParams contains tp) Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable $tp is used in the destination type") else Right(Map(tp → dst))
+        }
+      case DisjunctT(constructor, tParams, terms) ⇒
+        // Can unify with the same DisjunctT or with one of the terms.
+        dst match {
+          case DisjunctT(`constructor`, tParams2, _) ⇒ wrapResult(tParams zip tParams2)
+          case NamedConjunctT(ncName, tParams2, _, _) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
+          case _ ⇒ error
+        }
+      case ConjunctT(terms) ⇒ dst match {
+        case ConjunctT(terms2) if terms.length == terms2.length ⇒ wrapResult(terms zip terms2)
+        case _ ⇒ error
+      }
+      case #->(head, body) ⇒ dst match {
+        case #->(head2, body2) ⇒ wrapResult(Seq((head, head2), (body, body2)))
+        case _ ⇒ error
+      }
+
+      case RecurseT(name, tParams) ⇒ dst match {
+        case RecurseT(`name`, tParams2) ⇒ wrapResult(tParams zip tParams2)
+        case _ ⇒ error
+      }
+
+      case NamedConjunctT(constructor, tParams, _, _) ⇒ dst match {
+        case NamedConjunctT(`constructor`, tParams2, _, _) ⇒ wrapResult(tParams zip tParams2)
+        case _ ⇒ error
+      }
+
+      case BasicT(name) ⇒ dst match {
+        case BasicT(`name`) ⇒ Right(Map())
+        case _ ⇒ error
+      }
+      case UnitT(name) ⇒ dst match {
+        case UnitT(`name`) ⇒ Right(Map())
+        case _ ⇒ error
+      }
+      case NothingT(name) ⇒ dst match {
+        case NothingT(`name`) ⇒ Right(Map())
+        case _ ⇒ error
+      }
+      case ConstructorT(name) ⇒ dst match {
+        case ConstructorT(`name`) ⇒ Right(Map())
+        case _ ⇒ error
+      }
     }
   }
 
@@ -121,7 +185,7 @@ object TypeExpr {
 
 }
 
-final case class DisjunctT(constructor: String, tParams: Seq[TypeExpr], terms: Seq[TypeExpr]) extends TypeExpr with NonAtomicTypeExpr {
+final case class DisjunctT(constructor: String, tParams: Seq[TypeExpr], terms: Seq[NamedConjunctT]) extends TypeExpr with NonAtomicTypeExpr {
   override def typeParams: Seq[TypeExpr] = tParams
 }
 

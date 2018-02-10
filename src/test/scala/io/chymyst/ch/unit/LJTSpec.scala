@@ -164,8 +164,12 @@ class LJTSpec extends FlatSpec with Matchers {
 
   behavior of "proof search - high-level API, rule +Rn"
 
+  val nc1 = NamedConjunctT("A", Nil, List("x"), List(TP("1")))
+  val nc2 = NamedConjunctT("B", Nil, List("y"), List(TP("2")))
+  val nc3 = NamedConjunctT("C", Nil, List("z"), List(TP("3")))
+
   it should "find proof term for simple instance of +Rn" in {
-    val disjunctT = DisjunctT("12", Seq(), Seq(TP("1"), TP("2")))
+    val disjunctT = DisjunctT("12", Seq(), Seq(nc1, nc2))
     val typeExpr = TP("1") ->: disjunctT
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1
@@ -173,7 +177,7 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "find proof term for simple instance of +Rn with several disjuncts" in {
-    val disjunctT = DisjunctT("123", Seq(), Seq(TP("1"), TP("2"), TP("3")))
+    val disjunctT = DisjunctT("123", Seq(), Seq(nc1, nc2, nc3))
     val typeExpr = TP("2") ->: disjunctT
     val proofs = TheoremProver.findProofs(typeExpr)._1
     proofs.length shouldEqual 1

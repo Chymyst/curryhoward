@@ -159,7 +159,7 @@ class Macros(val c: whitebox.Context) {
               case part :: Nil ⇒ part // A single case class implementing a trait. This is not a disjunction.
               case parts ⇒
                 //                if (debug) println(s"  DEBUG: buildTypeExpr on $t with $tMap returning DisjunctT($fullName, ${matchedTypeArgs.map(_.prettyPrint)}), parts=${parts.map(_.prettyPrint)}")
-                DisjunctT(typeName, matchedTypeArgs, parts) // Several case classes implementing a trait.
+                DisjunctT(typeName, matchedTypeArgs, parts.asInstanceOf[List[NamedConjunctT]]) // Several case classes implementing a trait.
             }
           } else if (matchedTypeArgs.isEmpty) BasicT(typeName)
           else ConstructorT(finalType.toString)

@@ -230,11 +230,19 @@ object TermExpr {
 }
 
 sealed trait TermExpr {
+  private def substTypeVars(substitutions: Map[TP, TypeExpr]): TermExpr =
+    substitutions.foldLeft(this) { case (prevTerm, (tp, newTypeExpr)) ⇒ TermExpr.substTypeVar(tp, newTypeExpr, prevTerm) }
+
   // Syntax helpers.
   def =>:(y: VarE): TermExpr = CurriedE(List(y), this)
 
   def apply(terms: TermExpr*): TermExpr = tExpr match {
-    case #->(_, _) ⇒ AppE(this, if (terms.length == 1) terms.head else ConjunctE(terms))
+    case #->(head, _) ⇒
+      val arguments = if (terms.length == 1) terms.head else ConjunctE(terms)
+      TypeExpr.unifyWith(head, arguments.tExpr) match {
+        case Left(errorMessage) ⇒ throw new Exception(errorMessage)
+        case Right(substitutions) ⇒ AppE(this.substTypeVars(substitutions), arguments)
+      }
     case _: ConjunctT | _: NamedConjunctT | _: DisjunctT | _: UnitT ⇒ tExpr.apply(terms: _*)
     case _ ⇒ throw new Exception(s"t.apply(...) is not defined for this term t=$this of type ${tExpr.prettyPrint}")
   }
@@ -252,7 +260,7 @@ sealed trait TermExpr {
 
   def substTypeVar(from: TermExpr, to: TermExpr): TermExpr = from.tExpr match {
     case tp@TP(_) ⇒ TermExpr.substTypeVar(tp, to.tExpr, this)
-    case _ ⇒ throw new Exception(s"substTypeVar requires a type variable as type of expression $from, but found ${from.tExpr.prettyPrint}")
+    case _ ⇒ throw new Exception(s"substTypeVar requires a type variable as type of expression $from, but found type ${from.tExpr.prettyPrint}")
   }
 
   def apply(i: Int): TermExpr = tExpr match {
