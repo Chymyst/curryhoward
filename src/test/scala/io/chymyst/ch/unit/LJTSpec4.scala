@@ -26,11 +26,14 @@ class LJTSpec4 extends FlatSpec with Matchers {
         f((Some(Some(1)), None)) == ((Some(1), None))
     } shouldEqual Seq(true)
 
+    /*
+
     // TODO: make this work
-    //    type P[T] = (Option[T], Option[T])
-    //    def flatten[A]: P[Option[Int]] ⇒ P[Int] = implement
-    //    flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), Some(2)))
-    //    flatten((Some(None), Some(Some(2)))) shouldEqual ((None, Some(2)))
-    //    flatten((Some(Some(1)), None)) shouldEqual ((Some(1), None))
+         type P[T] = (Option[T], Option[T])
+         def flatten[A]: P[Option[Int]] ⇒ P[Int] = implement
+         flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), Some(2)))
+         flatten((Some(None), Some(Some(2)))) shouldEqual ((None, Some(2)))
+         flatten((Some(Some(1)), None)) shouldEqual ((Some(1), None))
+    */
   }
 }

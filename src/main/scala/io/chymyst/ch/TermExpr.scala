@@ -259,23 +259,7 @@ object TermExpr {
 
 sealed trait TermExpr {
 
-  private def roundFactor(x: Double): Long = math.round(x * 10000)
-
-  // Need to split the tuple into parts because Ordering[] is undefined on tuples > 9
-  lazy val informationLossScore = (
-    (TermExpr.unusedArgs(this).size
-      , unusedTupleParts
-      , roundFactor(unusedMatchClauseVars)
-      , unequallyUsedTupleParts
-      , roundFactor(TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this))
-    ), (
-    TermExpr.argsMultiUseCountShallow(this)
-    , TermExpr.argsMultiUseCountDeep(this)
-    , roundFactor(TermExpr.unequalTupleSize(this))
-    , TermExpr.caseClausesCount(this)
-//    , TermExpr.size(this)
-  )
-  )
+  private def roundFactor(x: Double): Int = math.round(x * 10000).toInt
 
   /** Provide :@ syntax for term application with automatic alpha-conversions.
     */
@@ -351,11 +335,24 @@ sealed trait TermExpr {
     case _ ⇒ throw new Exception(s"substTypeVar requires a type variable as type of expression $from, but found type ${from.t.prettyPrint}")
   }
 
+  // Need to split the tuple into parts because Ordering[] is undefined on tuples > 9
+  lazy val informationLossScore = (
+    TermExpr.unusedArgs(this).size
+    , unusedTupleParts + unusedMatchClauseVars
+    , TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this)
+    , TermExpr.argsMultiUseCountShallow(this)
+    , TermExpr.argsMultiUseCountDeep(this)
+    //    , unequallyUsedTupleParts
+    //    , roundFactor(TermExpr.unequalTupleSize(this))
+    //    , TermExpr.caseClausesCount(this)
+    //    , TermExpr.size(this) // Should not use this.
+  )
+
   def t: TypeExpr
 
-  def prettyPrint: String = prettyPrintWithParentheses(0)
+  lazy val prettyPrint: String = prettyPrintWithParentheses(0)
 
-  def prettyRenamePrint: String = prettyRename.prettyPrint
+  lazy val prettyRenamePrint: String = prettyRename.prettyPrint
 
   override lazy val toString: String = this match {
     case VarE(name, _) ⇒ s"$name"
@@ -405,7 +402,7 @@ sealed trait TermExpr {
     letter ← ('a' to 'z').toIterator
   } yield s"$letter$number"
 
-  def prettyRename: TermExpr = {
+  lazy val prettyRename: TermExpr = {
     val oldVars = usedVars // Use a `Seq` here rather than a `Set` for the list of variable names.
     // This achieves deterministic renaming, which is important for checking that different terms are equivalent up to renaming.
     val newVars = prettyVars.take(oldVars.length).toSeq
@@ -418,11 +415,11 @@ sealed trait TermExpr {
     case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : ${t.prettyPrint} because its type is not a conjunction")
   }
 
-  def simplify: TermExpr = TermExpr.simplifyWithEtaUntilStable(this)
+  lazy val simplify: TermExpr = TermExpr.simplifyWithEtaUntilStable(this)
 
   private[ch] def simplifyOnce(withEta: Boolean = false): TermExpr = this
 
-  private[ch] def unusedMatchClauseVars: Double = {
+  private[ch] lazy val unusedMatchClauseVars: Double = {
     import TermExpr.monoidDouble
     TermExpr.foldMap[Double](this) {
       case MatchE(_, cases) ⇒ cases.map {
@@ -450,7 +447,7 @@ sealed trait TermExpr {
     .map { case (term, partsUsed) ⇒
     val totalParts = term.t.conjunctSize
     totalParts - partsUsed.length
-  }.sum
+  }.count(_ > 0)
 
   /** Shows how many times each tuple part was used for any given term.
     * Example: `List((a,1), (a,2), (a,1), (a,1), (a,1))`

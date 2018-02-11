@@ -69,7 +69,7 @@ sealed trait TypeExpr {
     case UnitT(name) ⇒ s"$name"
   }
 
-  def conjunctSize: Int = this match {
+  lazy val conjunctSize: Int = this match {
     case ConjunctT(terms) ⇒ terms.length
     case NamedConjunctT(_, _, _, wrapped) ⇒ wrapped.size
     case _ ⇒ 1

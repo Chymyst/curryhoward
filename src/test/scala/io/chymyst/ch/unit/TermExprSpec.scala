@@ -59,7 +59,7 @@ class TermExprSpec extends FlatSpec with Matchers {
 
   it should "compute permutation score for conjunctions" in {
 
-    def permScore(t: TermExpr): Double = t.informationLossScore._1._5
+    def permutationScore(t: TermExpr): Int = t.informationLossScore._1._3
 
     val c = ConjunctE(Seq(VarE("a", TP("A")), VarE("b", TP("B"))))
 
@@ -68,14 +68,14 @@ class TermExprSpec extends FlatSpec with Matchers {
       ProjectE(1, c)
     ))
 
-    permScore(t) shouldEqual 0
+    permutationScore(t) shouldEqual 0
 
-    permScore(ConjunctE(Seq(
+    permutationScore(ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(1, c)
     ))) shouldEqual 1
 
-    permScore(ConjunctE(Seq(
+    permutationScore(ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(0, c)
     ))) shouldEqual 2
