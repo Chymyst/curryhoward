@@ -114,7 +114,7 @@ object LJT {
           val freshVarsAB = heads.map(VarE(sequent.freshVar(), _)).toList
           // Each part of the disjunction is matched with a function of the form fv ⇒ TermExpr(fv, other_premises).
           val subTerms = TermExprs.zip(freshVarsAB)
-            .map { case (pt, fv) ⇒ (fv.tExpr, CurriedE(List(fv), TermExpr.applyCurried(pt, fv :: oldPremisesWithoutI))) }
+            .map { case (pt, fv) ⇒ (fv.t, CurriedE(List(fv), TermExpr.applyCurried(pt, fv :: oldPremisesWithoutI))) }
             .sortBy(_._1.prettyPrint).map(_._2) // Sort the clauses by type expression.
         // At this point, `subTerms` can be reordered at will since these are mutually exclusive and exhaustive cases in a disjunction.
         val result = MatchE(thePremiseVarAB, subTerms.toList)
@@ -259,7 +259,8 @@ object LJT {
   // G* |- Named(A, B) when G* |- (A & B)  -- rule _&R
   private def ruleNamedConjunctionAtRight = ForwardRule(name = "_&R", sequent ⇒
     sequent.goal match {
-      case nct@NamedConjunctT(constructor, _, _, wrapped) ⇒
+      case nct@NamedConjunctT(constructor, _, accessors, wrapped)
+        if accessors.nonEmpty || wrapped.isEmpty ⇒ // Avoid applying rule _&R to a named unit that is not a case object. e.g. NamedConjunctT("name", Nil, Nil, List(UnitT("...")))
         val unwrapped = wrapped match {
           case Nil ⇒ // empty wrapper means a named Unit as a case object
             UnitT(constructor)
@@ -271,7 +272,7 @@ object LJT {
           val resultTerms: Seq[TermExpr] = sequent.substituteInto(TermExpr) match {
             // Wrapped Unit or wrapped single term.
             case _ if nct.caseObjectName.isDefined ⇒ Nil
-//            case term if nct.accessors.length == 1 ⇒ Seq(term) // This breaks several things, since we are not creating a ProjectE().
+            //            case term if nct.accessors.length == 1 ⇒ Seq(term) // This breaks several things, since we are not creating a ProjectE().
             // Wrapped conjunction having at least one part.
             // The term will eventually evaluate to a conjunction.
             case term ⇒ nct.accessors.indices.map { i ⇒ ProjectE(i, term) }
@@ -285,7 +286,8 @@ object LJT {
 
   // G*, Named(A, B) |- C when G*, A, B |- C  -- rule _&L
   private def ruleNamedConjunctionAtLeft = uniformRule("_&L") {
-    case NamedConjunctT(constructor, _, accessors, wrapped) ⇒
+    case NamedConjunctT(constructor, _, accessors, wrapped)
+      if accessors.nonEmpty || wrapped.isEmpty ⇒ // Avoid applying rule _&L to a named unit that is not a case object. e.g. NamedConjunctT("name", Nil, Nil, List(UnitT("...")))
       val unwrapped = wrapped match {
         case Nil ⇒ // empty wrapper means a named Unit as a case object
           List(UnitT(constructor))

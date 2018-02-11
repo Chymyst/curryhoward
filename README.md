@@ -220,6 +220,9 @@ mapReaderTerm.prettyPrint // returns the string "a ⇒ b ⇒ c ⇒ b (a c)"
 
 ```
 
+Symbolic computations with lambda-terms can be used for a rigorous verification of equational laws for the generated code.
+See the tutorial for more examples of such computations.
+
 ## Supported syntax
 
 There are three ways in which code can be generated based on a given type:

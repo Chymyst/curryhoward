@@ -3,8 +3,8 @@ package io.chymyst.ch.unit
 import io.chymyst.ch._
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
-import org.scalatest.prop.GeneratorDrivenPropertyChecks
-import org.scalatest.{Assertion, FlatSpec, Matchers}
+import org.scalatest.Assertion
+import org.scalacheck.ScalacheckShapeless._
 
 class LawsSpec extends LawChecking {
 
@@ -142,30 +142,30 @@ class LawsSpec extends LawChecking {
     checkMonadLaws[Int, Long, String, Cont](pointS, fmapS, flatmapS)
   }
 
-  it should "check laws for Density monad" in {
-    case class Dens[X](c: (X ⇒ Int) ⇒ X)
+  it should "check laws for Center-of-mass monad" in {
+    case class CenterOfMass[X](c: (X ⇒ Int) ⇒ X)
 
-    implicit def contEqual[A: Arbitrary](s1: Dens[A], s2: Dens[A])(implicit ai: Arbitrary[A ⇒ Int]): Assertion = fEqual(s1.c, s2.c)
+    implicit def contEqual[A: Arbitrary](s1: CenterOfMass[A], s2: CenterOfMass[A])(implicit ai: Arbitrary[A ⇒ Int]): Assertion = fEqual(s1.c, s2.c)
 
-    implicit def genCaseClass[A: Arbitrary]: Arbitrary[Dens[A]] = Arbitrary {
+    implicit def genCaseClass[A: Arbitrary]: Arbitrary[CenterOfMass[A]] = Arbitrary {
       for {
         n <- arbitrary[(A ⇒ Int) ⇒ A]
-      } yield Dens(n)
+      } yield CenterOfMass(n)
     }
 
-    val pointS = new FPoint[Dens] {
-      override def f[A]: A => Dens[A] = implement
+    val pointS = new FPoint[CenterOfMass] {
+      override def f[A]: A => CenterOfMass[A] = implement
     }
 
-    val fmapS = new FMap[Dens] {
-      override def f[A, B]: (A => B) => Dens[A] => Dens[B] = implement
+    val fmapS = new FMap[CenterOfMass] {
+      override def f[A, B]: (A => B) => CenterOfMass[A] => CenterOfMass[B] = implement
     }
 
-    val flatmapS = new FFlatMap[Dens] {
-      override def f[A, B]: (A => Dens[B]) => Dens[A] => Dens[B] = implement
+    val flatmapS = new FFlatMap[CenterOfMass] {
+      override def f[A, B]: (A => CenterOfMass[B]) => CenterOfMass[A] => CenterOfMass[B] = implement
     }
 
-    checkMonadLaws[Int, Long, String, Dens](pointS, fmapS, flatmapS)
+    checkMonadLaws[Int, Long, String, CenterOfMass](pointS, fmapS, flatmapS)
   }
 
   it should "fail to implement Option[Option] monad due to ambiguities" in {
@@ -185,17 +185,22 @@ class LawsSpec extends LawChecking {
       m(_.toString + "abc")(OOption(Some(Some(123)))) shouldEqual OOption(Some(Some("123abc")))
     }
 
+    val fmapS = new FMap[OOption] {
+      override def f[A, B]: (A => B) => OOption[A] => OOption[B] = implement
+    }
+
     def flatmaps[A, B] = allOfType[(A => OOption[B]) => OOption[A] => OOption[B]]
 
-    flatmaps.length shouldEqual 12
+    flatmaps.length shouldEqual 1
 
 
-    /*  val flatmapS = new FFlatMap[OOption] {
-          override def f[A, B]: (A => OOption[B]) => OOption[A] => OOption[B] = implement
-        }
+    val flatmapS = new FFlatMap[OOption] {
+      override def f[A, B]: (A => OOption[B]) => OOption[A] => OOption[B] = implement
+    }
 
-        checkMonadLaws[Int, Long, String, OOption](pointS, fmapS, flatmapS)
-    */
+    implicit def ooptEqual[T](x: OOption[T], y: OOption[T]): Assertion = x shouldEqual y
+
+    checkMonadLaws[Int, Long, String, OOption](pointS, fmapS, flatmapS)
   }
 
   it should "check functor laws for the worked example 1.3 from chapter 4, part 1" in {
@@ -205,13 +210,21 @@ class LawsSpec extends LawChecking {
     sealed trait Data2[+A]
     final case class Message[A](code: Int, message: String) extends Data2[A]
     final case class Value[A](x: A) extends Data2[A]
-
+/* This does not work due to ambiguity of d.get._1 and Value.x
     val fmap: FMap[Data] = new FMap[Data] {
       override def f[A, B]: (A => B) => Data[A] => Data[B] = implement
     }
+    implicit def dataEqual[T](x: Data[T], y: Data[T]): Assertion = x shouldEqual y
 
+    fmapLawIdentity[Int, Data](fmap)
+    fmapLawComposition[Int, String, Boolean, Data](fmap)
+
+//    fmap.f[Int, Int](x ⇒ x + 1)(Data(Some((123, Value(456))))) shouldEqual Data(Some((124, Value(457))))
+//    fmap.f[Int, Int](x ⇒ x + 1)(Data(Some((123, Message(10, "20"))))) shouldEqual Data(Some((124, Message(10, "20"))))
+*/
     def fmaps[A, B] = allOfType[(A ⇒ B) ⇒ Data[A] ⇒ Data[B]]
 
-    fmaps.length shouldEqual 1
+    fmaps.length shouldEqual 2
   }
+
 }

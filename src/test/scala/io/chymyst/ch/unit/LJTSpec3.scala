@@ -166,7 +166,7 @@ class LJTSpec3 extends FlatSpec with Matchers {
     contrajoins2[Int, String] shouldEqual 0
   }
 
-  it should "generate methods for the Density-Option monad" in {
+  it should "generate methods for the Center-Of-Mass-with-Option monad" in {
     def points[D, A] = allOfType[A ⇒ ((Option[A] ⇒ D) ⇒ Option[A])]()
 
     points[Int, String].length shouldEqual 1

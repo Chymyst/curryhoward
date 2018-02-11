@@ -23,13 +23,13 @@ object TheoremProver {
       case (List(termFound), allTerms) ⇒
         allTerms.length match {
           case count if count > 1 ⇒
-            val message = s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(t ⇒ s"${t.prettyPrint} [score: ${t.informationLossScore}]").mkString(";\n ")}."
+            val message = s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(t ⇒ s"${t.prettyRenamePrint} [score: ${t.informationLossScore}]").mkString(";\n ")}."
             Right((Some(message), termFound))
           case _ ⇒
             Right((None, termFound))
         }
       case (list, _) ⇒
-        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} inequivalent ways:\n ${list.map(t ⇒ s"${t.prettyPrint} [score: ${t.informationLossScore}]").mkString(";\n ")}.")
+        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} inequivalent ways:\n ${list.map(t ⇒ s"${t.prettyRenamePrint} [score: ${t.informationLossScore}]").mkString(";\n ")}.")
     }
   }
 
@@ -58,7 +58,7 @@ object TheoremProver {
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
     val allTermExprs = findTermExprs(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename).prettyRename).distinct
     if (debug || debugTrace) {
-      val prettyPT = allTermExprs.map(p ⇒ (p.informationLossScore, s"${p.prettyPrint}; score = ${p.informationLossScore}: ${TermExpr.unusedArgs(p).size} unused args: ${TermExpr.unusedArgs(p)}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyPrint, i) }}"))
+      val prettyPT = allTermExprs.map(p ⇒ (p.informationLossScore, s"${p.prettyRenamePrint}; score = ${p.informationLossScore}: ${TermExpr.unusedArgs(p).size} unused args: ${TermExpr.unusedArgs(p)}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyRenamePrint, i) }}"))
         .sortBy(_._1).map(_._2)
       val TermExprsMessage = if (prettyPT.isEmpty) "no final proof terms." else s"${prettyPT.length} final proof terms:\n ${prettyPT.take(maxTermsPrinted).mkString(" ;\n ")} ."
       println(s"DEBUG: for main sequent $mainSequent, obtained $TermExprsMessage This took ${System.currentTimeMillis() - t0} ms")
@@ -118,7 +118,7 @@ object TheoremProver {
           // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
           val fromAxioms = if (fromIdAxiom.nonEmpty) fromIdAxiom else fromTAxiom
 
-          if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyPrint).mkString("; ")}")
+          if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyRenamePrint).mkString("; ")}")
 
           // Try each rule on sequent. If rule applies, obtain the next sequent.
           // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
@@ -157,7 +157,7 @@ object TheoremProver {
               case 0 ⇒ "no terms"
               case x ⇒
                 val messagePrefix = if (x > maxTermsPrinted) s"first $maxTermsPrinted out of " else ""
-                s"$messagePrefix$x terms:\n " + termsFound.take(maxTermsPrinted).map(_.prettyPrint).mkString(" ;\n ") + " ,\n"
+                s"$messagePrefix$x terms:\n " + termsFound.take(maxTermsPrinted).map(_.prettyRenamePrint).mkString(" ;\n ") + " ,\n"
             }
             println(s"DEBUG: returning $termsMessage for sequent $sequent")
           }

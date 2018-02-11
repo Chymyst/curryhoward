@@ -138,6 +138,11 @@ class ApiSpec extends LawChecking {
     allOfType[(Int, String)](123, 456, (x: Int) ⇒ x.toString + "abc").length shouldEqual 2
   }
 
+  it should "find any implementations with given arguments when there is more than one implementation" in {
+    allOfType[(Int, Int, Int, String)](123, 456, (x: Int) ⇒ x.toString + "abc").length shouldEqual 14
+    anyOfType[(Int, Int, Int, String)](123, 456, (x: Int) ⇒ x.toString + "abc").length shouldEqual 16
+  }
+
   it should "run the example in the tutorial" in {
     ofType[Option[Int] ⇒ Option[Option[Int]]] // should print alternative terms
 

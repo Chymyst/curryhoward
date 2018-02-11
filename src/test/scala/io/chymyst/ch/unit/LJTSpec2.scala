@@ -333,4 +333,21 @@ class LJTSpec2 extends FlatSpec with Matchers {
     d(500) shouldEqual C(None)
     d(200) shouldEqual C(Some((246, 912)))
   }
+
+  it should "correctly work with tuples of options" in {
+
+    type P[T] = (Option[T], Option[T])
+
+    // TODO: make this work
+    //  def fmap[A, B](f: A ⇒ B):P[A] ⇒ P[B] = implement
+//  def flatten[A]: P[Option[Int]] ⇒ P[Int] = implement
+//    flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), None)) // This is incorrect!
+//     flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), Some(2)))
+//     flatten((Some(None), Some(Some(2)))) shouldEqual ((None, Some(2)))
+//     flatten((Some(Some(1)), None)) shouldEqual ((Some(1), None))
+
+    def flattens[A] = anyOfType[P[Option[Int]] ⇒ P[Int]]()
+    flattens.length shouldEqual 128
+
+  }
 }

@@ -97,7 +97,7 @@ lazy val curryhoward: Project = (project in file("."))
   .settings(common)
   .settings(
     organization := "io.chymyst",
-    version := "0.3.2",
+    version := "0.3.3",
 
     licenses := Seq("Apache License, Version 2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
     homepage := Some(url("https://github.com/Chymyst/curryhoward")),
@@ -121,6 +121,7 @@ lazy val curryhoward: Project = (project in file("."))
     libraryDependencies ++= Seq(
       // We need scala-reflect because we use macros.
       "org.scala-lang" % "scala-reflect" % scalaVersion.value
+      , "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test
     )
   )
 

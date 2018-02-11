@@ -46,6 +46,16 @@ package object ch {
     */
   def allOfType[U](values: Any*): Seq[U] = macro Macros.allOfTypeImplWithValues[U]
 
+  /** Automatically implement an expression of a given type using given values, and return all inequivalent implementations
+    * regardless of their information loss score.
+    * The type parameter `U` _must_ be specified.
+    *
+    * @tparam U Type of the expression to be implemented.
+    * @param values Zero or more expressions that may be used while implementing the type.
+    * @return A sequence of all possible inequivalent automatically constructed expressions of type `U`.
+    */
+  def anyOfType[U](values: Any*): Seq[U] = macro Macros.anyOfTypeImplWithValues[U]
+
   /** Automatically implement an expression of a given type, using given values.
     * The type parameter `U` _must_ be specified.
     *
@@ -66,15 +76,15 @@ package object ch {
   /** Obtain the lambda-term from an enriched expression that results from `ofType`.
     * Will throw an exception if the expression is not obtained from `ofType` or `allOfType`.
     *
-    * @param x An expression that was automatically produced by `ofType` or `allOfType`.
+    * @param functionValue An expression that was automatically produced by `ofType` or `allOfType`.
     */
-  implicit class WithLambdaTerm(val x: Any) extends AnyVal {
-    def lambdaTerm: TermExpr = x match {
+  implicit class WithLambdaTerm(val functionValue: Any) extends AnyVal {
+    def lambdaTerm: TermExpr = functionValue match {
       case g: Function0Lambda[_] ⇒ g.lambdaTerm
       case g: Function1Lambda[_, _] ⇒ g.lambdaTerm
       case g: Function2Lambda[_, _, _] ⇒ g.lambdaTerm
       case g: Function3Lambda[_, _, _, _] ⇒ g.lambdaTerm
-      case _ ⇒ throw new Exception("Called `.lambdaTerm` on an expression that has no attached lambda-term")
+      case _ ⇒ throw new Exception(s"Called `.lambdaTerm` on an expression $functionValue that has no attached lambda-term")
     }
   }
 

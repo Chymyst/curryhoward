@@ -37,7 +37,7 @@ class TermExprSpec extends FlatSpec with Matchers {
     // b ⇒ c ⇒ b (a ⇒ a c)  is of type (((A ⇒ B) ⇒ B) ⇒ B) ⇒ A ⇒ B
     val termExpr = CurriedE(List(b, c), AppE(b, CurriedE(List(a), AppE(a, c))))
     termExpr.toString shouldEqual "\\((b:((A ⇒ B) ⇒ B) ⇒ B) ⇒ (c:A) ⇒ (b \\((a:A ⇒ B) ⇒ (a c))))"
-    termExpr.prettyPrint shouldEqual "a ⇒ b ⇒ a (c ⇒ c b)"
+    termExpr.prettyRenamePrint shouldEqual "a ⇒ b ⇒ a (c ⇒ c b)"
   }
 
   behavior of "TermExpr#freeVars"
@@ -58,22 +58,31 @@ class TermExprSpec extends FlatSpec with Matchers {
   behavior of "information loss"
 
   it should "compute permutation score for conjunctions" in {
+
+    def permutationScore(t: TermExpr): Double = t.informationLossScore._3
+
     val c = ConjunctE(Seq(VarE("a", TP("A")), VarE("b", TP("B"))))
+
     val t = ConjunctE(Seq(
       ProjectE(0, c),
       ProjectE(1, c)
     ))
-    t.informationLossScore._3 shouldEqual 0
 
-    ConjunctE(Seq(
+    permutationScore(t) shouldEqual 0
+
+    permutationScore(ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(1, c)
-    )).informationLossScore._3 shouldEqual 1
+    ))) shouldEqual TermExpr.roundFactor(1)
 
-    ConjunctE(Seq(
+    permutationScore(ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(0, c)
-    )).informationLossScore._3 shouldEqual 2
+    ))) shouldEqual TermExpr.roundFactor(2)
+
+    TermExpr.findAll(t) {
+      case ProjectE(_, _) ⇒ "abc"
+    } shouldEqual Seq("abc", "abc")
 
     TermExpr.findFirst(t) {
       case ProjectE(_, _) ⇒ "abc"
