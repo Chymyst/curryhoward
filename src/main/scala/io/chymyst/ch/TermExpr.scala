@@ -136,6 +136,22 @@ object TermExpr {
     })
   }
 
+  def findFirst[R](inExpr: TermExpr)(pred: PartialFunction[TermExpr, R]): Option[R] = {
+    Some(inExpr).collect(pred).orElse {
+      inExpr match {
+        case VarE(_, _) ⇒ None
+        case AppE(head, arg) ⇒ findFirst(head)(pred).orElse(findFirst(arg)(pred))
+        case CurriedE(_, body) ⇒ findFirst(body)(pred)
+        case UnitE(_) ⇒ None
+        case NamedConjunctE(terms, _) ⇒ terms.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred))
+        case ConjunctE(terms) ⇒ terms.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred))
+        case ProjectE(_, term) ⇒ findFirst(term)(pred)
+        case MatchE(term, cases) ⇒ findFirst(term)(pred).orElse(cases.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred)))
+        case DisjunctE(_, _, term, _) ⇒ findFirst(term)(pred)
+      }
+    }
+  }
+
   private def sameConstructor(t1: TypeExpr, t2: TypeExpr): Boolean = t1 match {
     case NamedConjunctT(c1, _, _, _) ⇒ t2 match {
       case NamedConjunctT(c2, _, _, _) ⇒ c1 == c2
@@ -210,14 +226,14 @@ object TermExpr {
       terms.map(conjunctionPermutationScore).sum +
         terms.zipWithIndex.flatMap { case (t, i) ⇒
           // Only count projections from terms of exactly the same type as this `NamedConjunctE`.
-          findAll(t) { case ProjectE(index, term) if sameConstructor(term.t, tExpr) ⇒
+          findFirst(t) { case ProjectE(index, term) if sameConstructor(term.t, tExpr) ⇒
             conjunctionPermutationScore(term) / terms.length.toDouble +
               (if (index == i) 0 else 1)
           }
         }.sum
     case ConjunctE(terms) ⇒
       terms.zipWithIndex.flatMap { case (t, i) ⇒
-        findAll(t) { case ProjectE(index, term) if (term.t match {
+        findFirst(t) { case ProjectE(index, term) if (term.t match {
           case ConjunctT(_) ⇒ true
           case _ ⇒ false
         }) ⇒
@@ -232,7 +248,7 @@ object TermExpr {
       disjunctionPermutationScore(term) +
         cases.zipWithIndex.flatMap { case (t, i) ⇒
           // Only count disjunction constructions into terms of exactly the same type as the `term` being matched.
-          findAll(t) { case DisjunctE(index, _, t2, tExpr) if sameConstructor(term.t, tExpr) ⇒
+          findFirst(t) { case DisjunctE(index, _, t2, tExpr) if sameConstructor(term.t, tExpr) ⇒
             disjunctionPermutationScore(t2) / cases.length.toDouble +
               (if (index == i) 0 else 1)
           }
@@ -255,11 +271,11 @@ object TermExpr {
     }
 
   }
+
+  private[ch] def roundFactor(x: Double): Int = math.round(x * 10000).toInt
 }
 
 sealed trait TermExpr {
-
-  private def roundFactor(x: Double): Int = math.round(x * 10000).toInt
 
   /** Provide :@ syntax for term application with automatic alpha-conversions.
     */
