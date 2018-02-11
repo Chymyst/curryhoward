@@ -473,4 +473,27 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     f1(someNone).simplify shouldEqual someNone
   }
 
+  it should "produce a type expression with empty-arg case class" in {
+
+    final case class Empty()
+
+    val vE = freshVar[Empty]
+    val e = vE()
+    val vI = freshVar[Int]
+    val vU = freshVar[Unit]
+
+    val u = vU()
+
+    val tExpr = (vE =>: vI =>: u).t
+
+    tExpr.prettyPrint shouldEqual "Empty ⇒ <c>Int ⇒ Unit"
+
+    val (proofs, _) = TheoremProver.findProofs(tExpr)
+
+    proofs.length shouldEqual 1
+
+    val f: Empty ⇒ Int ⇒ Unit = implement
+
+    f(Empty())(123) shouldEqual (())
+  }
 }

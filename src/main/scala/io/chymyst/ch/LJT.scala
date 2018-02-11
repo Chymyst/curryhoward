@@ -285,7 +285,8 @@ object LJT {
 
   // G*, Named(A, B) |- C when G*, A, B |- C  -- rule _&L
   private def ruleNamedConjunctionAtLeft = uniformRule("_&L") {
-    case NamedConjunctT(constructor, _, accessors, wrapped) ⇒
+    case NamedConjunctT(constructor, _, accessors, wrapped)
+      if accessors.nonEmpty || wrapped.isEmpty ⇒ // Avoid applying rule _&L to a named unit that is not a case object. e.g. NamedConjunctT("name", Nil, Nil, List(UnitT("...")))
       val unwrapped = wrapped match {
         case Nil ⇒ // empty wrapper means a named Unit as a case object
           List(UnitT(constructor))
