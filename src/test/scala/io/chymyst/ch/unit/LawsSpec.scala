@@ -168,7 +168,7 @@ class LawsSpec extends LawChecking {
     checkMonadLaws[Int, Long, String, CenterOfMass](pointS, fmapS, flatmapS)
   }
 
-  it should "fail to implement Option[Option] monad due to ambiguities" in {
+  it should "implement Option[Option] monad and check laws" in {
     case class OOption[A](x: Option[Option[A]])
 
     val pointS = new FPoint[OOption] {
@@ -203,7 +203,7 @@ class LawsSpec extends LawChecking {
     checkMonadLaws[Int, Long, String, OOption](pointS, fmapS, flatmapS)
   }
 
-  it should "check functor laws for the worked example 1.3 from chapter 4, part 1" in {
+  it should "fail to check functor laws for the worked example 1.3 from chapter 4, part 1, due to ambiguities" in {
     // Data[A] ≡ 1 + A × (Int × String + A)
     final case class Data[A](d: Option[(A, Data2[A])]) //  1 + A × Data2[A]
 
