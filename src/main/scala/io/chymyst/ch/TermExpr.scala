@@ -439,11 +439,11 @@ sealed trait TermExpr {
 
   final private[ch] def simplifyOnce(withEta: Boolean = false): TermExpr = if (withEta) simplifyOnceWithEta else simplifyOnceWithoutEta
 
-  final private[ch] lazy val simplifyOnceWithEta = simplifyOnceInternal(withEta = true)
+  private[ch] lazy val simplifyOnceWithEta = simplifyOnceInternal(withEta = true)
 
-  final private[ch] lazy val simplifyOnceWithoutEta = simplifyOnceInternal(withEta = false)
+  private[ch] lazy val simplifyOnceWithoutEta = simplifyOnceInternal(withEta = false)
 
-  final private[ch] lazy val unusedMatchClauseVars: Double = {
+  private[ch] lazy val unusedMatchClauseVars: Double = {
     import TermExpr.monoidDouble
     TermExpr.foldMap[Double](this) {
       case MatchE(_, cases) ⇒ cases.map {

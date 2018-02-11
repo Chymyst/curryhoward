@@ -141,6 +141,7 @@ object TypeExpr {
     */
   private[ch] def leftUnifyTypeVariables(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): UnifyResult = {
 
+    import MonadEither._
     def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): UnifyResult = tuples.foldLeft[UnifyResult](Right(substitutions)) { case (prev, (t, t2)) ⇒
       prev.flatMap(p ⇒ leftUnifyTypeVariables(t, t2, p))
     }
