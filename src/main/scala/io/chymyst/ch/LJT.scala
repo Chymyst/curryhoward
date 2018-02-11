@@ -259,7 +259,8 @@ object LJT {
   // G* |- Named(A, B) when G* |- (A & B)  -- rule _&R
   private def ruleNamedConjunctionAtRight = ForwardRule(name = "_&R", sequent ⇒
     sequent.goal match {
-      case nct@NamedConjunctT(constructor, _, _, wrapped) ⇒
+      case nct@NamedConjunctT(constructor, _, accessors, wrapped)
+        if accessors.nonEmpty || wrapped.isEmpty ⇒ // Avoid applying rule _&R to a named unit that is not a case object. e.g. NamedConjunctT("name", Nil, Nil, List(UnitT("...")))
         val unwrapped = wrapped match {
           case Nil ⇒ // empty wrapper means a named Unit as a case object
             UnitT(constructor)
@@ -271,7 +272,7 @@ object LJT {
           val resultTerms: Seq[TermExpr] = sequent.substituteInto(TermExpr) match {
             // Wrapped Unit or wrapped single term.
             case _ if nct.caseObjectName.isDefined ⇒ Nil
-//            case term if nct.accessors.length == 1 ⇒ Seq(term) // This breaks several things, since we are not creating a ProjectE().
+            //            case term if nct.accessors.length == 1 ⇒ Seq(term) // This breaks several things, since we are not creating a ProjectE().
             // Wrapped conjunction having at least one part.
             // The term will eventually evaluate to a conjunction.
             case term ⇒ nct.accessors.indices.map { i ⇒ ProjectE(i, term) }

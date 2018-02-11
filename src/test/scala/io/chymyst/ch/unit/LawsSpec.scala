@@ -142,30 +142,30 @@ class LawsSpec extends LawChecking {
     checkMonadLaws[Int, Long, String, Cont](pointS, fmapS, flatmapS)
   }
 
-  it should "check laws for Density monad" in {
-    case class Dens[X](c: (X ⇒ Int) ⇒ X)
+  it should "check laws for Center-of-mass monad" in {
+    case class CenterOfMass[X](c: (X ⇒ Int) ⇒ X)
 
-    implicit def contEqual[A: Arbitrary](s1: Dens[A], s2: Dens[A])(implicit ai: Arbitrary[A ⇒ Int]): Assertion = fEqual(s1.c, s2.c)
+    implicit def contEqual[A: Arbitrary](s1: CenterOfMass[A], s2: CenterOfMass[A])(implicit ai: Arbitrary[A ⇒ Int]): Assertion = fEqual(s1.c, s2.c)
 
-    implicit def genCaseClass[A: Arbitrary]: Arbitrary[Dens[A]] = Arbitrary {
+    implicit def genCaseClass[A: Arbitrary]: Arbitrary[CenterOfMass[A]] = Arbitrary {
       for {
         n <- arbitrary[(A ⇒ Int) ⇒ A]
-      } yield Dens(n)
+      } yield CenterOfMass(n)
     }
 
-    val pointS = new FPoint[Dens] {
-      override def f[A]: A => Dens[A] = implement
+    val pointS = new FPoint[CenterOfMass] {
+      override def f[A]: A => CenterOfMass[A] = implement
     }
 
-    val fmapS = new FMap[Dens] {
-      override def f[A, B]: (A => B) => Dens[A] => Dens[B] = implement
+    val fmapS = new FMap[CenterOfMass] {
+      override def f[A, B]: (A => B) => CenterOfMass[A] => CenterOfMass[B] = implement
     }
 
-    val flatmapS = new FFlatMap[Dens] {
-      override def f[A, B]: (A => Dens[B]) => Dens[A] => Dens[B] = implement
+    val flatmapS = new FFlatMap[CenterOfMass] {
+      override def f[A, B]: (A => CenterOfMass[B]) => CenterOfMass[A] => CenterOfMass[B] = implement
     }
 
-    checkMonadLaws[Int, Long, String, Dens](pointS, fmapS, flatmapS)
+    checkMonadLaws[Int, Long, String, CenterOfMass](pointS, fmapS, flatmapS)
   }
 
   it should "fail to implement Option[Option] monad due to ambiguities" in {
