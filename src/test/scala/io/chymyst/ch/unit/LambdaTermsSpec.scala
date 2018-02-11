@@ -72,7 +72,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val f3 = allOfType[(Int, Int, Int) ⇒ Int]
     f3.length shouldEqual 3
     f3.flatMap(TermExpr.lambdaTerm).length shouldEqual 3
-    f3.map(_.lambdaTerm).length shouldEqual 3
+    f3.map((x: Any) ⇒ x.lambdaTerm).length shouldEqual 3
   }
 
   it should "produce no lambda-terms when `implement` is used" in {
