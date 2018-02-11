@@ -88,8 +88,8 @@ The macros examine the given type expression via reflection (at compile time).
 The type expression is rewritten as a formula of IPL and passed on to the theorem prover.
 The theorem prover performs an exhaustive proof search to look for all possible lambda-terms that implement the given type.
 After that, the terms are simplified, so that equivalent terms that are different only by alpha-conversion, beta-conversion, or eta-conversion are eliminated.
-Finally, the terms are measured according to their "information loss score", and sorted so that the terms with the least information loss are returned (and all other alternative terms ignored).
-The Scala macro then converts the lambda-terms into Scala code.
+Finally, the terms are measured according to their "information loss score", and sorted so that one or more terms with the least information loss are returned (and all other terms ignored).
+The Scala macro then converts the lambda-term(s) into Scala code.
 All this happens at compile time, so compilation may take longer if a lot of terms are being generated.
 
 It is also possible to use some given expressions with known types.
@@ -122,6 +122,7 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 # Revision history
 
+- 0.3.3 Automatic renaming of type variables in lambda-terms; `anyOfType`; minor bug fixes. 
 - 0.3.2 More aggressive simplification of named conjunctions; a comprehensive lambda-term API with a new tutorial section.
 - 0.3.1 Code cleanups, minor fixes, first proof-of-concept for symbolic law checking via lambda-terms API.
 - 0.3.0 Experimental API for obtaining lambda-terms. Simplified the internal code by removing the type parameter `T` from AST types.
@@ -136,24 +137,19 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 - The theorem prover for the full IPL is working
 - When a type cannot be implemented, signal a compile-time error
-- Debugging options are available
+- Debugging and logging options are available
 - Support for `Unit` type, constant types, type parameters, function types, tuples, sealed traits / case classes / case objects
 - Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T` can be used
-- Java-style argument groups can be used, e.g. `A => (B, C) => D`, which is not the same as using a tuple type: `A => ((B, C)) => D`
+- Java-style argument groups can be used, e.g. `A ⇒ (B, C) ⇒ D`, in addition to using a tuple type, e.g. `A ⇒ ((B, C)) ⇒ D`
 - When a type can be implemented in more than one way, heuristics ("least information loss") are used to prefer implementations that are more likely to satisfy algebraic laws
 - Signal error when a type can be implemented in more than one way despite using heuristics
 - Generated lambda-terms can be inspected and manipulated at run time, and equational laws can be checked symbolically
-- Tests and a tutorial
-
-# To-do items
-
-- develop better facilities to reason about terms at run time (e.g. check the laws) more easily using `TermExpr` structures
+- Tests and a [tutorial](docs/Tutorial.md)
 
 # Known limitations
 
-- Limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. A non-recursive example that fails to generate sensible code: `T => List[T]` (the generated code always returns empty list)
-- Functions with zero arguments are currently not supported, e.g. `ofType[Int => () => Int]` will not compile
-- Lambda-terms do not automatically perform alpha-conversions either at value or at type level; alpha-conversions need to be handled manually, as shown in the tutorial
+- Limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. A non-recursive example that fails to generate sensible code: `T ⇒ List[T]` (the generated code always returns empty list)
+- Functions with zero arguments are currently not supported, e.g. `ofType[Int ⇒ () ⇒ Int]` will not compile
 
 # Examples of functionality
 
@@ -205,7 +201,7 @@ Case objects (and case classes with zero-argument constructors) are treated as n
 
 Case classes and sealed traits can be nested and can have type parameters.
 
-Type aliases are supported as well.
+Type aliases (`type P[T] = ...`) are supported as well.
 
 Lambda-terms can be obtained and manipulated symbolically.
 
@@ -221,15 +217,16 @@ mapReaderTerm.prettyPrint // returns the string "a ⇒ b ⇒ c ⇒ b (a c)"
 ```
 
 Symbolic computations with lambda-terms can be used for a rigorous verification of equational laws for the generated code.
-See the tutorial for more examples of such computations.
+See the [tutorial](docs/Tutorial.md#working-with-lambda-terms) for some examples of such computations.
 
 ## Supported syntax
 
-There are three ways in which code can be generated based on a given type:
+Code can be generated based on a given type and possibly on given values:
 
 1. `def f[...](...): ... = implement` -- the type and extra values are specified on the left-hand side 
 2. `ofType[...](...)` -- the type and extra values are specified within an expression
-3. `allOfType[...](...)` -- similar to `ofType[...](...)`, except that now all inequivalent implementations are returned 
+3. `allOfType[...](...)` -- similar to `ofType[...](...)`, except that now all inequivalent implementations with the lowest information loss are returned 
+4. `anyOfType[...](...)` - similar to `allOfType` except all found implementations are returned
 
 ```scala
 import io.chymyst.ch._
