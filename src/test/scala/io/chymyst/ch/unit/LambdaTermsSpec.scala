@@ -62,23 +62,26 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "produce result terms for functions of 2 and 3 arguments" in {
-    val terms1 = allOfType[(Int, Int) ⇒ Int]
-    terms1.length shouldEqual 2
+    val f2 = allOfType[(Int, Int) ⇒ Int]
+    f2.length shouldEqual 2
+    f2.flatMap(TermExpr.lambdaTerm).length shouldEqual 2
+    f2.map(_.lambdaTerm).length shouldEqual 2
 
-    val f1 = allOfType[(Int, Int) ⇒ Int]
-    f1.flatMap(TermExpr.lambdaTerm).length shouldEqual 2
-
-    val terms2 = allOfType[(Int, Int, Int) ⇒ Int]
-    terms2.length shouldEqual 3
-
-    val f2 = allOfType[(Int, Int, Int) ⇒ Int]
-    f2.flatMap(TermExpr.lambdaTerm).length shouldEqual 3
+    val f3 = allOfType[(Int, Int, Int) ⇒ Int]
+    f3.length shouldEqual 3
+    f3.flatMap(TermExpr.lambdaTerm).length shouldEqual 3
+    f3.map(_.lambdaTerm).length shouldEqual 3
   }
 
   it should "produce no lambda-terms when `implement` is used" in {
-    val terms1: Int ⇒ Int = implement
+    val f1: Int ⇒ Int = implement
 
-    TermExpr.lambdaTerm(terms1) shouldEqual None
+    TermExpr.lambdaTerm(f1) shouldEqual None
+    the[Exception] thrownBy f1.lambdaTerm should have message "Called `.lambdaTerm` on an expression <function1> that has no attached lambda-term"
+
+    val f2: (Int, String) ⇒ Int = implement
+    TermExpr.lambdaTerm(f2) shouldEqual None
+    the[Exception] thrownBy f2.lambdaTerm should have message "Called `.lambdaTerm` on an expression <function2> that has no attached lambda-term"
   }
 
   it should "symbolically lambda-verify identity law for map on Reader monad" in {
@@ -201,7 +204,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     def b[B] = freshVar[B]
 
-    the[Exception] thrownBy idA(b) should have message "Internal error: Invalid head type in application (\\((a$12:A) ⇒ a$12) b$13): `A ⇒ A` must be a function with argument type `B`"
+    the[Exception] thrownBy idA(b) should have message "Internal error: Invalid head type in application (\\((a$12:A) ⇒ a$12) b$13): A ⇒ A must be a function with argument type B"
 
     val fmapAA = fmapT.substTypeVar(b, a)
 
@@ -269,10 +272,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     u1.t.conjunctSize shouldEqual 2
     u1.t.caseObjectName shouldEqual None
 
-    the[Exception] thrownBy u1(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
+    the[Exception] thrownBy u1(x, x) should have message "Some arguments of .apply() have unexpected types [None.type; None.type] that do not match the types in User"
     the[Exception] thrownBy u1() should have message ".apply() must be called with 2 arguments on this type User but it was called with 0 arguments"
 
-    the[Exception] thrownBy u1.t(x, x) should have message "Some arguments have unexpected types [None.type; None.type] that do not match the types in User"
+    the[Exception] thrownBy u1.t(x, x) should have message "Some arguments of .apply() have unexpected types [None.type; None.type] that do not match the types in User"
     the[Exception] thrownBy u1.t() should have message ".apply() must be called with 2 arguments on this type User but it was called with 0 arguments"
 
     the[Exception] thrownBy u1(100) should have message ".apply(100) is undefined since this conjunction type has only 2 parts"
@@ -315,6 +318,12 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     var i = freshVar[Int]
 
     the[Exception] thrownBy i() should have message "t.apply(...) is not defined for the term i$28 of type <c>Int"
+
+    (f0 andThen f0).t shouldEqual f0.t
+
+    the[Exception] thrownBy (f0 andThen u0 =>: u0) should have message "Call to `.andThen` is invalid because the function types (<c>Int ⇒ <c>Int and Unit ⇒ Unit) do not match"
+
+    the[Exception] thrownBy (f0 andThen u0) should have message "Call to `.andThen` is invalid because the type of one of the arguments (<c>Int ⇒ <c>Int and Unit) is not of a function type"
   }
 
   behavior of "automatic alpha-conversion"
@@ -356,7 +365,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
       val fBC = freshVar[B ⇒ C]
 
       // fmap fAB . fmap fBC = fmap (fAB . fBC) as functions on a `reader`
-      (fmapTerm :@ fAB andThen (fmapTerm :@ fBC))(reader) equiv (fmapTerm :@ (fAB andThen fBC))(reader) shouldEqual true
+      (fmapTerm :@ fAB andThen (fmapTerm :@ fBC)) (reader) equiv (fmapTerm :@ (fAB andThen fBC)) (reader) shouldEqual true
     }
 
     check()
@@ -375,6 +384,71 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     def vC[C] = freshVar[C]
 
     TypeExpr.leftUnifyTypeVariables((vA =>: vB).t, (vB =>: vC).t) shouldEqual Right(Map(vA.t → vB.t, vB.t → vC.t))
+
+    TypeExpr.leftUnifyTypeVariables(ConjunctT(Seq(vA.t, vB.t)), ConjunctT(Seq(vInt.t, vFloat.t))) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
+
+    def vX[A, B] = freshVar[(A, Option[(B, B)])]
+
+    val vY = freshVar[(Int, Option[(Float, Float)])]
+    TypeExpr.leftUnifyTypeVariables(vX.t, vY.t) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
+
+    def vX2[A, B] = freshVar[(A, Unit, Option[(B, B)])]
+
+    val vY2 = freshVar[(Int, Unit, Option[(Float, Float)])]
+    TypeExpr.leftUnifyTypeVariables(vX2.t, vY2.t) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
+  }
+
+  behavior of "other functionality"
+
+  it should "produce error message when Java-style argument group is mismatched" in {
+    val f = freshVar[(Int, String) ⇒ Int]
+    val vInt = freshVar[Int]
+    val vString = freshVar[String]
+
+    f(vInt, vString).t shouldEqual vInt.t
+
+    the[Exception] thrownBy f(vInt, vInt) should have message s"Internal error: Invalid head type in application (${f.name} (${vInt.name}, ${vInt.name})): (<c>Int, <c>String) ⇒ <c>Int must be a function with argument type (<c>Int, <c>Int)"
+    the[Exception] thrownBy f(vInt, vInt, vInt) should have message s"Internal error: Invalid head type in application (${f.name} (${vInt.name}, ${vInt.name}, ${vInt.name})): (<c>Int, <c>String) ⇒ <c>Int must be a function with argument type (<c>Int, <c>Int, <c>Int)"
+  }
+
+  it should "produce error message when applying ConjunctE to wrong types" in {
+    val vInt = freshVar[Int]
+    val vString = freshVar[String]
+    val x = ConjunctE(Seq(vInt, vString))
+
+    x(vInt, vString).t shouldEqual x.t
+
+    the[Exception] thrownBy x(vInt, vInt) should have message "Some arguments of .apply() have unexpected types [<c>Int] that do not match the types in (<c>Int, <c>String)"
+    the[Exception] thrownBy x(vInt, vInt, vInt) should have message ".apply() must be called with 2 arguments on this type (<c>Int, <c>String) but it was called with 3 arguments"
+  }
+
+  it should "use unit types in functions" in {
+    val vUnit = freshVar[Unit]
+
+    def vF[A] = freshVar[Unit ⇒ A]
+
+    def vA[A] = freshVar[A]
+
+    vF(vUnit).t shouldEqual vA.t
+    (vF :@ vUnit).t shouldEqual vA.t
+  }
+
+  it should "unify disjunction and conjunction types containing basic types" in {
+    def vF[A, B] = freshVar[(A, Unit, Option[(B, B)]) ⇒ A]
+
+    val vUnit = freshVar[Unit]
+
+    def vA[A] = freshVar[A]
+
+    val vInt = freshVar[Int]
+    val vFloatFloat = freshVar[Option[(Float, Float)]]
+    val vFloatInt = freshVar[Option[(Float, Int)]]
+
+    (vF :@ (vInt, vUnit, vFloatFloat)).t shouldEqual vInt.t
+
+    the[Exception] thrownBy (vF :@ (vInt, vUnit, vFloatInt)).t should have message "Cannot unify B with <c>Int because type parameter TP(B) requires incompatible substitutions <c>Float and <c>Int"
+    the[Exception] thrownBy (vF :@ vFloatFloat).t should have message "Cannot unify (A, Unit, Option[Tuple2[B,B]]{None.type + Some[Tuple2[B,B]]}) with an incompatible type Option[Tuple2[<c>Float,<c>Float]]{None.type + Some[Tuple2[<c>Float,<c>Float]]}"
+    the[Exception] thrownBy println((vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrint) should have message "Cannot unify A with A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]} because type variable A is used in the destination type"
   }
 
 }

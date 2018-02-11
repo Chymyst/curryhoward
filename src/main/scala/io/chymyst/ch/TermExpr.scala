@@ -230,6 +230,21 @@ object TermExpr {
 }
 
 sealed trait TermExpr {
+  /** Provide :@ syntax for term application with automatic alpha-conversions.
+    */
+  def :@(terms: TermExpr*): TermExpr = this.applyWithAlpha(terms: _*)
+
+  /** Provide syntax for function composition.
+    */
+  def andThen(otherTerm: TermExpr): TermExpr = (this.t, otherTerm.t) match {
+    case (#->(head1, body1), #->(head2, body2)) ⇒
+      if (head2 == body1) {
+        val var1 = VarE(TheoremProver.freshVar(), head1)
+        var1 =>: otherTerm(this(var1))
+      } else throw new Exception(s"Call to `.andThen` is invalid because the function types (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) do not match")
+    case _ ⇒ throw new Exception(s"Call to `.andThen` is invalid because the type of one of the arguments (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) is not of a function type")
+  }
+
   private def substTypeVars(substitutions: Map[TP, TypeExpr]): TermExpr =
     substitutions.foldLeft(this) { case (prevTerm, (tp, newTypeExpr)) ⇒ TermExpr.substTypeVar(tp, newTypeExpr, prevTerm) }
 
@@ -438,7 +453,7 @@ final case class AppE(head: TermExpr, arg: TermExpr) extends TermExpr {
   // Make this a `val` to catch bugs early.
   val t: TypeExpr = head.t match {
     case hd #-> body if hd == arg.t ⇒ body
-    case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application $this: `${head.t.prettyPrint}` must be a function with argument type `${arg.t.prettyPrint}`")
+    case _ ⇒ throw new Exception(s"Internal error: Invalid head type in application $this: ${head.t.prettyPrint} must be a function with argument type ${arg.t.prettyPrint}")
   }
 
   private[ch] override def simplifyOnce(withEta: Boolean): TermExpr = {

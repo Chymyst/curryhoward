@@ -78,25 +78,6 @@ package object ch {
     }
   }
 
-  /** Provide syntax for term operations.
-    */
-  implicit class WithAlphaConversion(val termExpr: TermExpr) extends AnyVal {
-    /** Provide :@ syntax for term application with automatic alpha-conversions.
-      */
-    def :@(terms: TermExpr*): TermExpr = termExpr.applyWithAlpha(terms: _*)
-
-    /** Provide syntax for function composition.
-      */
-    def andThen(otherTerm: TermExpr): TermExpr = (termExpr.t, otherTerm.t) match {
-      case (#->(head1, body1), #->(head2, body2)) ⇒
-        if (head2 == body1) {
-          val var1 = VarE(TheoremProver.freshVar(), head1)
-          var1 =>: otherTerm(termExpr(var1))
-        } else throw new Exception(s"Call to `.andThen` is invalid because the function types (${termExpr.t} and ${otherTerm.t}) do not match")
-      case _ ⇒ throw new Exception(s"Call to `.andThen` is invalid because the type of one of the arguments (${termExpr.t} and ${otherTerm.t}) is not of a function type")
-    }
-  }
-
   /** Create a new fresh variable term of given type.
     *
     * @tparam X Type expression that will be assigned to the new variable.
