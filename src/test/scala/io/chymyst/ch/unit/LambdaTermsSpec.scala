@@ -45,14 +45,16 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     f2[Int].forall(TermExpr.lambdaTerm(_).isEmpty) shouldEqual true
 
     // Check that the returned terms are "(Left(a ⇒ a) + 0)", "(Right(1) + 0)".
-    val Seq(f2a, f2b) = f2[String]
+    val Seq(f2a: Either[String ⇒ String, Unit], f2b: Either[String ⇒ String, Unit]) = f2[String]
 
     f2a match {
       case Left(x) ⇒ x("abc") shouldEqual "abc"
+//      case Right(y) ⇒ y shouldEqual (())
     }
 
     f2b match {
       case Right(y) ⇒ y shouldEqual (())
+//      case Left(x) ⇒ x("abc") shouldEqual "abc"
     }
 
     def f3[A] = allOfType[(A, A) ⇒ A]

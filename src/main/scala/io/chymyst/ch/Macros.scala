@@ -400,6 +400,15 @@ class Macros(val c: whitebox.Context) {
     inhabitAllInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
   }
 
+  def anyOfTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
+    val typeUT: TypeExpr = buildTypeExpr(c.weakTypeOf[U])
+    val givenVars: Seq[(VarE, c.Tree)] = values.zipWithIndex
+      .map { case (v, i) ⇒ (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
+    val givenVarsAsArgs = givenVars.map(_._1)
+    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.t ->: prev }
+    inhabitAllInternal(typeStructure, givenVars.toMap, returnAllProofTerms = true) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
+  }
+
   /** Construct a Scala code tree that implements a type expression tree.
     * The implementation is chosen according to the "least information loss" principle.
     * It is an error if several inequivalent implementations are obtained.
@@ -456,12 +465,19 @@ class Macros(val c: whitebox.Context) {
 
   private def inhabitAllInternal(
     typeStructure: TypeExpr,
-    givenArgs: Map[VarE, c.Tree]
+    givenArgs: Map[VarE, c.Tree],
+    returnAllProofTerms: Boolean = false
   )(
     transform: TermExpr ⇒ TermExpr
   ): c.Tree = {
-    val foundTerms = TheoremProver.findProofs(typeStructure)._1
-    val createLambdas = foundTerms.map(TermExpr.size).foldLeft(0)(_ + _) < MAX_TERM_SIZE_FOR_LAMBDA_EXPORT
+    val (lowestScoreTerms, allTerms) = TheoremProver.findProofs(typeStructure)
+    val foundTerms = if (returnAllProofTerms) {
+      allTerms.foreach { t ⇒ c.info(c.enclosingPosition, s"[DEBUG] Score: ${t.informationLossScore}\tTerm: ${t.prettyPrint}", force = true) }
+      allTerms
+    } else {
+      lowestScoreTerms
+    }
+    val createLambdas = foundTerms.map(TermExpr.size).sum < MAX_TERM_SIZE_FOR_LAMBDA_EXPORT
     val terms = foundTerms.map { foundTerm ⇒
       returnTerm(transform(foundTerm), givenArgs, createLambdas)
     }

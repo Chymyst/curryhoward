@@ -58,26 +58,31 @@ class TermExprSpec extends FlatSpec with Matchers {
   behavior of "information loss"
 
   it should "compute permutation score for conjunctions" in {
+
+    def permScore(t: TermExpr): Double = t.informationLossScore._1._5
+
     val c = ConjunctE(Seq(VarE("a", TP("A")), VarE("b", TP("B"))))
+
     val t = ConjunctE(Seq(
       ProjectE(0, c),
       ProjectE(1, c)
     ))
-    t.informationLossScore._3 shouldEqual 0
 
-    ConjunctE(Seq(
+    permScore(t) shouldEqual 0
+
+    permScore(ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(1, c)
-    )).informationLossScore._3 shouldEqual 1
+    ))) shouldEqual 1
 
-    ConjunctE(Seq(
+    permScore(ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(0, c)
-    )).informationLossScore._3 shouldEqual 2
+    ))) shouldEqual 2
 
-    TermExpr.findFirst(t) {
+    TermExpr.findAll(t) {
       case ProjectE(_, _) ⇒ "abc"
-    } shouldEqual Some("abc")
+    } shouldEqual Seq("abc")
   }
 
   behavior of "TermExpr#simplify"

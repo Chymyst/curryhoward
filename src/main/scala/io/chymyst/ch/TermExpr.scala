@@ -32,6 +32,12 @@ object TermExpr {
     }
   }
 
+  /** Approximate size of the term.
+    * The computation adds 1 every time any subterms are combined in any way.
+    *
+    * @param termExpr A term.
+    * @return Number of elements in the term.
+    */
   def size(termExpr: TermExpr): Int = {
     implicit val monoidIntSum: Monoid[Int] = new Monoid[Int] {
       override def empty: Int = -1
@@ -116,20 +122,18 @@ object TermExpr {
     case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
   }
 
-  def findFirst[R](inExpr: TermExpr)(pred: PartialFunction[TermExpr, R]): Option[R] = {
-    Some(inExpr).collect(pred).orElse {
-      inExpr match {
-        case VarE(_, _) ⇒ None
-        case AppE(head, arg) ⇒ findFirst(head)(pred).orElse(findFirst(arg)(pred))
-        case CurriedE(_, body) ⇒ findFirst(body)(pred)
-        case UnitE(_) ⇒ None
-        case NamedConjunctE(terms, _) ⇒ terms.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred))
-        case ConjunctE(terms) ⇒ terms.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred))
-        case ProjectE(_, term) ⇒ findFirst(term)(pred)
-        case MatchE(term, cases) ⇒ findFirst(term)(pred).orElse(cases.find(t ⇒ findFirst(t)(pred).isDefined).flatMap(t ⇒ findFirst(t)(pred)))
-        case DisjunctE(_, _, term, _) ⇒ findFirst(term)(pred)
-      }
-    }
+  def findAll[R](inExpr: TermExpr)(pred: PartialFunction[TermExpr, R]): Seq[R] = {
+    Seq(inExpr).collect(pred) ++ (inExpr match {
+      case VarE(_, _) ⇒ Seq()
+      case AppE(head, arg) ⇒ findAll(head)(pred) ++ findAll(arg)(pred)
+      case CurriedE(_, body) ⇒ findAll(body)(pred)
+      case UnitE(_) ⇒ Seq()
+      case NamedConjunctE(terms, _) ⇒ terms.filter(t ⇒ findAll(t)(pred).nonEmpty).flatMap(t ⇒ findAll(t)(pred))
+      case ConjunctE(terms) ⇒ terms.filter(t ⇒ findAll(t)(pred).nonEmpty).flatMap(t ⇒ findAll(t)(pred))
+      case ProjectE(_, term) ⇒ findAll(term)(pred)
+      case MatchE(term, cases) ⇒ findAll(term)(pred) ++ cases.filter(t ⇒ findAll(t)(pred).nonEmpty).flatMap(t ⇒ findAll(t)(pred))
+      case DisjunctE(_, _, term, _) ⇒ findAll(term)(pred)
+    })
   }
 
   private def sameConstructor(t1: TypeExpr, t2: TypeExpr): Boolean = t1 match {
@@ -171,6 +175,30 @@ object TermExpr {
     case _ ⇒ 0
   }
 
+  // Count all "case" clauses.
+  private[ch] def caseClausesCount(inExpr: TermExpr): Int = {
+    implicit val monoidInt: Monoid[Int] = TermExpr.monoidIntStandard
+    TermExpr.foldMap(inExpr) {
+      case MatchE(term, cases) ⇒ cases.length + caseClausesCount(term) + cases.map(caseClausesCount).sum
+    }
+  }
+
+  private[ch] def unequalTupleSize(inExpr: TermExpr): Double = {
+    implicit val monoidDouble: Monoid[Double] = TermExpr.monoidDouble
+    TermExpr.foldMap(inExpr) {
+      case NamedConjunctE(terms, _) ⇒
+        val sizeDifference = terms.groupBy(_.t) // Map[TypeExpr, Seq[TermExpr]]
+          .filter(_._2.length > 1)
+          .map { case (_, ts) ⇒
+            val sizes = ts.map(TermExpr.size)
+            sizes.max - sizes.min
+          }.sum
+        val sizeDifferenceInTerms = terms.map(unequalTupleSize).sum
+
+        (sizeDifference + sizeDifferenceInTerms) / TermExpr.size(inExpr).toDouble
+    }
+  }
+
   implicit val monoidDouble: Monoid[Double] = new Monoid[Double] {
     override def empty: Double = 0.0
 
@@ -182,14 +210,14 @@ object TermExpr {
       terms.map(conjunctionPermutationScore).sum +
         terms.zipWithIndex.flatMap { case (t, i) ⇒
           // Only count projections from terms of exactly the same type as this `NamedConjunctE`.
-          findFirst(t) { case ProjectE(index, term) if sameConstructor(term.t, tExpr) ⇒
+          findAll(t) { case ProjectE(index, term) if sameConstructor(term.t, tExpr) ⇒
             conjunctionPermutationScore(term) / terms.length.toDouble +
               (if (index == i) 0 else 1)
           }
         }.sum
     case ConjunctE(terms) ⇒
       terms.zipWithIndex.flatMap { case (t, i) ⇒
-        findFirst(t) { case ProjectE(index, term) if (term.t match {
+        findAll(t) { case ProjectE(index, term) if (term.t match {
           case ConjunctT(_) ⇒ true
           case _ ⇒ false
         }) ⇒
@@ -204,7 +232,7 @@ object TermExpr {
       disjunctionPermutationScore(term) +
         cases.zipWithIndex.flatMap { case (t, i) ⇒
           // Only count disjunction constructions into terms of exactly the same type as the `term` being matched.
-          findFirst(t) { case DisjunctE(index, _, t2, tExpr) if sameConstructor(term.t, tExpr) ⇒
+          findAll(t) { case DisjunctE(index, _, t2, tExpr) if sameConstructor(term.t, tExpr) ⇒
             disjunctionPermutationScore(t2) / cases.length.toDouble +
               (if (index == i) 0 else 1)
           }
@@ -230,6 +258,25 @@ object TermExpr {
 }
 
 sealed trait TermExpr {
+
+  private def roundFactor(x: Double): Long = math.round(x * 10000)
+
+  // Need to split the tuple into parts because Ordering[] is undefined on tuples > 9
+  lazy val informationLossScore = (
+    (TermExpr.unusedArgs(this).size
+      , unusedTupleParts
+      , roundFactor(unusedMatchClauseVars)
+      , unequallyUsedTupleParts
+      , roundFactor(TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this))
+    ), (
+    TermExpr.argsMultiUseCountShallow(this)
+    , TermExpr.argsMultiUseCountDeep(this)
+    , roundFactor(TermExpr.unequalTupleSize(this))
+    , TermExpr.caseClausesCount(this)
+//    , TermExpr.size(this)
+  )
+  )
+
   /** Provide :@ syntax for term application with automatic alpha-conversions.
     */
   def :@(terms: TermExpr*): TermExpr = this.applyWithAlpha(terms: _*)
@@ -239,8 +286,8 @@ sealed trait TermExpr {
   def andThen(otherTerm: TermExpr): TermExpr = (this.t, otherTerm.t) match {
     case (#->(head1, body1), #->(head2, body2)) ⇒
       if (head2 == body1) {
-        val var1 = VarE(TheoremProver.freshVar(), head1)
-        var1 =>: otherTerm(this(var1))
+        val newVar = VarE(TheoremProver.freshVar(), head1)
+        newVar =>: otherTerm(this (newVar))
       } else throw new Exception(s"Call to `.andThen` is invalid because the function types (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) do not match")
     case _ ⇒ throw new Exception(s"Call to `.andThen` is invalid because the type of one of the arguments (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) is not of a function type")
   }
@@ -303,14 +350,6 @@ sealed trait TermExpr {
     case tp@TP(_) ⇒ TermExpr.substTypeVar(tp, to.t, this)
     case _ ⇒ throw new Exception(s"substTypeVar requires a type variable as type of expression $from, but found type ${from.t.prettyPrint}")
   }
-
-  def informationLossScore = (
-    TermExpr.unusedArgs(this).size
-    , unusedTupleParts + unusedMatchClauseVars
-    , TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this)
-    , TermExpr.argsMultiUseCountShallow(this)
-    , TermExpr.argsMultiUseCountDeep(this)
-  )
 
   def t: TypeExpr
 
@@ -393,14 +432,29 @@ sealed trait TermExpr {
     }
   }
 
+  private[ch] lazy val unequallyUsedTupleParts: Int = usedTuplePartsSeq
+    .groupBy(_._1) // Map[TermExpr, Seq[(TermExpr, Int)]]
+    .mapValues(_.map(_._2)) // Map[TermExpr, Seq[Int]]
+    .map { case (term, partsUsed) ⇒
+    // e.g. partsUsed = List(1, 1, 1, 1, 1, 2, 2, 2, 3)
+    // We compute 5 - 1 = 4
+    val sorted = partsUsed.groupBy(identity[Int]) // Map[Int, Seq[Int]]
+      .mapValues(_.length) // Map[Int, Int]
+      .values.toSeq.sorted
+    sorted.max - sorted.min // It is guaranteed that the sequence is not empty because we used groupBy
+  }.sum
+
   private[ch] lazy val unusedTupleParts: Int = usedTuplePartsSeq
     .groupBy(_._1) // Map[TermExpr, Seq[(TermExpr, Int)]]
     .mapValues(_.map(_._2).distinct) // Map[TermExpr, Seq[Int]]
-    .map { case (term, parts) ⇒
+    .map { case (term, partsUsed) ⇒
     val totalParts = term.t.conjunctSize
-    totalParts - parts.length
-  }.count(_ > 0)
+    totalParts - partsUsed.length
+  }.sum
 
+  /** Shows how many times each tuple part was used for any given term.
+    * Example: `List((a,1), (a,2), (a,1), (a,1), (a,1))`
+    */
   private[ch] lazy val usedTuplePartsSeq: Seq[(TermExpr, Int)] = {
     TermExpr.foldMap(this) {
       case ProjectE(index, term) ⇒ Seq((term, index + 1)) ++ term.usedTuplePartsSeq
@@ -670,4 +724,3 @@ final class Function2Lambda[-Arg1, -Arg2, +Res](f: (Arg1, Arg2) ⇒ Res, val lam
 final class Function3Lambda[-Arg1, -Arg2, -Arg3, +Res](f: (Arg1, Arg2, Arg3) ⇒ Res, val lambdaTerm: TermExpr) extends ((Arg1, Arg2, Arg3) ⇒ Res) {
   override def apply(a1: Arg1, a2: Arg2, a3: Arg3): Res = f(a1, a2, a3)
 }
-
