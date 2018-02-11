@@ -73,12 +73,12 @@ class TermExprSpec extends FlatSpec with Matchers {
     permutationScore(ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(1, c)
-    ))) shouldEqual 1
+    ))) shouldEqual TermExpr.roundFactor(1)
 
     permutationScore(ConjunctE(Seq(
       ProjectE(1, c),
       ProjectE(0, c)
-    ))) shouldEqual 2
+    ))) shouldEqual TermExpr.roundFactor(2)
 
     TermExpr.findAll(t) {
       case ProjectE(_, _) ⇒ "abc"
