@@ -121,6 +121,7 @@ lazy val curryhoward: Project = (project in file("."))
     libraryDependencies ++= Seq(
       // We need scala-reflect because we use macros.
       "org.scala-lang" % "scala-reflect" % scalaVersion.value
+      , "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test
     )
   )
 

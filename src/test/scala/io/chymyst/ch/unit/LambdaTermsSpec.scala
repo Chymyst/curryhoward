@@ -247,7 +247,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val getIdAuto = ofType[Option[User] ⇒ Option[Long]]
     val getIdAutoTerm = getIdAuto.lambdaTerm
-    getIdAutoTerm.prettyRenamePrint shouldEqual getId.prettyRenamePrint
+    getIdAutoTerm.prettyRenamePrint shouldEqual getId.simplify.prettyRenamePrint
     getIdAutoTerm equiv getId.prettyRename shouldEqual true
   }
 
@@ -451,6 +451,26 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     the[Exception] thrownBy (vF :@ (vInt, vUnit, vFloatInt)).t should have message "Cannot unify B with <c>Int because type parameter TP(B) requires incompatible substitutions <c>Float and <c>Int"
     the[Exception] thrownBy (vF :@ vFloatFloat).t should have message "Cannot unify (A, Unit, Option[Tuple2[B,B]]{None.type + Some[Tuple2[B,B]]}) with an incompatible type Option[Tuple2[<c>Float,<c>Float]]{None.type + Some[Tuple2[<c>Float,<c>Float]]}"
     the[Exception] thrownBy println((vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrint) should have message "Cannot unify A with A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]} because type variable A is used in the destination type"
+  }
+
+  it should "have correct types for Option[Option[Int]]" in {
+    val fs = allOfType[Option[Option[Int]] ⇒ Option[Option[Int]]].map(_.lambdaTerm)
+    fs.length shouldEqual 1
+
+    val f1 = fs(0)
+    val ooi = freshVar[Option[Option[Int]]]
+    val oi = freshVar[Option[Int]]
+    val n = freshVar[None.type]
+    val si = freshVar[Some[Option[Int]]]
+
+
+    val nonE = oi(n())
+    val someNone = ooi(si(nonE))
+    println(someNone.t)
+    println(someNone.t.prettyPrint)
+
+    f1(ooi(n())).simplify shouldEqual ooi(n())
+    f1(someNone).simplify shouldEqual someNone
   }
 
 }

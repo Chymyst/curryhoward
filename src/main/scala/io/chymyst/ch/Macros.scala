@@ -204,8 +204,8 @@ class Macros(val c: whitebox.Context) {
     }
   }
 
-  // This is used to put types on all function arguments within reifyParam().
-  private def reifyType(typeExpr: TypeExpr): c.Tree = {
+  // This is used to put types on all function arguments within emitParamCode().
+  private def emitTypeCode(typeExpr: TypeExpr): c.Tree = {
 
     def makeTypeName(nameT: String): c.universe.Tree = {
       val tpn = TypeName(nameT)
@@ -214,21 +214,21 @@ class Macros(val c: whitebox.Context) {
 
     typeExpr match {
       // Special case for Java-style arg lists.
-      case ConjunctT(terms) #-> body ⇒ tq"(..${terms.map(reifyType)}) ⇒ ${reifyType(body)}"
-      case head #-> body ⇒ tq"(${reifyType(head)}) ⇒ ${reifyType(body)}"
+      case ConjunctT(terms) #-> body ⇒ tq"(..${terms.map(emitTypeCode)}) ⇒ ${emitTypeCode(body)}"
+      case head #-> body ⇒ tq"(${emitTypeCode(head)}) ⇒ ${emitTypeCode(body)}"
       case TP(nameT) ⇒ makeTypeName(nameT)
       case BasicT(nameT) ⇒ makeTypeName(nameT)
       case RecurseT(nameT, tParams) ⇒
         val constructorT = makeTypeName(nameT)
         val constructorWithTypeParams = if (tParams.isEmpty) constructorT else {
-          val tParamsTrees = tParams.map(reifyType)
+          val tParamsTrees = tParams.map(emitTypeCode)
           tq"$constructorT[..$tParamsTrees]"
         }
         constructorWithTypeParams
       case NamedConjunctT(constructor, tParams, _, _) ⇒
         val constructorT = makeTypeName(constructor)
         val constructorWithTypeParams = if (tParams.isEmpty) constructorT else {
-          val tParamsTrees = tParams.map(reifyType)
+          val tParamsTrees = tParams.map(emitTypeCode)
           tq"$constructorT[..$tParamsTrees]"
         }
         if (typeExpr.caseObjectName.isDefined) {
@@ -237,31 +237,31 @@ class Macros(val c: whitebox.Context) {
       case NothingT(nameT) ⇒ makeTypeName(nameT)
       case UnitT(nameT) ⇒ makeTypeName(nameT)
       case ConjunctT(terms) ⇒ // Assuming this is a tuple type.
-        val tpts = terms.map(reifyType)
+        val tpts = terms.map(emitTypeCode)
         tq"(..$tpts)"
       case DisjunctT(constructor, tParams, _) ⇒
         val constructorT = makeTypeName(constructor)
         if (tParams.isEmpty) constructorT else {
-          val tParamsTrees = tParams.map(reifyType)
+          val tParamsTrees = tParams.map(emitTypeCode)
           tq"$constructorT[..$tParamsTrees]"
         }
-      // TODO: reify this with type parameters
+      // TODO: emit this code with type parameters
       case ConstructorT(name) ⇒ makeTypeName(name)
     }
   }
 
   // Prepare the tree for a function parameter with the specified type.
-  private def reifyParam(term: VarE): c.Tree = term match {
+  private def emitParamCode(term: VarE): c.Tree = term match {
     case VarE(name, typeExpr) ⇒
-      val tpt = reifyType(typeExpr)
+      val tpt = emitTypeCode(typeExpr)
       val termName = TermName(name.toString)
       val param = q"val $termName: $tpt"
       param
   }
 
-  private def reifyTerm(termExpr: TermExpr, givenArgs: Map[VarE, c.Tree]): c.Tree = {
+  private def emitTermCode(termExpr: TermExpr, givenArgs: Map[VarE, c.Tree]): c.Tree = {
     // Shortcut for calling this function recursively with all the same arguments.
-    def reifyTermShort(termExpr: TermExpr): c.Tree = reifyTerm(termExpr, givenArgs)
+    def emitTermShort(termExpr: TermExpr): c.Tree = emitTermCode(termExpr, givenArgs)
 
     def conjunctSubstName(p: VarE, i: Int): String = s"${p.name}_$i"
 
@@ -269,45 +269,45 @@ class Macros(val c: whitebox.Context) {
       case p@VarE(name, _) ⇒ givenArgs.getOrElse(p, q"${TermName(name.toString)}")
 
       // A function applied to several arguments Java-style.
-      case AppE(head, ConjunctE(terms)) ⇒ q"${reifyTermShort(head)}(..${terms.map(reifyTermShort)})"
+      case AppE(head, ConjunctE(terms)) ⇒ q"${emitTermShort(head)}(..${terms.map(emitTermShort)})"
 
-      case AppE(head, arg) ⇒ q"${reifyTermShort(head)}(${reifyTermShort(arg)})"
+      case AppE(head, arg) ⇒ q"${emitTermShort(head)}(${emitTermShort(arg)})"
 
       // If `heads` = List(x, y, z) and `body` = b then the generated code will be x ⇒ y ⇒ z ⇒ b.
       case CurriedE(heads, body) ⇒
         // If one of the heads is a ConjunctT, we need to do a replacement in the entire body.
-        // It will be too late to do this once we start reifying the terms.
+        // It will be too late to do this once we start emitting code for the terms.
         val conjunctHeads = heads.collect { case p@VarE(_, ConjunctT(terms)) ⇒ (p, terms) }
         val replacedBody = conjunctHeads.foldLeft(body) {
           case (prev, (p, termTypes)) ⇒ TermExpr.subst(
             p,
             ConjunctE(termTypes.zipWithIndex.map { case (t, i) ⇒ VarE(conjunctSubstName(p, i), t) }),
             prev
-          ).simplifyOnce()
+          ).simplifyOnce(withEta = false)
         }.simplifyOnce(withEta = true)
 
-        // Need to be careful to substitute arguments that are of type ConjunctT, because they represent java-style arg groups.
-        heads.reverse.foldLeft(reifyTermShort(replacedBody)) { case (prevTree, paramE) ⇒
+        // Need to be careful to substitute arguments that are of type ConjunctT, because they represent Java-style arg groups.
+        heads.reverse.foldLeft(emitTermShort(replacedBody)) { case (prevTree, paramE) ⇒
           conjunctHeads.find(_._1 == paramE) match {
             case Some((_, terms)) ⇒
-              val args = terms.zipWithIndex.map { case (t, i) ⇒ reifyParam(VarE(conjunctSubstName(paramE, i), t)) }
+              val args = terms.zipWithIndex.map { case (t, i) ⇒ emitParamCode(VarE(conjunctSubstName(paramE, i), t)) }
               q"((..$args) ⇒ $prevTree)"
-            case None ⇒ q"(${reifyParam(paramE)} ⇒ $prevTree)"
+            case None ⇒ q"(${emitParamCode(paramE)} ⇒ $prevTree)"
           }
         }
 
       case UnitE(_) ⇒ q"()"
-      case ConjunctE(terms) ⇒ q"(..${terms.map(reifyTermShort)})"
+      case ConjunctE(terms) ⇒ q"(..${terms.map(emitTermShort)})"
       case NamedConjunctE(terms, tExpr) ⇒
-        val constructorE = q"${TermName(tExpr.constructor)}[..${tExpr.tParams.map(reifyType)}]"
+        val constructorE = q"${TermName(tExpr.constructor)}[..${tExpr.tParams.map(emitTypeCode)}]"
         if (tExpr.isAtomic)
           constructorE // avoid spurious parameter lists for case objects
         else
-          q"$constructorE(..${terms.map(reifyTermShort)})"
+          q"$constructorE(..${terms.map(emitTermShort)})"
       case ProjectE(index, term) ⇒
         val accessor = TermName(term.accessor(index))
-        q"${reifyTermShort(term)}.$accessor"
-      case DisjunctE(_, _, term, _) ⇒ q"${reifyTermShort(term)}" // A disjunct term is always a NamedConjunctE, so we just reify that.
+        q"${emitTermShort(term)}.$accessor"
+      case DisjunctE(_, _, term, _) ⇒ q"${emitTermShort(term)}" // A disjunct term is always a NamedConjunctE, so we just emit that code.
       case MatchE(term, cases) ⇒
         // Each term within `cases` is always a CurriedE because it is of the form fv ⇒ TermExpr(fv, other_premises).
         val casesTrees: Seq[c.Tree] = cases.map {
@@ -316,14 +316,14 @@ class Macros(val c: whitebox.Context) {
           case CurriedE(VarE(fvName, fvType) :: rest, body) ⇒
             // Generate cq"$pat => $expr" where pat = pq"Constructor(..$Strings)".
             val pat = fvType.caseObjectName match {
-              case Some(constructor) ⇒ pq"_ : ${TermName(constructor)}.type"
-              case None ⇒ pq"${TermName(fvName)} : ${reifyType(fvType)}"
+              case Some(constructor) ⇒ pq"${TermName(fvName)} : ${TermName(constructor)}.type" // used to be pq"_ : ${TermName(constructor)}.type"
+              case None ⇒ pq"${TermName(fvName)} : ${emitTypeCode(fvType)}"
             }
-            cq"$pat => ${reifyTermShort(if (rest.isEmpty) body else CurriedE(rest, body))}"
+            cq"$pat => ${emitTermShort(if (rest.isEmpty) body else CurriedE(rest, body))}"
           case cc ⇒ throw new Exception(s"Internal error: `case` term ${cc.prettyRenamePrint} must be a function")
         }
 
-        q"${reifyTermShort(term)} match { case ..$casesTrees }"
+        q"${emitTermShort(term)} match { case ..$casesTrees }"
     }
   }
 
@@ -443,7 +443,7 @@ class Macros(val c: whitebox.Context) {
     import LiftedAST._
     val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
     c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
-    val resultCodeTree = reifyTerm(termFound, givenArgs)
+    val resultCodeTree = emitTermCode(termFound, givenArgs)
     val result = if (!createLambdas) {
       resultCodeTree
     } else {

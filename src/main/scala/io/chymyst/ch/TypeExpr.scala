@@ -124,6 +124,11 @@ object TypeExpr {
     }
   }
 
+  private[ch] def isDisjunctionPart(disj: TypeExpr, part: TypeExpr): Boolean = (disj, part) match {
+    case (DisjunctT(_, _, terms), NamedConjunctT(ncName, _, _, _)) if terms.map(_.constructor) contains ncName ⇒ true
+    case _ ⇒ false
+  }
+
   private[ch] type UnifyResult = Either[String, Map[TP, TypeExpr]]
 
   /** Obtain type variable substitutions via unification of two type expressions `src` and `dst`.
@@ -172,7 +177,7 @@ object TypeExpr {
       case (DisjunctT(constructor, tParams, terms), DisjunctT(constructor2, tParams2, _))
         if constructor == constructor2 && tParams.length == tParams2.length ⇒ wrapResult(tParams zip tParams2)
 
-      case (d@DisjunctT(_, tParams, terms), n@NamedConjunctT(ncName, tParams2, _, _)) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
+      case (d@DisjunctT(_, _, _), n@NamedConjunctT(_, _, _, _)) if isDisjunctionPart(d, n) ⇒ wrapResult(d.tParams zip n.tParams)
       //      case (n@NamedConjunctT(ncName, tParams2, _, _), d@DisjunctT(_, tParams, terms)) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
 
       case (ConjunctT(terms), ConjunctT(terms2)) if terms.length == terms2.length ⇒ wrapResult(terms zip terms2)

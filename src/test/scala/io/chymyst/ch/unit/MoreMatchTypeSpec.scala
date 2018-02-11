@@ -4,7 +4,7 @@ import io.chymyst.ch._
 import io.chymyst.ch.Macros._
 import org.scalatest.{FlatSpec, Matchers}
 
-class MatchTypeSpec2 extends FlatSpec with Matchers {
+class MoreMatchTypeSpec extends FlatSpec with Matchers {
 
   behavior of "tuples"
 
@@ -53,7 +53,7 @@ class MatchTypeSpec2 extends FlatSpec with Matchers {
     r._1 shouldEqual "A ⇒ ((A, B, C) ⇒ A) ⇒ B"
   }
 
-  it should "use conjunct to reify argument group" in {
+  it should "use ConjunctT to emit code for Java-style argument group" in {
     freshVar[(Int, (Int, Boolean), (Int, String) ⇒ Double) ⇒ Boolean].t shouldEqual #->(ConjunctT(List(BasicT("Int"), NamedConjunctT("Tuple2", List(BasicT("Int"), BasicT("Boolean")), List("_1", "_2"), List(BasicT("Int"), BasicT("Boolean"))), #->(ConjunctT(List(BasicT("Int"), BasicT("String"))), BasicT("Double")))), BasicT("Boolean"))
   }
 

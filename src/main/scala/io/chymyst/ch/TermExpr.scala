@@ -113,7 +113,9 @@ object TermExpr {
 
   def subst(replaceVar: VarE, expr: TermExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
     case VarE(name, tExpr) if name == replaceVar.name ⇒
-      if (tExpr == replaceVar.t) expr else throw new Exception(s"Incorrect type ${replaceVar.t.prettyPrint} in subst($replaceVar, $expr, $inExpr), expected ${tExpr.prettyPrint}")
+      if (tExpr == replaceVar.t || TypeExpr.isDisjunctionPart(tExpr, replaceVar.t))
+        expr
+      else throw new Exception(s"Incorrect type ${replaceVar.t.prettyPrint} in subst($replaceVar, $expr, $inExpr), expected ${tExpr.prettyPrint}")
   }
 
   def substTypeVar(replaceTypeVar: TP, newTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
@@ -166,7 +168,7 @@ object TermExpr {
 
   private def atLeastOnce(x: Int): Int = math.max(x - 1, 0)
 
-  val monoidIntStandard: Monoid[Int] = new Monoid[Int] {
+  private[ch] val monoidIntStandard: Monoid[Int] = new Monoid[Int] {
     override def empty: Int = 0
 
     override def combine(x: Int, y: Int): Int = x + y
@@ -354,12 +356,12 @@ sealed trait TermExpr {
   // Need to split the tuple into parts because Ordering[] is undefined on tuples > 9
   lazy val informationLossScore = (
     TermExpr.unusedArgs(this).size
-    , TermExpr.roundFactor(unusedTupleParts + unusedMatchClauseVars)
+    , TermExpr.roundFactor(unusedTupleParts.toDouble + unusedMatchClauseVars)
     , TermExpr.roundFactor(TermExpr.conjunctionPermutationScore(this) + TermExpr.disjunctionPermutationScore(this))
-//    , TermExpr.argsMultiUseCountShallow(this)
+    , TermExpr.argsMultiUseCountShallow(this)
     , TermExpr.argsMultiUseCountDeep(this)
-//        , unequallyUsedTupleParts
-//        , TermExpr.roundFactor(TermExpr.unequalTupleSize(this))
+//    , unequallyUsedTupleParts // experimental
+    //        , TermExpr.roundFactor(TermExpr.unequalTupleSize(this))
     //    , TermExpr.caseClausesCount(this)
     //    , TermExpr.size(this) // Should not use this.
   )
@@ -445,7 +447,9 @@ sealed trait TermExpr {
     import TermExpr.monoidDouble
     TermExpr.foldMap[Double](this) {
       case MatchE(_, cases) ⇒ cases.map {
-        case CurriedE(List(prop), body) ⇒ if (body.freeVars contains prop.name) 0.0 else 1.0
+        case CurriedE(List(prop), body) ⇒
+          val thisValue = if (body.freeVars contains prop.name) 0.0 else 1.0
+          thisValue + body.unusedMatchClauseVars
         case c ⇒ c.unusedMatchClauseVars
       }.sum / cases.length.toDouble
     }
@@ -652,7 +656,7 @@ final case class ProjectE(index: Int, term: TermExpr) extends TermExpr {
   *              that is, with at least one argument.
   */
 final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr {
-  override def t: TypeExpr = cases match {
+  override lazy val t: TypeExpr = cases match {
     case te :: tail ⇒
       te match {
         case CurriedE(List(_), body) ⇒
@@ -673,17 +677,21 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
   private[ch] override def simplifyOnceInternal(withEta: Boolean): TermExpr = {
     lazy val casesSimplified = cases.map(_.simplifyOnce(withEta))
     term.simplifyOnce(withEta) match {
-      case DisjunctE(index, total, t, _) ⇒
+      case DisjunctE(index, total, termInjected, _) ⇒
         if (total == cases.length) {
-          AppE(cases(index).simplifyOnce(withEta), t).simplifyOnce(withEta)
+          AppE(cases(index).simplifyOnce(withEta), termInjected).simplifyOnce(withEta)
         } else throw new Exception(s"Internal error: MatchE with ${cases.length} cases applied to DisjunctE with $total parts, but must be of equal size")
 
       // Detect the identity patterns:
       // MatchE(_, List(a ⇒ DisjunctE(0, total, a, _), a ⇒ DisjunctE(1, total, a, _), ...))
       // MatchE(_, a: T1 ⇒ DisjunctE(i, total, NamedConjunctE(List(ProjectE(0, a), Project(1, a), ...), T1), ...), _)
-      case t ⇒
+      case termSimplified ⇒
         if (cases.nonEmpty && {
           casesSimplified.zipWithIndex.forall {
+            // Detect a ⇒ a pattern
+            case (CurriedE(List(head@VarE(_, _)), body@VarE(_, _)), ind)
+              if head.name == body.name
+            ⇒ true
             case (CurriedE(List(head@VarE(_, _)), DisjunctE(i, len, x, _)), ind)
               if x == head && len == cases.length && ind == i
             ⇒ true
@@ -711,8 +719,24 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
             case Some(Some(body)) if bodyTerms.size == 1 ⇒ body
             case _ ⇒
               // We failed to detect the constant pattern.
-              // This is the default, catch-all case.
-              MatchE(t, casesSimplified)
+
+              // This is the remaining catch-all case.
+
+              // Detect the identity pattern in a clause that matches a named unit:
+              // MatchE(_, { ... c : NCT("name", Nil, Nil, Nil) => DisjunctE(i, _, NamedConjunctE(Nil, NCT("name", Nil, Nil, Nil)), DisjunctT(...)) ... } )
+              // and replace each such clause by c : NCT("name", Nil, Nil, Nil) => c : DisjunctT(...) where DisjunctT(...) is the same type as `term.t`.
+              // This is safe to replace at this point in every case clause.
+              // However, this breaks types of named units that are parts of different disjunctions, for example in Option[Option[Int]] ⇒ Option[Option[Int]].
+              // So we will not do this now.
+
+/*              val casesReplaced = if (withEta) casesSimplified.zipWithIndex.map {
+                case (CurriedE(vs@(VarE(vName, nct@NamedConjunctT(_, Nil, Nil, Nil)) :: Nil), DisjunctE(j, total, NamedConjunctE(Nil, nct2), disjunctType)), i)
+                  if i == j && total == cases.length && nct == nct2 && disjunctType == t ⇒
+                  CurriedE(vs, VarE(vName, disjunctType))
+                case (c, _) ⇒ c
+              } else casesSimplified
+*/
+              MatchE(termSimplified, casesSimplified)
           }
         }
     }

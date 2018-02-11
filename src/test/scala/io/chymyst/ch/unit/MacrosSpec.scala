@@ -34,7 +34,7 @@ class MacrosSpec extends FlatSpec with Matchers {
     }
   */
 
-  behavior of "reifyType"
+  behavior of "emitTypeCode"
 
   it should "produce correct type expressions for function types" in {
     val t = freshVar[Int ⇒ Double ⇒ String].t
