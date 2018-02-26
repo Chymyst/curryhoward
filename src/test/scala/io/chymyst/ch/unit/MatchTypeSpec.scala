@@ -46,7 +46,7 @@ class MatchTypeSpec extends FlatSpec with Matchers {
   it should "get printable representation of fixed types with type constructors" in {
     def result[P, Q, R]: (String, String) = testType[Option[Seq[Int]] ⇒ Option[IndexedSeq[Set[P]]] ⇒ Q]
 
-    result._1 shouldEqual "Option[<tc>Seq[Int]]{None.type + Some[<tc>Seq[Int]]} ⇒ Option[<tc>IndexedSeq[Set[P]]]{None.type + Some[<tc>IndexedSeq[Set[P]]]} ⇒ Q"
+    result._1 shouldEqual "Option[<tc>Seq[<c>Int]]{None.type + Some[<tc>Seq[<c>Int]]} ⇒ Option[<tc>IndexedSeq[<tc>Set[P]]]{None.type + Some[<tc>IndexedSeq[<tc>Set[P]]]} ⇒ Q"
   }
 
   it should "get printable representation of fixed types with type constructors with [_]" in {

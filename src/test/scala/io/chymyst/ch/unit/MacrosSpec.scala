@@ -132,12 +132,12 @@ class MacrosSpec extends FlatSpec with Matchers {
 
   it should "produce correct type expression for unknown type constructors" in {
     val t = freshVar[IndexedSeq[Int]].t
-    t shouldEqual ConstructorT("IndexedSeq[Int]")
+    t shouldEqual ConstructorT("IndexedSeq", List(BasicT("Int")))
   }
 
   it should "produce correct type expression for unknown type constructors under Option" in {
     val t = freshVar[Option[IndexedSeq[Int]]].t
-    val t1 = ConstructorT("IndexedSeq[Int]")
+    val t1 = ConstructorT("IndexedSeq", List(BasicT("Int")))
     val t1l = List(t1)
     t shouldEqual DisjunctT("Option", t1l, List(NamedConjunctT("None", List(), List(), Nil), NamedConjunctT("Some", t1l, List("value"), t1l)))
   }

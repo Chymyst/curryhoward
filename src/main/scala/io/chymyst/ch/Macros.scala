@@ -162,9 +162,9 @@ class Macros(val c: whitebox.Context) {
                 DisjunctT(typeName, matchedTypeArgs, parts.asInstanceOf[List[NamedConjunctT]]) // Several case classes implementing a trait.
             }
           } else if (matchedTypeArgs.isEmpty) BasicT(typeName)
-          else ConstructorT(finalType.toString)
+          else ConstructorT(typeName, matchedTypeArgs)
         }
-      case _ ⇒ ConstructorT(finalType.toString) // Sometimes we get <none> as the type symbol's name... Not sure what to do in that case.
+      case _ ⇒ ConstructorT(finalType.toString, Nil) // Sometimes we get <none> as the type symbol's name... Not sure what to do in that case.
     }
   }
 
@@ -180,7 +180,7 @@ class Macros(val c: whitebox.Context) {
       case RecurseT(name, tParams) ⇒ q"_root_.io.chymyst.ch.RecurseT($name, Seq(..$tParams))"
       case BasicT(name) ⇒ q"_root_.io.chymyst.ch.BasicT($name)"
       case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, List(..$tParams), List(..$accessors), List(..$wrapped))"
-      case ConstructorT(name) ⇒ q"_root_.io.chymyst.ch.ConstructorT($name)"
+      case ConstructorT(name, tParams) ⇒ q"_root_.io.chymyst.ch.ConstructorT($name, List(..$tParams))"
     }
 
     implicit def liftedTermExpr: Liftable[TermExpr] = Liftable[TermExpr] {
@@ -207,6 +207,14 @@ class Macros(val c: whitebox.Context) {
   // This is used to put types on all function arguments within emitParamCode().
   private def emitTypeCode(typeExpr: TypeExpr): c.Tree = {
 
+    def makeTypeNameWithTypeParams(constructor: String, tParams: Seq[TypeExpr]): c.universe.Tree = {
+      val constructorT = makeTypeName(constructor)
+      if (tParams.isEmpty) constructorT else {
+        val tParamsTrees = tParams.map(emitTypeCode)
+        tq"$constructorT[..$tParamsTrees]"
+      }
+    }
+
     def makeTypeName(nameT: String): c.universe.Tree = {
       val tpn = TypeName(nameT)
       tq"$tpn"
@@ -218,19 +226,11 @@ class Macros(val c: whitebox.Context) {
       case head #-> body ⇒ tq"(${emitTypeCode(head)}) ⇒ ${emitTypeCode(body)}"
       case TP(nameT) ⇒ makeTypeName(nameT)
       case BasicT(nameT) ⇒ makeTypeName(nameT)
-      case RecurseT(nameT, tParams) ⇒
-        val constructorT = makeTypeName(nameT)
-        val constructorWithTypeParams = if (tParams.isEmpty) constructorT else {
-          val tParamsTrees = tParams.map(emitTypeCode)
-          tq"$constructorT[..$tParamsTrees]"
-        }
-        constructorWithTypeParams
+      case RecurseT(constructor, tParams) ⇒ makeTypeNameWithTypeParams(constructor, tParams)
+
       case NamedConjunctT(constructor, tParams, _, _) ⇒
         val constructorT = makeTypeName(constructor)
-        val constructorWithTypeParams = if (tParams.isEmpty) constructorT else {
-          val tParamsTrees = tParams.map(emitTypeCode)
-          tq"$constructorT[..$tParamsTrees]"
-        }
+        val constructorWithTypeParams = makeTypeNameWithTypeParams(constructor, tParams)
         if (typeExpr.caseObjectName.isDefined) {
           tq"$constructorT.type" // case object
         } else constructorWithTypeParams
@@ -239,14 +239,8 @@ class Macros(val c: whitebox.Context) {
       case ConjunctT(terms) ⇒ // Assuming this is a tuple type.
         val tpts = terms.map(emitTypeCode)
         tq"(..$tpts)"
-      case DisjunctT(constructor, tParams, _) ⇒
-        val constructorT = makeTypeName(constructor)
-        if (tParams.isEmpty) constructorT else {
-          val tParamsTrees = tParams.map(emitTypeCode)
-          tq"$constructorT[..$tParamsTrees]"
-        }
-      // TODO: emit this code with type parameters
-      case ConstructorT(name) ⇒ makeTypeName(name)
+      case DisjunctT(constructor, tParams, _) ⇒ makeTypeNameWithTypeParams(constructor, tParams)
+      case ConstructorT(constructor, tParams) ⇒ makeTypeNameWithTypeParams(constructor, tParams)
     }
   }
 
@@ -299,7 +293,7 @@ class Macros(val c: whitebox.Context) {
       case UnitE(_) ⇒ q"()"
       case ConjunctE(terms) ⇒ q"(..${terms.map(emitTermShort)})"
       case NamedConjunctE(terms, tExpr) ⇒
-        val constructorE = q"${TermName(tExpr.constructor)}[..${tExpr.tParams.map(emitTypeCode)}]"
+        val constructorE = q"${TermName(tExpr.constructor)}[..${tExpr.typeParams.map(emitTypeCode)}]"
         if (tExpr.isAtomic)
           constructorE // avoid spurious parameter lists for case objects
         else
