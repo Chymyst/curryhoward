@@ -40,6 +40,8 @@ class Macros(val c: whitebox.Context) {
 
   private def debug = Macros.options contains "macros"
 
+  private def verbose = Macros.options contains "verbose"
+
   private def showReturningTerm = Macros.options contains "terms"
 
   /** Convert a Scala `Type` value into an expression tree of type TypeExpr.
@@ -424,7 +426,7 @@ class Macros(val c: whitebox.Context) {
   ): c.Tree = {
     TheoremProver.inhabitInternal(typeStructure) match {
       case Right((messageOpt, foundTerm)) ⇒
-        messageOpt.foreach(message ⇒ c.warning(c.enclosingPosition, message))
+        messageOpt.foreach(message ⇒ if (verbose) c.warning(c.enclosingPosition, message))
         returnTerm(transform(foundTerm), givenArgs, createLambdas)
       case Left(errorMessage) ⇒
         c.error(c.enclosingPosition, errorMessage)
@@ -436,7 +438,7 @@ class Macros(val c: whitebox.Context) {
   private def returnTerm(termFound: TermExpr, givenArgs: Map[VarE, c.Tree], createLambdas: Boolean): c.Tree = {
     import LiftedAST._
     val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
-    c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
+    if (verbose) c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
     val resultCodeTree = emitTermCode(termFound, givenArgs)
     val result = if (!createLambdas) {
       resultCodeTree
