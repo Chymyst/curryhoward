@@ -9,13 +9,22 @@ libraryDependencies += "io.chymyst" %% "curryhoward" % "latest.integration"
 
 ```
 
-The `curryhoward` functionality becomes available once you add this statement:
+The `curryhoward` functionality becomes available once you add this import declaration:
 
 ```tut:silent
 import io.chymyst.ch._
 ```
 
 This imports all the necessary symbols such as `implement`, `ofType`, `allOfType` and so on.
+
+In this tutorial, we will activate the `verbose` logging option:
+
+```tut:silent
+System.setProperty("curryhoward.log", "verbose")
+```
+
+The value of the `"curryhoward.log"` JVM property is a comma-separated list of options.
+Other supported logging options include `macros`, `terms`, and `prover`.
 
 # First examples
 
@@ -59,7 +68,7 @@ def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implemen
 makeUser(123, (n: Int) ⇒ "id:" + (n * 100).toString)
 ```
 
-The library always prints the lambda-calculus term corresponding to the generated code.
+With the `verbose` option set, the library will print the lambda-calculus term corresponding to the generated code.
 In this example, the term is `User(userName, userIdGenerator userName)`.
 
 The chosen notation for lambda-calculus terms supports tuples and named case classes.
