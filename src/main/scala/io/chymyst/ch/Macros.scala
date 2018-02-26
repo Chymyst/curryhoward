@@ -472,7 +472,7 @@ class Macros(val c: whitebox.Context) {
   ): c.Tree = {
     val (lowestScoreTerms, allTerms) = TheoremProver.findProofs(typeStructure)
     val foundTerms = if (returnAllProofTerms) {
-      allTerms.foreach { t ⇒ c.info(c.enclosingPosition, s"[DEBUG] Score: ${t.informationLossScore}\tTerm: ${t.prettyPrint}", force = true) }
+      if (debug) allTerms.foreach { t ⇒ c.info(c.enclosingPosition, s"[DEBUG] Score: ${t.informationLossScore}\tTerm: ${t.prettyPrint}", force = true) }
       allTerms
     } else {
       lowestScoreTerms
