@@ -297,6 +297,9 @@ fs(1).lambdaTerm
 
 ```
 
+When using the `implement` macro, STLC terms are not generated.
+This is because `implement` is intended for "production" use.
+
 ## What can we do with lambda-terms?
 
 There are several ways in which we can use lambda-terms:
@@ -385,7 +388,7 @@ We have thus extracted the STLC term `fmapT` corresponding to the generated code
 
 Note that the type parameter names `A` and `B` in the term `fmapT` are fixed by the macro `ofType` at compile time.
 While the Scala method `fmap` has type parameters and can be called `fmap[Int, String]` and so on,
-the term `fmapT` has fixed STLC type names `A` and `B`, which we cannot change by specifying Scala type parameters.
+the STLC term `fmapT` has fixed STLC type names `A` and `B`, which we cannot change by specifying Scala type parameters.
 For this reason, we will have to manipulate these names explicitly in our symbolic computations.
 
 The identity law is `fmap id = id`. To verify this law, we need to apply `fmap` to an identity function of type `A ⇒ A`, and to check that the result is an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
@@ -445,7 +448,7 @@ We see that, after simplification, we obtain the original term `optA`.
 We can check this by using the `.equiv()` method:
 
 ```tut
-optA equiv f2(optA)
+assert(optA equiv f2(optA))
 ```
 
 This concludes the verification of the identity law.
@@ -456,7 +459,7 @@ def fmap[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]]
 val fmapT = fmap.lambdaTerm
 def a[A] = freshVar[A]
 def optA[A] = freshVar[Either[Int, A]]
-(fmapT :@ (a =>: a))(optA) equiv optA
+assert((fmapT :@ (a =>: a))(optA) equiv optA)
 
 ```
 
@@ -485,9 +488,9 @@ def f[A,B] = freshVar[A ⇒ B]
 We will now compute both sides of the naturality equation, reassigning type variables automatically:
 
 ```tut
-val leftSide = (f :@@ pure).simplify
-val rightSide = (pure @@: (fmapT :@ f)).simplify
-leftSide equiv rightSide
+val leftSide = f @@: pure
+val rightSide = pure :@@ (fmapT :@ f)
+assert(leftSide equiv rightSide)
 ```
 
 

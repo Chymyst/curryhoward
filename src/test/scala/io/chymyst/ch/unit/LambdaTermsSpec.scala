@@ -505,7 +505,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     f1.simplify.prettyRename.prettyPrint shouldEqual "a ⇒ a" // not "a ⇒ Tuple2(a._1, a._2)"
   }
 
-  it should "verify naturality for pure" in {
+  it should "verify naturality for pure / Either as in tutorial" in {
     def fmapT[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]].lambdaTerm
 
     def pure[A] = ofType[A ⇒ Either[Int, A]].lambdaTerm

@@ -334,7 +334,6 @@ sealed trait TermExpr {
         case Left(errorMessage) ⇒
           throw new Exception(s"Call to `:@@` is invalid because the function types (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) do not match: $errorMessage")
         case Right(substitutions) ⇒
-          println(s"DEBUG: for $otherTerm @@: $this -- got substitutions: $substitutions")
           val substitutedTerm = substTypeVars(substitutions)
           val newVar = VarE(TheoremProver.freshVar(), head1)
           newVar =>: substitutedTerm(otherTerm(newVar))
