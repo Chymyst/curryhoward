@@ -129,6 +129,9 @@ class TermExprSpec extends FlatSpec with Matchers {
   def flatten[A] = anyOfType[Pair[Pair[A]] ⇒ Pair[A]]()
 
   it should "perform automatic type conversions when using :@" in {
+
+    TypeExpr.allTypeParams(fmap.t) shouldEqual Set(TP("A"), TP("B"))
+
     def ftnAs[A] = allOfType[Pair[Pair[A]] ⇒ Pair[A]].map(_.lambdaTerm)
 
     val ftnA = flatten.head.lambdaTerm
