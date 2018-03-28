@@ -1,5 +1,7 @@
 package io.chymyst.ch
 
+import Helper.AnyOpsEquals
+
 /*
 The calculus LJT as presented by Galmiche and Larchey-Wendling (1998).
 
@@ -76,7 +78,7 @@ object LJT {
     }) ++ Seq(ruleImplicationAtLeft1, ruleImplicationAtLeft4) // This is the same for all sequents.
   }
 
-  private def omitPremise[C](indexedPremises: Seq[(C, Int)], index: Int): List[C] = indexedPremises.filterNot(_._2 == index).map(_._1).toList
+  private def omitPremise[C](indexedPremises: Seq[(C, Int)], index: Int): List[C] = indexedPremises.filterNot(_._2 === index).map(_._1).toList
 
   private[ch] def followsFromAxioms(sequent: Sequent): (Seq[TermExpr], Seq[TermExpr]) = {
     // The LJT calculus has three axioms. We use the Id axiom and the T axiom only, because the F axiom is not useful for code generation.
@@ -84,7 +86,7 @@ object LJT {
     val fromIdAxiom: Seq[TermExpr] = sequent.premiseVars
       .zip(sequent.premises)
       // Find premises that are equal to the goal.
-      .filter(_._2 == sequent.goal) // && sequent.goal.isAtomic) // There is no harm in applying this rule also to non-atomic terms. No useful alternative proofs would be lost due to that.
+      .filter(_._2 === sequent.goal) // && sequent.goal.isAtomic) // There is no harm in applying this rule also to non-atomic terms. No useful alternative proofs would be lost due to that.
       .map { case (premiseVar, _) ⇒
       // Generate a new term x1 ⇒ x2 ⇒ ... ⇒ xN ⇒ xK with fresh names. Here `xK` is one of the variables, selecting the premise that is equal to the goal.
       // At this iteration, we already selected the premise that is equal to the goal.
@@ -216,7 +218,7 @@ object LJT {
       atomicPremiseXi ← indexedPremises.filter(_._1.isAtomic)
       (atomicPremiseX, atomicPremiseI) = atomicPremiseXi
       // We only need to keep `body` and `ind` here.
-      implPremiseAi ← indexedPremises.collect { case (head #-> body, ind) if head == atomicPremiseX ⇒ (body, ind) }
+      implPremiseAi ← indexedPremises.collect { case (head #-> body, ind) if head === atomicPremiseX ⇒ (body, ind) }
       (implPremiseA, implPremiseI) = implPremiseAi
     } yield {
       // Build the sequent (G*, X, A) |- B by excluding the premise X ⇒ A from the initial context, and by prepending A to it.
@@ -272,7 +274,7 @@ object LJT {
           val resultTerms: Seq[TermExpr] = sequent.substituteInto(TermExpr) match {
             // Wrapped Unit or wrapped single term.
             case _ if nct.caseObjectName.isDefined ⇒ Nil
-            //            case term if nct.accessors.length == 1 ⇒ Seq(term) // This breaks several things, since we are not creating a ProjectE().
+            //            case term if nct.accessors.length === 1 ⇒ Seq(term) // This breaks several things, since we are not creating a ProjectE().
             // Wrapped conjunction having at least one part.
             // The term will eventually evaluate to a conjunction.
             case term ⇒ nct.accessors.indices.map { i ⇒ ProjectE(i, term) }
@@ -356,7 +358,7 @@ object LJT {
       premiseABCi ← indexedPremises.collect { case ((headA #-> headB) #-> bodyC, ind) ⇒ (headA, headB, bodyC, ind) }
     } yield {
       val (a, b, c, i) = premiseABCi
-      val premisesWithoutI = indexedPremises.filterNot(_._2 == i).map(_._1)
+      val premisesWithoutI = indexedPremises.filterNot(_._2 === i).map(_._1)
       val newPremisesCD = c :: premisesWithoutI
       val newPremisesBCAB = (b ->: c) :: premisesWithoutI
       RuleResult("->L4", List(sequent.copy(premises = newPremisesBCAB, goal = a ->: b), sequent.copy(premises = newPremisesCD)), { TermExprs ⇒

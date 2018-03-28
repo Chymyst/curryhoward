@@ -22,9 +22,9 @@ lazy val disableWarningsForTut = Set(
   , "-Xlint"
 )
 
-lazy val errorsForWartRemover = Seq(Wart.EitherProjectionPartial, Wart.Enumeration, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal, Wart.LeakingSealed, Wart.Return, Wart.StringPlusAny, Wart.TryPartial)
+lazy val errorsForWartRemover = Seq(Wart.ArrayEquals, Wart.EitherProjectionPartial, Wart.Enumeration, Wart.Equals, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal, Wart.LeakingSealed, Wart.Return, Wart.StringPlusAny, Wart.TryPartial)
 
-lazy val warningsForWartRemover = Seq(Wart.Equals, Wart.JavaConversions, Wart.IsInstanceOf, Wart.OptionPartial, Wart.TraversableOps) //Seq(Wart.Any, Wart.AsInstanceOf, Wart.ImplicitConversion, Wart.Option2Iterable, Wart.NoNeedForMonad, Wart.Nothing, Wart.Product, Wart.Serializable, Wart.ToString, Wart.While)
+lazy val warningsForWartRemover = Seq(Wart.Any, Wart.AnyVal, Wart.JavaConversions, Wart.IsInstanceOf, Wart.Option2Iterable, Wart.OptionPartial, Wart.TraversableOps) //Seq(Wart.AsInstanceOf, Wart.ImplicitConversion, Wart.NoNeedForMonad, Wart.Nothing, Wart.Product, Wart.Serializable, Wart.ToString, Wart.While)
 
 // See http://tpolecat.github.io/2017/04/25/scalac-flags.html
 lazy val scalacOptionsRobNorris = Seq(
@@ -103,7 +103,7 @@ lazy val curryhoward: Project = (project in file("."))
   .settings(common)
   .settings(
     organization := "io.chymyst",
-    version := "0.3.4",
+    version := "0.3.5",
 
     licenses := Seq("Apache License, Version 2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
     homepage := Some(url("https://github.com/Chymyst/curryhoward")),

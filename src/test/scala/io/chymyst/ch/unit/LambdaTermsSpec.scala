@@ -496,4 +496,12 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     f(Empty())(123) shouldEqual (())
   }
+
+  it should "simplify tuple application" in {
+    val vI = freshVar[Int]
+    val vT = freshVar[(Int, Int)]
+    val tTuple = vT.t
+    val f1 = vT =>: tTuple(vT(0), vT(1))
+    f1.simplify.prettyRename.prettyPrint shouldEqual "a ⇒ a" // not "a ⇒ Tuple2(a._1, a._2)"
+  }
 }
