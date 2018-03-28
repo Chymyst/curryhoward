@@ -51,6 +51,24 @@ sealed trait TypeExpr {
     case ConstructorT(name, tParams) ⇒ ConstructorT(name, tParams.map(_.substTypeVar(typeVar, replaceBy)))
   }
 
+  def substTypeVars(substitutions: Map[TP, TypeExpr]): TypeExpr = this match {
+    case DisjunctT(constructor, tParams, terms) ⇒
+      DisjunctT(constructor, tParams.map(_.substTypeVars(substitutions)),
+        terms.map(_.substTypeVars(substitutions)).asInstanceOf[Seq[NamedConjunctT]])
+    case ConjunctT(terms) ⇒ ConjunctT(terms.map(_.substTypeVars(substitutions)))
+    case #->(head, body) ⇒ #->(head.substTypeVars(substitutions), body.substTypeVars(substitutions))
+    case NothingT(_) ⇒ this
+    case UnitT(_) ⇒ this
+    case tp@TP(_) ⇒ substitutions.get(tp) match {
+      case Some(replaceBy) ⇒ replaceBy
+      case None ⇒ this
+    }
+    case RecurseT(name, tParams) ⇒ RecurseT(name, tParams.map(_.substTypeVars(substitutions)))
+    case BasicT(_) ⇒ this
+    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ NamedConjunctT(constructor, tParams.map(_.substTypeVars(substitutions)), accessors, wrapped.map(_.substTypeVars(substitutions)))
+    case ConstructorT(name, tParams) ⇒ ConstructorT(name, tParams.map(_.substTypeVars(substitutions)))
+  }
+
   lazy val prettyPrint: String = prettyPrintWithParentheses(0)
 
   private[ch] def prettyPrintWithParentheses(level: Int): String = this match {
@@ -142,7 +160,8 @@ object TypeExpr {
     * @param substitutions Previously available substitutions, if any.
     * @return An updated substitution map, or an error message if unification cannot succeed.
     */
-  private[ch] def leftUnifyTypeVariables(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): UnifyResult = { // This is necessary to support Scala 2.11.
+  private[ch] def leftUnifyTypeVariables(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): UnifyResult = {
+    import MonadEither._ // This is necessary to support Scala 2.11.
     def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): UnifyResult = tuples.foldLeft[UnifyResult](Right(substitutions)) { case (prev, (t, t2)) ⇒
       prev.flatMap(p ⇒ leftUnifyTypeVariables(t, t2, p))
     }
@@ -152,7 +171,7 @@ object TypeExpr {
     val error: UnifyResult = Left(s"Cannot unify ${src.prettyPrint} with an incompatible type ${dst.prettyPrint}")
 
     def unifyTP(tp: TP, other: TypeExpr): UnifyResult = {
-      if (TypeExpr.allTypeParams(dst) contains tp)
+      if (false)// && TypeExpr.allTypeParams(dst) contains tp)
         Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable ${tp.prettyPrint} is used in the destination type")
       else {
         // Check that the new substitution does not contradict earlier substitutions for this variable.

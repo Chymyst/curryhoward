@@ -59,7 +59,7 @@ class TermExprSpec extends FlatSpec with Matchers {
 
   it should "compute permutation score for conjunctions" in {
 
-    def permutationScore(t: TermExpr): Double = t.informationLossScore._3
+    def permutationScore(t: TermExpr) = t.informationLossScore._3
 
     val c = ConjunctE(Seq(VarE("a", TP("A")), VarE("b", TP("B"))))
 
@@ -119,4 +119,85 @@ class TermExprSpec extends FlatSpec with Matchers {
     val term = sequent.constructResultTerm(premiseVars.head)
     term shouldEqual CurriedE(List(VarE("t1", TP("1")), VarE("t2", TP("2")), VarE("t3", TP("3"))), VarE("t1", TP("1")))
   }
+
+  behavior of "automatic alpha-conversions"
+
+  type Pair[A] = (A, A)
+
+  def fmap[A, B] = ofType[(A => B) => Pair[A] => Pair[B]].lambdaTerm
+
+  def flatten[A] = anyOfType[Pair[Pair[A]] ⇒ Pair[A]]()
+
+  it should "perform automatic type conversions when using :@" in {
+    def ftnAs[A] = allOfType[Pair[Pair[A]] ⇒ Pair[A]].map(_.lambdaTerm)
+    val ftnA = flatten.head.lambdaTerm
+    val head = fmap.asInstanceOf[CurriedE].heads.head
+    TypeExpr.leftUnifyTypeVariables(head.t, ftnA.t).asInstanceOf[Right[_,_]].value.asInstanceOf[Map[_,_]].size shouldEqual 2
+    (fmap :@ ftnA).t.prettyPrint shouldEqual "Tuple2[Tuple2[Tuple2[A,A],Tuple2[A,A]],Tuple2[Tuple2[A,A],Tuple2[A,A]]] ⇒ Tuple2[Tuple2[A,A],Tuple2[A,A]]"
+    (ftnA :@@ ftnA).t.prettyPrint shouldEqual "Tuple2[Tuple2[Tuple2[A,A],Tuple2[A,A]],Tuple2[Tuple2[A,A],Tuple2[A,A]]] ⇒ Tuple2[A,A]"
+    (fmap @@: fmap).t.prettyPrint shouldEqual "(A ⇒ B) ⇒ Tuple2[Tuple2[A,A],Tuple2[A,A]] ⇒ Tuple2[Tuple2[B,B],Tuple2[B,B]]"
+  }
+
+  it should "automatically select the correct implementation for (A, A) monad" in {
+
+    val terms = flatten
+
+    terms.length shouldEqual 16
+
+    // Select the implementations that satisfy rigorously the associativity law.
+    // fmap ftn . ftn = ftn . ftn
+
+    def associativeTerms[A]  = flatten[A].filter { ftn ⇒
+      val ftnA = ftn.lambdaTerm
+
+      val ftnAftnA = ftnA :@@ ftnA
+
+      // ftnLifted: Pair[Pair[Pair[C]]] ⇒ Pair[Pair[C]]
+      val ftnLifted = fmap :@ ftnA
+
+      val ftnLiftedftn = ftnLifted andThen ftnA
+      ftnLiftedftn equiv ftnAftnA
+    }
+
+    println("Semimonads:")
+    associativeTerms[Int].map(_.lambdaTerm.prettyPrint).foreach(println)
+    associativeTerms[Int].length shouldEqual 7 // One standard and six non-standard semimonads.
+    /*
+a ⇒ a._2 // Choose second outer tuple.
+a ⇒ a._1 // Choose first outer tuple.
+a ⇒ Tuple2(a._1._1, a._2._2) // The standard monad.
+a ⇒ Tuple2(a._1._2, a._2._2) // Choose second inner tuple.
+a ⇒ Tuple2(a._1._1, a._2._1) // Choose first inner tuple.
+a ⇒ Tuple2(a._1._1, a._1._1) // Choose first element of first inner tuple.
+a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
+     */
+
+    // Of these, select the implementations that satisfy rigorously the two identity laws.
+    // pure . ftn = id
+    // fmap pure . ftn = id
+
+    def pure[A] = ofType[A ⇒ Pair[A]]
+
+    val pureA = pure[Int].lambdaTerm
+    val pureLA = fmap :@ pureA // fmap pure: Pair[A] ⇒ Pair[Pair[A]]
+
+    def idAA[A] = ofType[Pair[A] ⇒ Pair[A]].lambdaTerm
+
+    def monadTerms[A] = associativeTerms[A].filter { ftn ⇒
+      val ftnA = ftn.lambdaTerm
+
+      val law1 = pureA :@@ ftnA
+      val law2 = pureLA andThen ftnA
+      (law1 equiv idAA) && (law2 equiv idAA)
+    }
+
+    println("Monads:")
+    monadTerms[Int].map(_.lambdaTerm.prettyPrint).foreach(println)
+    monadTerms[Int].length shouldEqual 1
+  }
+
+  it should "fail to apply @@: and :@@ to incorrect types" in {
+
+  }
+
 }

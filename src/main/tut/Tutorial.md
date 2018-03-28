@@ -599,14 +599,17 @@ val getIdAuto = ofType[Option[User] ⇒ Option[Long]]
 val getIdAutoTerm = getIdAuto.lambdaTerm
 getIdAutoTerm.prettyPrint
 getId.prettyPrint
-getIdAutoTerm equiv getId.prettyRename
 ``` 
 
 The `prettyRename` method will rename all variables in a given term to names `a`, `b`, `c`, and so on.
 Note that `prettyRenamePrint` performs a `prettyRename` before printing the term, and that `ofType` will always perform `prettyRename` as well, before returning a term.
 
 Therefore, we need to run `prettyRename` on our term `getId` so that it becomes syntactically equal to `getIdAutoTerm`.
+The method `equiv` will do this automatically:
 
+```tut
+getIdAutoTerm equiv getId.prettyRename
+```
 
 ## Summary of the lambda-term API
 
@@ -615,17 +618,18 @@ Therefore, we need to run `prettyRename` on our term `getId` so that it becomes 
 | `TermExpr.lambdaTerm`  | `Any ⇒ Option[TermExpr]` | extract a lambda-term if present  |
 | `a.lambdaTerm`  | `Any ⇒ TermExpr`  | extract a lambda-term, throw exception if not present  |
 | `t.prettyPrint` | `TermExpr ⇒ String` and `TypeExpr ⇒ String` | produce a more readable string representation than `.toString` |
-| `t.prettyRename` | `TermExpr ⇒ TermExpr` | rename variables in a closed term to `a`, `b`, `c`, etc., so that the term becomes more readable |
+| `t.prettyRename` | `TermExpr ⇒ TermExpr` | rename variables in a term to `a`, `b`, `c`, etc., so that the term becomes more readable |
 | `t.prettyRenamePrint` | `TermExpr ⇒ String` | shorthand for `.prettyRename.prettyPrint` |
 | `a.t` | `TermExpr ⇒ TypeExpr` | get the type expression for a given term |
-| `freshVar[T]` | `VarE` | create a STLC variable with assigned type expression `T` |
-| `a =>: b` | `VarE ⇒ TermExpr ⇒ TermExpr` | create a STLC function term ("abstraction") |
+| `freshVar[T]` | `VarE` | create a STLC variable with assigned type expression `T` -- here `T` can be a type parameter or a type expression such as `Int ⇒ Option[A]`  |
+| `a =>: b` | `VarE ⇒ TermExpr ⇒ TermExpr` | create a STLC function term (lambda-calculus "abstraction") |
 | `a(b)` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` |
 | `a :@ b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term with automatic substitution of type variables in `a` -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` after some type variables in `a` have been substituted |
 | `a andThen b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | compose functions `a` and `b` -- the argument type of `b` must be the same as the result type of `a`; no substitution of type variables is performed |
+| `a :@@ b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | compose functions `a` and `b` -- the argument type of `b` must be the same as the result type of `a` after an automatic substitution of type variables in `a` |
 | `a @@: b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | compose functions `a` and `b` -- the argument type of `b` must be the same as the result type of `a` after an automatic substitution of type variables in `b` |
 | `a.simplify` | `TermExpr ⇒ TermExpr` | perform symbolic simplification of STLC term |
-| `a equiv b` | `TermExpr ⇒ TermExpr ⇒ Boolean` | check whether two terms are syntactically equal after simplification |
+| `a equiv b` | `TermExpr ⇒ TermExpr ⇒ Boolean` | check whether two terms are syntactically equal after simplification and `prettyRename` |
 | `a.substTypeVar(b, c)` | `TermExpr ⇒ (TermExpr, TermExpr) ⇒ TermExpr` | replace the type of `b` by the type of `c` in `a` -- the type of `b` must be a type variable |
 | `u()`  | `TermExpr ⇒ () ⇒ TermExpr` and `TypeExpr ⇒ () ⇒ TermExpr` | create a named unit term of type `u.t` -- the type of `u` must be a named unit type, e.g. `None.type` |
 | `c(x...)`  | `TermExpr ⇒ TermExpr* ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named conjunction term of type `c.t` -- the type of `c` must be a conjunction whose parts match the types of the arguments `x...` |
