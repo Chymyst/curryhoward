@@ -49,12 +49,12 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     f2a match {
       case Left(x) ⇒ x("abc") shouldEqual "abc"
-//      case Right(y) ⇒ y shouldEqual (())
+      //      case Right(y) ⇒ y shouldEqual (())
     }
 
     f2b match {
       case Right(y) ⇒ y shouldEqual (())
-//      case Left(x) ⇒ x("abc") shouldEqual "abc"
+      //      case Left(x) ⇒ x("abc") shouldEqual "abc"
     }
 
     def f3[A] = allOfType[(A, A) ⇒ A]
@@ -450,7 +450,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     the[Exception] thrownBy (vF :@ (vInt, vUnit, vFloatInt)).t should have message "Cannot unify B with <c>Int because type parameter TP(B) requires incompatible substitutions <c>Float and <c>Int"
     the[Exception] thrownBy (vF :@ vFloatFloat).t should have message "Cannot unify (A, Unit, Option[Tuple2[B,B]]{None.type + Some[Tuple2[B,B]]}) with an incompatible type Option[Tuple2[<c>Float,<c>Float]]{None.type + Some[Tuple2[<c>Float,<c>Float]]}"
-    the[Exception] thrownBy println((vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrint) should have message "Cannot unify A with A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]} because type variable A is used in the destination type"
+    (vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrint shouldEqual "A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]}"
   }
 
   it should "have correct types for Option[Option[Int]]" in {
@@ -503,5 +503,23 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val tTuple = vT.t
     val f1 = vT =>: tTuple(vT(0), vT(1))
     f1.simplify.prettyRename.prettyPrint shouldEqual "a ⇒ a" // not "a ⇒ Tuple2(a._1, a._2)"
+  }
+
+  it should "verify naturality for pure" in {
+    def fmapT[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]].lambdaTerm
+
+    def pure[A] = ofType[A ⇒ Either[Int, A]].lambdaTerm
+
+    def f[A, B] = freshVar[A ⇒ B]
+
+    val leftSide = f @@: pure
+    leftSide.t.prettyPrint shouldEqual "A ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}"
+
+    val fmapF = fmapT :@ f
+    fmapF.t.prettyPrint shouldEqual "Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}"
+
+    val rightSide = pure :@@ (fmapT :@ f)
+    leftSide equiv rightSide shouldEqual true
+    leftSide.simplify.prettyRename.toString shouldEqual rightSide.simplify.prettyRename.toString
   }
 }

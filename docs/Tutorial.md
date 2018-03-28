@@ -483,7 +483,7 @@ idA: io.chymyst.ch.TermExpr = \((a$3:A) ⇒ a$3)
 
 The type parameter name `A` is fixed in the variable `a` since it is defined at compile time by the `freshVar` macro.
 For the same reason, calling `a[Int]` will return the same variable, still having type `A`.
-Repeated calls to `a` will always return the same variable.
+Repeated calls to `a` will also return the same variable.
 
 The operator `=>:` is right-associative:
 
@@ -500,10 +500,10 @@ Let us now apply the lambda-term `fmapT` to `idA`.
 ```scala
 scala> val result = fmapT(idA)
 java.lang.Exception: Internal error: Invalid head type in application (\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3)): (A ⇒ B) ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]} must be a function with argument type A ⇒ A
-  at io.chymyst.ch.AppE.<init>(TermExpr.scala:571)
-  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:361)
-  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:358)
-  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:592)
+  at io.chymyst.ch.AppE.<init>(TermExpr.scala:567)
+  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:367)
+  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:364)
+  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:588)
   ... 48 elided
 ```
 
@@ -511,21 +511,23 @@ We get an error because `fmapT` expects an argument of type `A ⇒ B`, while we 
 In Scala, the compiler would have automatically set `B = A` and resolved the types.
 But the STLC evaluation right now does not support type variables directly in this way.
 
-We need to rename the type variable `B` into `A` within the term `fmapT` when we apply `fmapT` to `idA`.
-To do this, we can use the method `:@` like this:
+We need to reassign the type variable `B` into `A` within the term `fmapT` when we apply `fmapT` to `idA`.
+The general methods `.substTypeVar` and `.substTypeVars` are available for this purpose; however, these methods are somewhat cumbersome to use. 
+
+To do the type variable reassignment easier, we can use the method `:@` like this:
 
 ```scala
 scala> val f2 = fmapT :@ idA
 f2: io.chymyst.ch.TermExpr = (\((a:A ⇒ A) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3))
-```
 
-It remains to show that the STLC term `f2` is an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
-We can first check that the type of this term is what we expect:
-
-```scala
 scala> f2.t.prettyPrint
 res16: String = Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}
 ```
+
+You can see from the type of `f2` that the type variables in `fmapT` have been automatically adjusted to match the given argument `idA`.
+The type of `f2` is `Either[Int, A] ⇒ Either[Int, A]`
+
+It remains to show that the STLC term `f2` is actually equal to an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
 
 The most straightforward way of verifying that `f2` is an identity function is to apply it to an arbitrary term of type `Either[Int, A]`.
 Let us define a new variable of that type and apply `f2` to that variable.
@@ -554,9 +556,51 @@ def fmap[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]]
 val fmapT = fmap.lambdaTerm
 def a[A] = freshVar[A]
 def optA[A] = freshVar[Either[Int, A]]
-(fmapT :@ a =>: a)(optA) equiv optA
+(fmapT :@ (a =>: a))(optA) equiv optA
 
 ```
+
+We have seen that the operator `:@` helps reassign type variables when checking algebraic laws.
+Another often used operation that needs type variable reassignment is the function composition.
+The operators `:@@` and `@@:` are available to make this easier.
+
+In the operators `:@`, `:@@`, and `@@:`, the colon `:` mnemonically shows the side that will automatically adjust its type.
+
+To illustrate the use of these operators, consider the function `pure`, which is standard for the `Either` monad and can be implemented automatically:
+
+```scala
+scala> def pure[A] = ofType[A ⇒ Either[Int, A]].lambdaTerm   
+<console>:15: Returning term: a ⇒ (0 + Right(a))
+       def pure[A] = ofType[A ⇒ Either[Int, A]].lambdaTerm
+                           ^
+pure: [A]=> io.chymyst.ch.TermExpr
+```
+
+Let us verify the naturality law for this function:
+
+`f . pure = pure . fmap f`
+
+In this law, `f` is an arbitrary function of type `A ⇒ B`. Let us therefore create a STLC variable of this type:
+
+```scala
+scala> def f[A,B] = freshVar[A ⇒ B]
+f: [A, B]=> io.chymyst.ch.VarE
+```
+
+We will now compute both sides of the naturality equation, reassigning type variables automatically:
+
+```scala
+scala> val leftSide = f :@@ pure
+leftSide: io.chymyst.ch.TermExpr = \((x1:A) ⇒ (\((a:A) ⇒ (0 + Right(a))) (f$6 x1)))
+
+scala> val rightSide = pure @@: (fmapT :@ f)
+rightSide: io.chymyst.ch.TermExpr = \((x2:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (\((a:Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}) ⇒ (0 + Right(a))) ((\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) f$6) x2)))
+
+scala> leftSide equiv rightSide
+res19: Boolean = false
+```
+
+
 
 ## How to construct other lambda-terms?
 
@@ -599,7 +643,7 @@ We begin by creating a fresh variable of type `Option[User]`.
 
 ```scala
 scala> val ou = freshVar[Option[User]]
-ou: io.chymyst.ch.VarE = ou$6
+ou: io.chymyst.ch.VarE = ou$7
 ```
 
 The type `Option[User]` is a disjunction type having two parts: `None.type` and `Some[User]`. 
@@ -626,10 +670,10 @@ For that, we will need to create new fresh variables of these types.
 
 ```scala
 scala> val n = freshVar[None.type]
-n: io.chymyst.ch.VarE = n$7
+n: io.chymyst.ch.VarE = n$8
 
 scala> val su = freshVar[Some[User]]
-su: io.chymyst.ch.VarE = su$8
+su: io.chymyst.ch.VarE = su$9
 ```
 
 We now need to create the case clauses. We might imagine to write them like this:
@@ -651,10 +695,10 @@ This is done in three steps:
 
 ```scala
 scala> val ol = freshVar[Option[Long]]
-ol: io.chymyst.ch.VarE = ol$9
+ol: io.chymyst.ch.VarE = ol$10
 
 scala> val case1 = n =>: ol.t(n.t())
-case1: io.chymyst.ch.TermExpr = \((n$7:None.type) ⇒ (<co>None() + 0))
+case1: io.chymyst.ch.TermExpr = \((n$8:None.type) ⇒ (<co>None() + 0))
 ```
 
 To implement the second case clause, we need to decompose `s` of type `Some[User]`.
@@ -673,20 +717,20 @@ This is done using the following steps:
 
 ```scala
 scala> val sl = freshVar[Some[Long]]
-sl: io.chymyst.ch.VarE = sl$10
+sl: io.chymyst.ch.VarE = sl$11
 
 scala> val case2 = su =>: ol.t(sl.t(su(0)("id")))
-case2: io.chymyst.ch.TermExpr = \((su$8:Some[User]) ⇒ (0 + Some(su$8.value.id)))
+case2: io.chymyst.ch.TermExpr = \((su$9:Some[User]) ⇒ (0 + Some(su$9.value.id)))
 ```
 
 Now we are ready to write the match statement, which is done by using the `.cases` function on the disjunction value `u`:
 
 ```scala
 scala> val getId = ou =>: ou.cases(case1, case2)
-getId: io.chymyst.ch.TermExpr = \((ou$6:Option[User]{None.type + Some[User]}) ⇒ (ou$6 match { \((n$7:None.type) ⇒ (<co>None() + 0)); \((su$8:Some[User]) ⇒ (0 + Some(su$8.value.id)))}))
+getId: io.chymyst.ch.TermExpr = \((ou$7:Option[User]{None.type + Some[User]}) ⇒ (ou$7 match { \((n$8:None.type) ⇒ (<co>None() + 0)); \((su$9:Some[User]) ⇒ (0 + Some(su$9.value.id)))}))
 
 scala> getId.prettyPrint
-res19: String = ou$6 ⇒ ou$6 match { n$7 ⇒ (None() + 0); su$8 ⇒ (0 + Some(su$8.value.id)) }
+res20: String = ou$7 ⇒ ou$7 match { n$8 ⇒ (None() + 0); su$9 ⇒ (0 + Some(su$9.value.id)) }
 ```
 
 Let us now apply this function term to some data and verify that it works as expected.
@@ -697,19 +741,19 @@ So, `dUser(dString, dLong)` is the same as `dUser.t(dString, dLong)` and constru
 
 ```scala
 scala> val dString = freshVar[String]
-dString: io.chymyst.ch.VarE = dString$11
+dString: io.chymyst.ch.VarE = dString$12
 
 scala> var dLong = freshVar[Long]
-dLong: io.chymyst.ch.VarE = dLong$12
+dLong: io.chymyst.ch.VarE = dLong$13
 
 scala> val u = freshVar[User]
-u: io.chymyst.ch.VarE = u$13
+u: io.chymyst.ch.VarE = u$14
 
 scala> val data = ou(su(u(dString, dLong)))
-data: io.chymyst.ch.TermExpr = (0 + Some(User(dString$11, dLong$12)))
+data: io.chymyst.ch.TermExpr = (0 + Some(User(dString$12, dLong$13)))
 
 scala> val result1 = getId(data).simplify
-result1: io.chymyst.ch.TermExpr = (0 + Some(dLong$12))
+result1: io.chymyst.ch.TermExpr = (0 + Some(dLong$13))
 ```
 
 We have obtained the resulting term, and we can see that it is what we expected -- it represents `Some(dLong)` as the right part of the disjunction type `Option[Long]`.
@@ -732,10 +776,10 @@ scala> val getIdAutoTerm = getIdAuto.lambdaTerm
 getIdAutoTerm: io.chymyst.ch.TermExpr = \((a:Option[User]{None.type + Some[User]}) ⇒ (a match { \((b:None.type) ⇒ (<co>None() + 0)); \((c:Some[User]) ⇒ (0 + Some(c.value.id)))}))
 
 scala> getIdAutoTerm.prettyPrint
-res20: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
+res21: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
 
 scala> getId.prettyPrint
-res21: String = ou$6 ⇒ ou$6 match { n$7 ⇒ (None() + 0); su$8 ⇒ (0 + Some(su$8.value.id)) }
+res22: String = ou$7 ⇒ ou$7 match { n$8 ⇒ (None() + 0); su$9 ⇒ (0 + Some(su$9.value.id)) }
 ``` 
 
 The `prettyRename` method will rename all variables in a given term to names `a`, `b`, `c`, and so on.
@@ -746,7 +790,7 @@ The method `equiv` will do this automatically:
 
 ```scala
 scala> getIdAutoTerm equiv getId.prettyRename
-res22: Boolean = true
+res23: Boolean = true
 ```
 
 ## Summary of the lambda-term API

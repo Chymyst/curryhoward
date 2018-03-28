@@ -290,7 +290,17 @@ sealed trait TermExpr {
 
   /** Provide :@ syntax for term application with automatic alpha-conversion for type variables in the function head.
     */
-  def :@(terms: TermExpr*): TermExpr = this.applyWithAlpha(terms: _*)
+  def :@(terms: TermExpr*): TermExpr = t match {
+    case #->(head, _) ⇒
+      val arguments = if (terms.length === 1) terms.head else ConjunctE(terms)
+      TypeExpr.leftUnifyTypeVariables(head, arguments.t) match {
+        case Left(errorMessage) ⇒
+          throw new Exception(errorMessage)
+        case Right(substitutions) ⇒
+          AppE(substTypeVars(substitutions), arguments)
+      }
+    case _ ⇒ throw new Exception(s"Call to `:@` is invalid because the head term $this of type ${t.prettyPrint} is not a function")
+  }
 
   /** Provide syntax for function composition.
     */
@@ -310,30 +320,27 @@ sealed trait TermExpr {
         case Left(errorMessage) ⇒
           throw new Exception(s"Call to `:@@` is invalid because the function types (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) do not match: $errorMessage")
         case Right(substitutions) ⇒
-          val substitutedTerm1 = TermExpr.substTypeVars(this, substitutions)
-          val newVar = VarE(TheoremProver.freshVar(), substitutedTerm1.asInstanceOf[CurriedE].heads.head.t)
+          val substitutedTerm1 = substTypeVars(substitutions)
+          val newVar = VarE(TheoremProver.freshVar(), substitutedTerm1.t.asInstanceOf[#->].head)
           newVar =>: otherTerm(substitutedTerm1(newVar))
       }
     case _ ⇒ throw new Exception(s"Call to `:@@` is invalid because the type of one of the arguments (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) is not of a function type")
   }
 
   // Function composition with automatic alpha-conversion for type variables in the second function.
-  def @@:(otherTerm: TermExpr): TermExpr = (this.t, otherTerm.t) match {
+  def @@:(otherTerm: TermExpr): TermExpr = (otherTerm.t, this.t) match {
     case (#->(head1, body1), #->(head2, _)) ⇒
       TypeExpr.leftUnifyTypeVariables(head2, body1) match {
         case Left(errorMessage) ⇒
           throw new Exception(s"Call to `:@@` is invalid because the function types (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) do not match: $errorMessage")
         case Right(substitutions) ⇒
-          val substitutedTerm2 = TermExpr.substTypeVars(otherTerm, substitutions)
+          println(s"DEBUG: for $otherTerm @@: $this -- got substitutions: $substitutions")
+          val substitutedTerm = substTypeVars(substitutions)
           val newVar = VarE(TheoremProver.freshVar(), head1)
-          newVar =>: substitutedTerm2(this.apply(newVar))
+          newVar =>: substitutedTerm(otherTerm(newVar))
       }
     case _ ⇒ throw new Exception(s"Call to `@@:` is invalid because the type of one of the arguments (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) is not of a function type")
   }
-
-  //
-  //  private def substTypeVars(substitutions: Map[TP, TypeExpr]): TermExpr =
-  //    substitutions.foldLeft(this) { case (prevTerm, (tp, newTypeExpr)) ⇒ TermExpr.substTypeVar(tp, newTypeExpr, prevTerm) }
 
   // Syntax helpers.
   def =>:(y: VarE): TermExpr = CurriedE(List(y), this)
@@ -363,18 +370,6 @@ sealed trait TermExpr {
     case _ ⇒ throw new Exception(s"t.apply(...) is not defined for the term $this of type ${t.prettyPrint}")
   }
 
-  private[ch] def applyWithAlpha(terms: TermExpr*): TermExpr = t match {
-    case #->(head, _) ⇒
-      val arguments = if (terms.length === 1) terms.head else ConjunctE(terms)
-      TypeExpr.leftUnifyTypeVariables(head, arguments.t) match {
-        case Left(errorMessage) ⇒
-          throw new Exception(errorMessage)
-        case Right(substitutions) ⇒
-          AppE(TermExpr.substTypeVars(this, substitutions), arguments)
-      }
-    case _ ⇒ throw new Exception(s"t.applyWithAlpha(...) is not defined for the term $this of type ${t.prettyPrint}")
-  }
-
   def cases(cases: TermExpr*): TermExpr = t match {
     case DisjunctT(_, _, termTypes) ⇒
       val typesOfCaseBodies = cases.zip(termTypes).collect { case (CurriedE(head :: _, body), t) if head.t === t ⇒ body.t }
@@ -390,6 +385,8 @@ sealed trait TermExpr {
     case tp@TP(_) ⇒ TermExpr.substTypeVar(tp, to.t, this)
     case _ ⇒ throw new Exception(s"substTypeVar requires a type variable as type of expression $from, but found type ${from.t.prettyPrint}")
   }
+
+  def substTypeVars(substitutions: Map[TP, TypeExpr]): TermExpr = TermExpr.substTypeVars(this, substitutions)
 
   // Need to split the tuple into parts because Ordering[] is undefined on tuples > 9
   private[ch] lazy val informationLossScore = (
@@ -411,7 +408,7 @@ sealed trait TermExpr {
   lazy val prettyRenamePrint: String = prettyRename.prettyPrint
 
   override lazy val toString: String = this match {
-    case VarE(name, _) ⇒ s"$name"
+    case VarE(name, _) ⇒ name
     case AppE(head, arg) ⇒ s"($head $arg)"
     case CurriedE(heads, body) ⇒ s"\\(${heads.map(h ⇒ "(" + h.name + ":" + h.t.prettyPrint + ")").mkString(" ⇒ ")} ⇒ $body)"
     case UnitE(_) ⇒ "()"
@@ -459,7 +456,8 @@ sealed trait TermExpr {
   } yield s"$letter$number"
 
   lazy val prettyRename: TermExpr = {
-    val oldVars = usedVars // Use a `Seq` here rather than a `Set` for the list of variable names.
+    val oldVars = usedVars diff freeVars // Do not rename free variables, since this leads to incorrect code!
+    // Use a `Seq` here rather than a `Set` for the list of variable names.
     // This achieves deterministic renaming, which is important for checking that different terms are equivalent up to renaming.
     val newVars = prettyVars.take(oldVars.length).toSeq
     this.renameAllVars(oldVars, newVars)
@@ -699,7 +697,7 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
       te match {
         case CurriedE(List(_), body) ⇒
           val tpe = body.t
-          if (tail.exists(_.asInstanceOf[CurriedE].body.t !== tpe))
+          if (tail.exists(_.t.asInstanceOf[#->].body !== tpe))
             throw new Exception(s"Internal error: unequal expression types in cases for $this")
           else
             tpe

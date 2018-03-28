@@ -399,7 +399,7 @@ val idA = a =>: a
 
 The type parameter name `A` is fixed in the variable `a` since it is defined at compile time by the `freshVar` macro.
 For the same reason, calling `a[Int]` will return the same variable, still having type `A`.
-Repeated calls to `a` will always return the same variable.
+Repeated calls to `a` will also return the same variable.
 
 The operator `=>:` is right-associative:
 
@@ -418,19 +418,20 @@ We get an error because `fmapT` expects an argument of type `A ⇒ B`, while we 
 In Scala, the compiler would have automatically set `B = A` and resolved the types.
 But the STLC evaluation right now does not support type variables directly in this way.
 
-We need to rename the type variable `B` into `A` within the term `fmapT` when we apply `fmapT` to `idA`.
-To do this, we can use the method `:@` like this:
+We need to reassign the type variable `B` into `A` within the term `fmapT` when we apply `fmapT` to `idA`.
+The general methods `.substTypeVar` and `.substTypeVars` are available for this purpose; however, these methods are somewhat cumbersome to use. 
+
+To do the type variable reassignment easier, we can use the method `:@` like this:
 
 ```tut
 val f2 = fmapT :@ idA
-```
-
-It remains to show that the STLC term `f2` is an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
-We can first check that the type of this term is what we expect:
-
-```tut
 f2.t.prettyPrint
 ```
+
+You can see from the type of `f2` that the type variables in `fmapT` have been automatically adjusted to match the given argument `idA`.
+The type of `f2` is `Either[Int, A] ⇒ Either[Int, A]`
+
+It remains to show that the STLC term `f2` is actually equal to an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
 
 The most straightforward way of verifying that `f2` is an identity function is to apply it to an arbitrary term of type `Either[Int, A]`.
 Let us define a new variable of that type and apply `f2` to that variable.
@@ -455,9 +456,41 @@ def fmap[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]]
 val fmapT = fmap.lambdaTerm
 def a[A] = freshVar[A]
 def optA[A] = freshVar[Either[Int, A]]
-(fmapT :@ a =>: a)(optA) equiv optA
+(fmapT :@ (a =>: a))(optA) equiv optA
 
 ```
+
+We have seen that the operator `:@` helps reassign type variables when checking algebraic laws.
+Another often used operation that needs type variable reassignment is the function composition.
+The operators `:@@` and `@@:` are available to make this easier.
+
+In the operators `:@`, `:@@`, and `@@:`, the colon `:` mnemonically shows the side that will automatically adjust its type.
+
+To illustrate the use of these operators, consider the function `pure`, which is standard for the `Either` monad and can be implemented automatically:
+
+```tut
+def pure[A] = ofType[A ⇒ Either[Int, A]].lambdaTerm
+```
+
+Let us verify the naturality law for this function:
+
+`f . pure = pure . fmap f`
+
+In this law, `f` is an arbitrary function of type `A ⇒ B`. Let us therefore create a STLC variable of this type:
+
+```tut
+def f[A,B] = freshVar[A ⇒ B]
+```
+
+We will now compute both sides of the naturality equation, reassigning type variables automatically:
+
+```tut
+val leftSide = (f :@@ pure).simplify
+val rightSide = (pure @@: (fmapT :@ f)).simplify
+leftSide equiv rightSide
+```
+
+
 
 ## How to construct other lambda-terms?
 

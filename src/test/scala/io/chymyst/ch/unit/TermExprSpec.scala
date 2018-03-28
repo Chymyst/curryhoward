@@ -130,9 +130,10 @@ class TermExprSpec extends FlatSpec with Matchers {
 
   it should "perform automatic type conversions when using :@" in {
     def ftnAs[A] = allOfType[Pair[Pair[A]] ⇒ Pair[A]].map(_.lambdaTerm)
+
     val ftnA = flatten.head.lambdaTerm
     val head = fmap.asInstanceOf[CurriedE].heads.head
-    TypeExpr.leftUnifyTypeVariables(head.t, ftnA.t).asInstanceOf[Right[_,_]].value.asInstanceOf[Map[_,_]].size shouldEqual 2
+    TypeExpr.leftUnifyTypeVariables(head.t, ftnA.t).asInstanceOf[Right[_, _]].value.asInstanceOf[Map[_, _]].size shouldEqual 2
     (fmap :@ ftnA).t.prettyPrint shouldEqual "Tuple2[Tuple2[Tuple2[A,A],Tuple2[A,A]],Tuple2[Tuple2[A,A],Tuple2[A,A]]] ⇒ Tuple2[Tuple2[A,A],Tuple2[A,A]]"
     (ftnA :@@ ftnA).t.prettyPrint shouldEqual "Tuple2[Tuple2[Tuple2[A,A],Tuple2[A,A]],Tuple2[Tuple2[A,A],Tuple2[A,A]]] ⇒ Tuple2[A,A]"
     (fmap @@: fmap).t.prettyPrint shouldEqual "(A ⇒ B) ⇒ Tuple2[Tuple2[A,A],Tuple2[A,A]] ⇒ Tuple2[Tuple2[B,B],Tuple2[B,B]]"
@@ -147,7 +148,7 @@ class TermExprSpec extends FlatSpec with Matchers {
     // Select the implementations that satisfy rigorously the associativity law.
     // fmap ftn . ftn = ftn . ftn
 
-    def associativeTerms[A]  = flatten[A].filter { ftn ⇒
+    def associativeTerms[A] = flatten[A].filter { ftn ⇒
       val ftnA = ftn.lambdaTerm
 
       val ftnAftnA = ftnA :@@ ftnA
@@ -155,7 +156,9 @@ class TermExprSpec extends FlatSpec with Matchers {
       // ftnLifted: Pair[Pair[Pair[C]]] ⇒ Pair[Pair[C]]
       val ftnLifted = fmap :@ ftnA
 
-      val ftnLiftedftn = ftnLifted andThen ftnA
+      // We could also use `ftnLifted andThen ftnA` here, since the function types already match.
+      // But :@@ works just as well.
+      val ftnLiftedftn = ftnLifted :@@ ftnA
       ftnLiftedftn equiv ftnAftnA
     }
 
@@ -187,7 +190,7 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
       val ftnA = ftn.lambdaTerm
 
       val law1 = pureA :@@ ftnA
-      val law2 = pureLA andThen ftnA
+      val law2 = pureLA :@@ ftnA
       (law1 equiv idAA) && (law2 equiv idAA)
     }
 
@@ -197,7 +200,13 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
   }
 
   it should "fail to apply @@: and :@@ to incorrect types" in {
-
+    val a = VarE("a", BasicT("Int"))
+    the[Exception] thrownBy (a @@: a) should have message "Call to `@@:` is invalid because the type of one of the arguments (<c>Int and <c>Int) is not of a function type"
+    the[Exception] thrownBy (a :@@ a) should have message "Call to `:@@` is invalid because the type of one of the arguments (<c>Int and <c>Int) is not of a function type"
+    the[Exception] thrownBy (fmap @@: (a =>: a)) should have message "Call to `:@@` is invalid because the function types (<c>Int ⇒ <c>Int and (A ⇒ B) ⇒ Tuple2[A,A] ⇒ Tuple2[B,B]) do not match: Cannot unify <c>Int with an incompatible type Tuple2[A,A] ⇒ Tuple2[B,B]"
+    the[Exception] thrownBy (fmap :@@ (a =>: a)) should have message "Call to `:@@` is invalid because the function types ((A ⇒ B) ⇒ Tuple2[A,A] ⇒ Tuple2[B,B] and <c>Int ⇒ <c>Int) do not match: Cannot unify Tuple2[A,A] ⇒ Tuple2[B,B] with an incompatible type <c>Int"
+    the[Exception] thrownBy (a :@ (a =>: a)) should have message "Call to `:@` is invalid because the head term a of type <c>Int is not a function"
+    the[Exception] thrownBy (fmap :@ a) should have message "Cannot unify A ⇒ B with an incompatible type <c>Int"
   }
 
 }
