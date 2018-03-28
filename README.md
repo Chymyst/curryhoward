@@ -122,6 +122,7 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 # Revision history
 
+- 0.3.5 Fixed a bug whereby `Tuple2(x._1, x._2)` was not simplified to `x`.
 - 0.3.4 Reduced verbosity by default. Fixed a bug uncovered during the demo in the February 2018 meetup presentation.
 - 0.3.3 Automatic renaming of type variables in lambda-terms; `anyOfType`; minor bug fixes. 
 - 0.3.2 More aggressive simplification of named conjunctions; a comprehensive lambda-term API with a new tutorial section.
@@ -227,7 +228,7 @@ Code can be generated based on a given type and possibly on given values:
 1. `def f[...](...): ... = implement` -- the type and extra values are specified on the left-hand side 
 2. `ofType[...](...)` -- the type and extra values are specified within an expression
 3. `allOfType[...](...)` -- similar to `ofType[...](...)`, except that now all inequivalent implementations with the lowest information loss are returned 
-4. `anyOfType[...](...)` - similar to `allOfType` except all found implementations are returned
+4. `anyOfType[...](...)` - similar to `allOfType` except all found implementations are returned, including those with higher information loss
 
 ```scala
 import io.chymyst.ch._
