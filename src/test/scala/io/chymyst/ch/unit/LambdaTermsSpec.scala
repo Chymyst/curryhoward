@@ -49,12 +49,12 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     f2a match {
       case Left(x) ⇒ x("abc") shouldEqual "abc"
-//      case Right(y) ⇒ y shouldEqual (())
+      //      case Right(y) ⇒ y shouldEqual (())
     }
 
     f2b match {
       case Right(y) ⇒ y shouldEqual (())
-//      case Left(x) ⇒ x("abc") shouldEqual "abc"
+      //      case Left(x) ⇒ x("abc") shouldEqual "abc"
     }
 
     def f3[A] = allOfType[(A, A) ⇒ A]
@@ -346,6 +346,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val mapApplied = mapReaderTerm :@ readerTerm
 
     mapApplied.toString shouldEqual "(\\((a:X ⇒ A) ⇒ (b:A ⇒ B) ⇒ (c:X) ⇒ (b (a c))) readerTerm$29)"
+    (mapApplied.t.prettyPrint, idTermA.t.prettyPrint) shouldEqual (("(A ⇒ B) ⇒ X ⇒ B", "A ⇒ A"))
 
     // map(rxa)(id) = rxa
     mapReaderTerm :@ readerTerm :@ idTermA equiv readerTerm shouldEqual true
@@ -381,23 +382,32 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     def vB[B] = freshVar[B]
 
-    TypeExpr.leftUnifyTypeVariables((vA =>: vB).t, (vInt =>: vFloat).t) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
+    TypeExpr.leftUnify((vA =>: vB).t, (vInt =>: vFloat).t, (vA =>: vB).t) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
 
     def vC[C] = freshVar[C]
 
-    TypeExpr.leftUnifyTypeVariables((vA =>: vB).t, (vB =>: vC).t) shouldEqual Right(Map(vA.t → vB.t, vB.t → vC.t))
+    TypeExpr.leftUnify((vA =>: vB).t, (vB =>: vC).t, (vA =>: vB).t) shouldEqual Right(Map(vA.t → vB.t, vB.t → vC.t))
 
-    TypeExpr.leftUnifyTypeVariables(ConjunctT(Seq(vA.t, vB.t)), ConjunctT(Seq(vInt.t, vFloat.t))) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
+    TypeExpr.leftUnify(ConjunctT(Seq(vA.t, vB.t)), ConjunctT(Seq(vInt.t, vFloat.t)), ConjunctT(Seq(vA.t, vB.t))) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
 
     def vX[A, B] = freshVar[(A, Option[(B, B)])]
 
-    val vY = freshVar[(Int, Option[(Float, Float)])]
-    TypeExpr.leftUnifyTypeVariables(vX.t, vY.t) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
+    val vX1 = freshVar[(Int, Option[(Float, Float)])]
+    TypeExpr.leftUnify(vX.t, vX1.t, vX.t) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
 
-    def vX2[A, B] = freshVar[(A, Unit, Option[(B, B)])]
+    val vX2 = freshVar[(Int, Option[(Float, Int)])]
+    TypeExpr.leftUnify(vX.t, vX2.t, vX.t) shouldEqual Left("Cannot unify B with <c>Int because type parameter B requires incompatible substitutions <c>Float and <c>Int")
 
-    val vY2 = freshVar[(Int, Unit, Option[(Float, Float)])]
-    TypeExpr.leftUnifyTypeVariables(vX2.t, vY2.t) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
+    def vX3[A, B] = freshVar[(A, Option[(A, B)])]
+
+    TypeExpr.leftUnify(vX.t, vX3.t, vX.t) shouldEqual Left("Cannot unify B with B because type parameter B requires incompatible substitutions A and B")
+
+    def vY[A, B] = freshVar[(A, Unit, Option[(B, B)])]
+
+    val vY1 = freshVar[(Int, Unit, Option[(Float, Float)])]
+    TypeExpr.leftUnify(vY.t, vY1.t, vY.t) shouldEqual Right(Map(vA.t → vInt.t, vB.t → vFloat.t))
+
+    TypeExpr.leftUnify((vA =>: vB).t, (vB =>: vA).t, (vA =>: vB).t) shouldEqual Right(Map(vA.t → vB.t, vB.t → vA.t))
   }
 
   behavior of "other functionality"
@@ -448,9 +458,9 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     (vF :@ (vInt, vUnit, vFloatFloat)).t shouldEqual vInt.t
 
-    the[Exception] thrownBy (vF :@ (vInt, vUnit, vFloatInt)).t should have message "Cannot unify B with <c>Int because type parameter TP(B) requires incompatible substitutions <c>Float and <c>Int"
+    the[Exception] thrownBy (vF :@ (vInt, vUnit, vFloatInt)).t should have message "Cannot unify B with <c>Int because type parameter B requires incompatible substitutions <c>Float and <c>Int"
     the[Exception] thrownBy (vF :@ vFloatFloat).t should have message "Cannot unify (A, Unit, Option[Tuple2[B,B]]{None.type + Some[Tuple2[B,B]]}) with an incompatible type Option[Tuple2[<c>Float,<c>Float]]{None.type + Some[Tuple2[<c>Float,<c>Float]]}"
-    the[Exception] thrownBy println((vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrint) should have message "Cannot unify A with A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]} because type variable A is used in the destination type"
+    (vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrint shouldEqual "A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]}"
   }
 
   it should "have correct types for Option[Option[Int]]" in {
@@ -495,5 +505,42 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val f: Empty ⇒ Int ⇒ Unit = implement
 
     f(Empty())(123) shouldEqual (())
+  }
+
+  it should "simplify tuple application" in {
+    val vI = freshVar[Int]
+    val vT = freshVar[(Int, Int)]
+    val tTuple = vT.t
+    val f1 = vT =>: tTuple(vT(0), vT(1))
+    f1.simplify.prettyRename.prettyPrint shouldEqual "a ⇒ a" // not "a ⇒ Tuple2(a._1, a._2)"
+  }
+
+  it should "verify naturality for pure / Either as in tutorial" in {
+    def fmapT[A, B] = ofType[(A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B]].lambdaTerm
+
+    def pure[A] = ofType[A ⇒ Either[Int, A]].lambdaTerm
+
+    def f[A, B] = freshVar[A ⇒ B]
+
+    val leftSide = f @@: pure
+    leftSide.t.prettyPrint shouldEqual "A ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}"
+
+    val fmapF = fmapT :@ f
+    fmapF.t.prettyPrint shouldEqual "Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}"
+
+    val rightSide = pure :@@ (fmapT :@ f)
+    leftSide equiv rightSide shouldEqual true
+    leftSide.simplify.prettyRename.toString shouldEqual rightSide.simplify.prettyRename.toString
+  }
+
+  it should "auto-rename unused type variables in case of a name clash" in {
+    def f[A, B] = freshVar[(A, B) ⇒ B]
+
+    TypeExpr.allTypeParams(f.t) shouldEqual Set(TP("A"), TP("B"))
+
+    def pure[A] = ofType[A ⇒ (A, A)].lambdaTerm
+
+    val composition = f :@@ pure
+    composition.t.prettyPrint should fullyMatch regex "\\(Z[0-9]+, A\\) ⇒ Tuple2\\[A,A\\]"
   }
 }

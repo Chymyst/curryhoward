@@ -1,10 +1,12 @@
 package io.chymyst.ch
 
+import io.chymyst.ch.Helper._
+
 sealed trait TypeExpr {
   def apply(args: TermExpr*): TermExpr = this match {
     case ConjunctT(terms) ⇒
       val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !terms.lift(i).contains(arg.t) }
-      if (terms.length != args.length)
+      if (terms.length !== args.length)
         throw new Exception(s".apply() must be called with ${terms.length} arguments on this type $prettyPrint but it was called with ${args.length} arguments")
       else if (invalidTypeArgs.isEmpty)
         ConjunctE(args)
@@ -12,14 +14,14 @@ sealed trait TypeExpr {
 
     case nct: NamedConjunctT ⇒
       val invalidTypeArgs = args.zipWithIndex.filter { case (arg, i) ⇒ !nct.wrapped.lift(i).contains(arg.t) }
-      if (nct.accessors.length != args.length)
+      if (nct.accessors.length !== args.length)
         throw new Exception(s".apply() must be called with ${nct.accessors.length} arguments on this type $prettyPrint but it was called with ${args.length} arguments")
       else if (invalidTypeArgs.isEmpty)
         NamedConjunctE(args, nct)
       else throw new Exception(s"Some arguments of .apply() have unexpected types [${invalidTypeArgs.map(_._1.t.prettyPrint).mkString("; ")}] that do not match the types in $prettyPrint")
 
     case DisjunctT(_, _, terms) ⇒ args.headOption match {
-      case Some(arg) if args.length == 1 ⇒
+      case Some(arg) if args.length === 1 ⇒
         val index = terms.indexOf(arg.t)
         if (index >= 0)
           DisjunctE(index, terms.length, arg, this)
@@ -42,11 +44,29 @@ sealed trait TypeExpr {
     case #->(head, body) ⇒ #->(head.substTypeVar(typeVar, replaceBy), body.substTypeVar(typeVar, replaceBy))
     case NothingT(_) ⇒ this
     case UnitT(_) ⇒ this
-    case TP(_) ⇒ if (this == typeVar) replaceBy else this
+    case TP(_) ⇒ if (this === typeVar) replaceBy else this
     case RecurseT(name, tParams) ⇒ RecurseT(name, tParams.map(_.substTypeVar(typeVar, replaceBy)))
     case BasicT(_) ⇒ this
     case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ NamedConjunctT(constructor, tParams.map(_.substTypeVar(typeVar, replaceBy)), accessors, wrapped.map(_.substTypeVar(typeVar, replaceBy)))
     case ConstructorT(name, tParams) ⇒ ConstructorT(name, tParams.map(_.substTypeVar(typeVar, replaceBy)))
+  }
+
+  def substTypeVars(substitutions: Map[TP, TypeExpr]): TypeExpr = this match {
+    case DisjunctT(constructor, tParams, terms) ⇒
+      DisjunctT(constructor, tParams.map(_.substTypeVars(substitutions)),
+        terms.map(_.substTypeVars(substitutions)).asInstanceOf[Seq[NamedConjunctT]])
+    case ConjunctT(terms) ⇒ ConjunctT(terms.map(_.substTypeVars(substitutions)))
+    case #->(head, body) ⇒ #->(head.substTypeVars(substitutions), body.substTypeVars(substitutions))
+    case NothingT(_) ⇒ this
+    case UnitT(_) ⇒ this
+    case tp@TP(_) ⇒ substitutions.get(tp) match {
+      case Some(replaceBy) ⇒ replaceBy
+      case None ⇒ this
+    }
+    case RecurseT(name, tParams) ⇒ RecurseT(name, tParams.map(_.substTypeVars(substitutions)))
+    case BasicT(_) ⇒ this
+    case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ NamedConjunctT(constructor, tParams.map(_.substTypeVars(substitutions)), accessors, wrapped.map(_.substTypeVars(substitutions)))
+    case ConstructorT(name, tParams) ⇒ ConstructorT(name, tParams.map(_.substTypeVars(substitutions)))
   }
 
   lazy val prettyPrint: String = prettyPrintWithParentheses(0)
@@ -56,7 +76,7 @@ sealed trait TypeExpr {
     case ConjunctT(terms) ⇒ s"(${terms.map(_.prettyPrintWithParentheses(0)).mkString(", ")})"
     case head #-> body ⇒
       val r = s"${head.prettyPrintWithParentheses(1)} ⇒ ${body.prettyPrintWithParentheses(0)}"
-      if (level == 1) s"($r)" else r
+      if (level === 1) s"($r)" else r
     case BasicT(name) ⇒ s"<c>$name" // a basic, non-parameter type such as Int
     case ConstructorT(fullExpr, tParams) ⇒ s"<tc>$fullExpr${TypeExpr.tParamString(tParams)}" // A type constructor (e.g. `Seq[Int]`), possibly with type arguments.
     case TP(name) ⇒ s"$name"
@@ -93,7 +113,6 @@ sealed trait AtomicTypeExpr {
 }
 
 object TypeExpr {
-
   def allTypeParams(typeExpr: TypeExpr): Set[TP] = typeExpr match {
     case DisjunctT(_, tParams, terms) ⇒ (tParams ++ terms).flatMap(allTypeParams).toSet
     case ConjunctT(terms) ⇒ terms.flatMap(allTypeParams).toSet
@@ -132,6 +151,22 @@ object TypeExpr {
 
   private[ch] type UnifyResult = Either[String, Map[TP, TypeExpr]]
 
+  private val freshTypeVarIdents = new FreshIdents("Z")
+
+  // Unification is performed between src and dst; the entire initial term is fullSrc.
+  private[ch] def leftUnify(src: TypeExpr, dst: TypeExpr, fullSrc: TypeExpr): UnifyResult = {
+    // Check whether some type variables are not mapped but used in other variables' maps.
+    // In this case, we need to auto-rename them.
+    leftUnifyRec(src, dst, Map()).right.map { substitutions ⇒
+      val usedVars = substitutions.values.map(allTypeParams).foldLeft(Set[TP]())(_ ++ _)
+      val unmappedVars = (usedVars intersect allTypeParams(fullSrc)) -- substitutions.keySet
+      val alphaConversions: Map[TP, TypeExpr] = unmappedVars.toSeq.map {
+        _ → TP(freshTypeVarIdents())
+      }(scala.collection.breakOut)
+      substitutions ++ alphaConversions
+    }
+  }
+
   /** Obtain type variable substitutions via unification of two type expressions `src` and `dst`.
     * Left-Unification consists of finding the values for type variables in `src` such that the two type expressions match.
     *
@@ -140,11 +175,10 @@ object TypeExpr {
     * @param substitutions Previously available substitutions, if any.
     * @return An updated substitution map, or an error message if unification cannot succeed.
     */
-  private[ch] def leftUnifyTypeVariables(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): UnifyResult = {
-
-    import MonadEither._
+  private def leftUnifyRec(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr]): UnifyResult = {
+    import MonadEither._ // This is necessary to support Scala 2.11.
     def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): UnifyResult = tuples.foldLeft[UnifyResult](Right(substitutions)) { case (prev, (t, t2)) ⇒
-      prev.flatMap(p ⇒ leftUnifyTypeVariables(t, t2, p))
+      prev.flatMap(p ⇒ leftUnifyRec(t, t2, p))
     }
 
     val allDone: UnifyResult = Right(substitutions)
@@ -152,12 +186,12 @@ object TypeExpr {
     val error: UnifyResult = Left(s"Cannot unify ${src.prettyPrint} with an incompatible type ${dst.prettyPrint}")
 
     def unifyTP(tp: TP, other: TypeExpr): UnifyResult = {
-      if (TypeExpr.allTypeParams(dst) contains tp)
+      if (false) // && TypeExpr.allTypeParams(dst) contains tp)
         Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable ${tp.prettyPrint} is used in the destination type")
       else {
         // Check that the new substitution does not contradict earlier substitutions for this variable.
         substitutions.get(tp) match {
-          case Some(oldSubstitution) if other != oldSubstitution ⇒ Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type parameter $tp requires incompatible substitutions ${oldSubstitution.prettyPrint} and ${other.prettyPrint}")
+          case Some(oldSubstitution) if other !== oldSubstitution ⇒ Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type parameter ${tp.prettyPrint} requires incompatible substitutions ${oldSubstitution.prettyPrint} and ${other.prettyPrint}")
           case _ ⇒ Right(Map(tp → other) ++ substitutions)
         }
 
@@ -165,31 +199,31 @@ object TypeExpr {
     }
 
     val result: UnifyResult = (src, dst) match {
-      case (TP(name1), TP(name2)) if name1 == name2 ⇒ allDone
+      //      case (TP(name1), TP(name2)) if name1 === name2 ⇒ allDone // Let's not do this. Substitutions A -> A are useful to keep in the list, because it will prevent inconsistencies.
       // A type parameter can unify with anything, as long as it is not free there.
       case (tp@TP(_), _) ⇒ unifyTP(tp, dst)
       //      case (_, tp@TP(_)) ⇒ unifyTP(tp, src)
 
-      case (BasicT(name1), BasicT(name2)) if name1 == name2 ⇒ allDone
-      case (UnitT(name1), UnitT(name2)) if name1 == name2 ⇒ allDone
-      case (NothingT(name1), NothingT(name2)) if name1 == name2 ⇒ allDone
-      case (ConstructorT(name1, tParams), ConstructorT(name2, tParams2)) if name1 == name2 && tParams.length == tParams2.length ⇒ wrapResult(tParams zip tParams2)
+      case (BasicT(name1), BasicT(name2)) if name1 === name2 ⇒ allDone
+      case (UnitT(name1), UnitT(name2)) if name1 === name2 ⇒ allDone
+      case (NothingT(name1), NothingT(name2)) if name1 === name2 ⇒ allDone
+      case (ConstructorT(name1, tParams), ConstructorT(name2, tParams2)) if name1 === name2 && tParams.length === tParams2.length ⇒ wrapResult(tParams zip tParams2)
 
       // Can unify DisjunctT with the same DisjunctT or with one of the terms.
-      case (DisjunctT(constructor, tParams, terms), DisjunctT(constructor2, tParams2, _))
-        if constructor == constructor2 && tParams.length == tParams2.length ⇒ wrapResult(tParams zip tParams2)
+      case (DisjunctT(constructor, tParams, _), DisjunctT(constructor2, tParams2, _))
+        if constructor === constructor2 && tParams.length === tParams2.length ⇒ wrapResult(tParams zip tParams2)
 
       case (d@DisjunctT(_, _, _), n@NamedConjunctT(_, _, _, _)) if isDisjunctionPart(d, n) ⇒ wrapResult(d.typeParams zip n.typeParams)
       //      case (n@NamedConjunctT(ncName, tParams2, _, _), d@DisjunctT(_, tParams, terms)) if terms.map(_.constructor) contains ncName ⇒ wrapResult(tParams zip tParams2)
 
-      case (ConjunctT(terms), ConjunctT(terms2)) if terms.length == terms2.length ⇒ wrapResult(terms zip terms2)
+      case (ConjunctT(terms), ConjunctT(terms2)) if terms.length === terms2.length ⇒ wrapResult(terms zip terms2)
 
       case (#->(head, body), #->(head2, body2)) ⇒ wrapResult(Seq((head, head2), (body, body2)))
 
-      case (RecurseT(name, tParams), RecurseT(name2, tParams2)) if name == name2 ⇒ wrapResult(tParams zip tParams2)
+      case (RecurseT(name, tParams), RecurseT(name2, tParams2)) if name === name2 ⇒ wrapResult(tParams zip tParams2)
 
       case (NamedConjunctT(constructor, tParams, _, _), NamedConjunctT(constructor2, tParams2, _, _))
-        if constructor == constructor2 && tParams.length == tParams2.length ⇒ wrapResult(tParams zip tParams2)
+        if constructor === constructor2 && tParams.length === tParams2.length ⇒ wrapResult(tParams zip tParams2)
 
       case _ ⇒ error
     }

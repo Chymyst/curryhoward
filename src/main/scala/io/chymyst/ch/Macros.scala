@@ -1,8 +1,9 @@
 package io.chymyst.ch
 
 import scala.language.experimental.macros
-//import scala.reflect.macros.blackbox
-import scala.reflect.macros.whitebox
+import io.chymyst.ch.Helper.AnyOpsEquals
+
+import scala.reflect.macros.whitebox // Does not work with blackbox.
 
 /* http://stackoverflow.com/questions/17494010/debug-scala-macros-with-intellij
 
@@ -88,7 +89,7 @@ class Macros(val c: whitebox.Context) {
       case "scala.Any" | "Any" ⇒ BasicT("_")
       case "scala.Nothing" | "Nothing" ⇒ NothingT("Nothing")
       case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
-      case _ if matchedTypeArgs.isEmpty && finalType.baseClasses.map(_.fullName) == Seq("scala.Any") ⇒ TP(finalType.toString)
+      case _ if matchedTypeArgs.isEmpty && finalType.baseClasses.map(_.fullName) === List("scala.Any") ⇒ TP(finalType.toString)
 
       case _ if typesSeen contains typeName ⇒ RecurseT(typeName, matchedTypeArgs)
       case _ if finalTypeSymbol.isClass ⇒
@@ -284,7 +285,7 @@ class Macros(val c: whitebox.Context) {
 
         // Need to be careful to substitute arguments that are of type ConjunctT, because they represent Java-style arg groups.
         heads.reverse.foldLeft(emitTermShort(replacedBody)) { case (prevTree, paramE) ⇒
-          conjunctHeads.find(_._1 == paramE) match {
+          conjunctHeads.find(_._1 === paramE) match {
             case Some((_, terms)) ⇒
               val args = terms.zipWithIndex.map { case (t, i) ⇒ emitParamCode(VarE(conjunctSubstName(paramE, i), t)) }
               q"((..$args) ⇒ $prevTree)"
