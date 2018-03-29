@@ -399,6 +399,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     TypeExpr.leftUnify(vX.t, vX2.t, vX.t) shouldEqual Left("Cannot unify B with <c>Int because type parameter B requires incompatible substitutions <c>Float and <c>Int")
 
     def vX3[A, B] = freshVar[(A, Option[(A, B)])]
+
     TypeExpr.leftUnify(vX.t, vX3.t, vX.t) shouldEqual Left("Cannot unify B with B because type parameter B requires incompatible substitutions A and B")
 
     def vY[A, B] = freshVar[(A, Unit, Option[(B, B)])]

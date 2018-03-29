@@ -1,6 +1,5 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.Macros._
 import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -59,6 +58,7 @@ class MacrosSpec extends FlatSpec with Matchers {
     case class AA1[U](x: U, d: Double) extends AA[U]
     case class AA2[U](y: U, b: Boolean) extends AA[U]
     def t[T] = freshVar[T ⇒ Double ⇒ AA[T]].t
+
     t[String] shouldEqual TP("T") ->: BasicT("Double") ->: DisjunctT("AA", List(TP("T")), Seq(
       NamedConjunctT("AA1", List(TP("T")), List("x", "d"), List(TP("T"), BasicT("Double"))),
       NamedConjunctT("AA2", List(TP("T")), List("y", "b"), List(TP("T"), BasicT("Boolean")))
@@ -70,6 +70,7 @@ class MacrosSpec extends FlatSpec with Matchers {
     case class AA1[V](x: V, d: Double) extends AA[V]
     case class AA2[W](y: W, b: Boolean) extends AA[W]
     def t[T] = freshVar[T ⇒ Double ⇒ AA[T]].t
+
     t[String] shouldEqual TP("T") ->: BasicT("Double") ->: DisjunctT("AA", List(TP("T")), Seq(
       NamedConjunctT("AA1", List(TP("T")), List("x", "d"), List(TP("T"), BasicT("Double"))),
       NamedConjunctT("AA2", List(TP("T")), List("y", "b"), List(TP("T"), BasicT("Boolean")))
@@ -124,6 +125,7 @@ class MacrosSpec extends FlatSpec with Matchers {
 
   it should "produce correct type expressions for Either as result type" in {
     def t[P, Q] = freshVar[Option[P] ⇒ Either[P, Q]].t
+
     val tl2 = List(TP("P"), TP("Q"))
     val tl1 = List(TP("P"))
     t[Int, String] shouldEqual DisjunctT("Option", tl1, List(NamedConjunctT("None", Nil, Nil, Nil), NamedConjunctT("Some", tl1, List("value"), tl1))) ->: DisjunctT("Either", tl2, List(NamedConjunctT("Left", tl2, List("value"), tl1),

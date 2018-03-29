@@ -113,18 +113,18 @@ sealed trait AtomicTypeExpr {
 }
 
 object TypeExpr {
-    def allTypeParams(typeExpr: TypeExpr): Set[TP] = typeExpr match {
-      case DisjunctT(_, tParams, terms) ⇒ (tParams ++ terms).flatMap(allTypeParams).toSet
-      case ConjunctT(terms) ⇒ terms.flatMap(allTypeParams).toSet
-      case #->(head, body) ⇒ Set(head, body).flatMap(allTypeParams)
-      case NothingT(_) ⇒ Set()
-      case UnitT(_) ⇒ Set()
-      case tp@TP(_) ⇒ Set(tp)
-      case RecurseT(_, tParams) ⇒ tParams.flatMap(allTypeParams).toSet
-      case BasicT(_) ⇒ Set()
-      case NamedConjunctT(_, tParams, _, wrapped) ⇒ (tParams ++ wrapped).flatMap(allTypeParams).toSet
-      case ConstructorT(_, tParams) ⇒ tParams.flatMap(allTypeParams).toSet
-    }
+  def allTypeParams(typeExpr: TypeExpr): Set[TP] = typeExpr match {
+    case DisjunctT(_, tParams, terms) ⇒ (tParams ++ terms).flatMap(allTypeParams).toSet
+    case ConjunctT(terms) ⇒ terms.flatMap(allTypeParams).toSet
+    case #->(head, body) ⇒ Set(head, body).flatMap(allTypeParams)
+    case NothingT(_) ⇒ Set()
+    case UnitT(_) ⇒ Set()
+    case tp@TP(_) ⇒ Set(tp)
+    case RecurseT(_, tParams) ⇒ tParams.flatMap(allTypeParams).toSet
+    case BasicT(_) ⇒ Set()
+    case NamedConjunctT(_, tParams, _, wrapped) ⇒ (tParams ++ wrapped).flatMap(allTypeParams).toSet
+    case ConstructorT(_, tParams) ⇒ tParams.flatMap(allTypeParams).toSet
+  }
 
   def substNames(typeExpr: TypeExpr, typeMap: Map[String, TypeExpr]): TypeExpr = {
 
@@ -160,7 +160,9 @@ object TypeExpr {
     leftUnifyRec(src, dst, Map()).right.map { substitutions ⇒
       val usedVars = substitutions.values.map(allTypeParams).foldLeft(Set[TP]())(_ ++ _)
       val unmappedVars = (usedVars intersect allTypeParams(fullSrc)) -- substitutions.keySet
-      val alphaConversions: Map[TP, TypeExpr] = unmappedVars.toSeq.map { _ → TP(freshTypeVarIdents())}(scala.collection.breakOut)
+      val alphaConversions: Map[TP, TypeExpr] = unmappedVars.toSeq.map {
+        _ → TP(freshTypeVarIdents())
+      }(scala.collection.breakOut)
       substitutions ++ alphaConversions
     }
   }
@@ -197,7 +199,7 @@ object TypeExpr {
     }
 
     val result: UnifyResult = (src, dst) match {
-//      case (TP(name1), TP(name2)) if name1 === name2 ⇒ allDone // Let's not do this. Substitutions A -> A are useful to keep in the list, because it will prevent inconsistencies.
+      //      case (TP(name1), TP(name2)) if name1 === name2 ⇒ allDone // Let's not do this. Substitutions A -> A are useful to keep in the list, because it will prevent inconsistencies.
       // A type parameter can unify with anything, as long as it is not free there.
       case (tp@TP(_), _) ⇒ unifyTP(tp, dst)
       //      case (_, tp@TP(_)) ⇒ unifyTP(tp, src)
