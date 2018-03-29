@@ -111,7 +111,11 @@ lazy val curryhoward: Project = (project in file("."))
 
     //    scalacOptions += "-Ymacro-debug-lite",
     scalacOptions ++= (scalacOptionsRobNorris ++ myScalacOptions ++ (
-      if (scalaBinaryVersion.value != "2.11")
+      // Accommodate weird versions such as 2.12.1-933bab2-nightly.
+      if (CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((x, y)) if x >= 2 && y >= 12 ⇒ true;
+        case _ ⇒ false
+      })
         scalacOptionsRobNorris212AndAbove ++ Seq(
           "-opt:l:inline",
           "-Ypartial-unification",

@@ -14,6 +14,40 @@ The `curryhoward` library aims to use the Curry-Howard isomorphism as a tool for
 
 This is a library for automatic implementation of Scala expressions via the Curry-Howard isomorphism.
 
+Quick start:
+
+```scala
+// build.sbt
+libraryDependencies += "io.chymyst" %% "curryhoward" % "latest.integration"
+
+// Scala
+import io.chymyst.ch.implement
+
+def f[X, Y]: (X ⇒ Y) ⇒ (Int ⇒ X) ⇒ (Int ⇒ Y) = implement
+
+// The macro `implement` will automatically generate this code for the function body:
+// {
+//  (f: X ⇒ Y) ⇒ (r: Int ⇒ X) ⇒ (e: Int) ⇒ f(r(e))
+// }
+
+```
+
+## Features
+
+- Automatically fill in the function body, given the function's type alone (`implement`)
+- Automatically generate an expression of a specified type from given arguments (`ofType`)
+- Works as a macro at compile time; when a type cannot be implemented, signal a compile-time error
+- Supports function types, tuples, sealed traits / case classes / case objects
+- Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T` can be used equivalently
+- Java-style argument groups can be used, e.g. `A ⇒ (B, C) ⇒ D`, in addition to using a tuple type, e.g. `A ⇒ ((B, C)) ⇒ D`
+- When a type can be implemented in more than one way, heuristics ("least information loss") are used to prefer implementations that are more likely to satisfy algebraic laws
+- Signal error when a type can be implemented in more than one way despite using heuristics
+- Debugging and logging options are available
+- Generated code can be inspected at run time; facilities are provided for checking equational laws (e.g. naturality, associativity, etc.)
+- [Tutorial](docs/Tutorial.md) explains how to do that in detail
+
+## Overview
+
 The Curry-Howard isomorphism maps functions with fully parametric types to theorems in the intuitionistic propositional logic (IPL) with universally quantified propositions.
 
 For example, the type of the function
@@ -82,7 +116,7 @@ val user = ofType[User](f, s, x)
 
 The generated code is purely functional and assumes that all given values and types are free of side effects.
 
-# How it works
+## How it works
 
 The macros examine the given type expression via reflection (at compile time).
 The type expression is rewritten as a formula of IPL and passed on to the theorem prover.
@@ -122,7 +156,7 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 # Revision history
 
-- 0.3.5 Fixed a bug whereby `Tuple2(x._1, x._2)` was not simplified to `x`.
+- 0.3.5 Added `:@@` and `@@:` operations to the STLC interpreter. Fixed a bug whereby `Tuple2(x._1, x._2)` was not simplified to `x`. Fixed other bugs in alpha-conversion of type parameters.
 - 0.3.4 Reduced verbosity by default. Fixed a bug uncovered during the demo in the February 2018 meetup presentation.
 - 0.3.3 Automatic renaming of type variables in lambda-terms; `anyOfType`; minor bug fixes. 
 - 0.3.2 More aggressive simplification of named conjunctions; a comprehensive lambda-term API with a new tutorial section.
@@ -137,21 +171,18 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 # Status
 
-- The theorem prover for the full IPL is working
-- When a type cannot be implemented, signal a compile-time error
-- Debugging and logging options are available
-- Support for `Unit` type, constant types, type parameters, function types, tuples, sealed traits / case classes / case objects
-- Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T` can be used
-- Java-style argument groups can be used, e.g. `A ⇒ (B, C) ⇒ D`, in addition to using a tuple type, e.g. `A ⇒ ((B, C)) ⇒ D`
-- When a type can be implemented in more than one way, heuristics ("least information loss") are used to prefer implementations that are more likely to satisfy algebraic laws
-- Signal error when a type can be implemented in more than one way despite using heuristics
-- Generated lambda-terms can be inspected and manipulated at run time, and equational laws can be checked symbolically
-- Tests and a [tutorial](docs/Tutorial.md)
+- The theorem prover for the full IPL is working and appears to be error-free
+- Heuristics ("least information loss") seem to be working adequately in many cases
+- STLC interpreter is reasonably full-featured 
+- 92% unit test coverage
+- Cross-compiled to Scala 2.11.11 and 2.12.4, published on Maven
+- This project is now included in the [Scala community build](https://github.com/scala/community-builds)
 
 # Known limitations
 
-- Limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. A non-recursive example that fails to generate sensible code: `T ⇒ List[T]` (the generated code always returns empty list)
+- Very limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. A non-recursive example that fails to generate sensible code: `T ⇒ List[T]` (the generated code always returns empty list)
 - Functions with zero arguments are currently not supported, e.g. `ofType[Int ⇒ () ⇒ Int]` will not compile
+- If the type contains lots of repeated copies of the same type parameter, or lots of `Option[T]`, heuristics will sometimes fail to produce the desired implementation
 
 # Examples of functionality
 

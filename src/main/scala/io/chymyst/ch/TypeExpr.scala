@@ -113,19 +113,18 @@ sealed trait AtomicTypeExpr {
 }
 
 object TypeExpr {
-
-  def allTypeParams(typeExpr: TypeExpr): Set[TP] = typeExpr match {
-    case DisjunctT(_, tParams, terms) ⇒ (tParams ++ terms).flatMap(allTypeParams).toSet
-    case ConjunctT(terms) ⇒ terms.flatMap(allTypeParams).toSet
-    case #->(head, body) ⇒ Set(head, body).flatMap(allTypeParams)
-    case NothingT(_) ⇒ Set()
-    case UnitT(_) ⇒ Set()
-    case tp@TP(_) ⇒ Set(tp)
-    case RecurseT(_, tParams) ⇒ tParams.flatMap(allTypeParams).toSet
-    case BasicT(_) ⇒ Set()
-    case NamedConjunctT(_, tParams, _, wrapped) ⇒ (tParams ++ wrapped).flatMap(allTypeParams).toSet
-    case ConstructorT(_, tParams) ⇒ tParams.flatMap(allTypeParams).toSet
-  }
+    def allTypeParams(typeExpr: TypeExpr): Set[TP] = typeExpr match {
+      case DisjunctT(_, tParams, terms) ⇒ (tParams ++ terms).flatMap(allTypeParams).toSet
+      case ConjunctT(terms) ⇒ terms.flatMap(allTypeParams).toSet
+      case #->(head, body) ⇒ Set(head, body).flatMap(allTypeParams)
+      case NothingT(_) ⇒ Set()
+      case UnitT(_) ⇒ Set()
+      case tp@TP(_) ⇒ Set(tp)
+      case RecurseT(_, tParams) ⇒ tParams.flatMap(allTypeParams).toSet
+      case BasicT(_) ⇒ Set()
+      case NamedConjunctT(_, tParams, _, wrapped) ⇒ (tParams ++ wrapped).flatMap(allTypeParams).toSet
+      case ConstructorT(_, tParams) ⇒ tParams.flatMap(allTypeParams).toSet
+    }
 
   def substNames(typeExpr: TypeExpr, typeMap: Map[String, TypeExpr]): TypeExpr = {
 
@@ -152,6 +151,20 @@ object TypeExpr {
 
   private[ch] type UnifyResult = Either[String, Map[TP, TypeExpr]]
 
+  private val freshTypeVarIdents = new FreshIdents("Z")
+
+  // Unification is performed between src and dst; the entire initial term is fullSrc.
+  private[ch] def leftUnify(src: TypeExpr, dst: TypeExpr, fullSrc: TypeExpr): UnifyResult = {
+    // Check whether some type variables are not mapped but used in other variables' maps.
+    // In this case, we need to auto-rename them.
+    leftUnifyRec(src, dst, Map()).right.map { substitutions ⇒
+      val usedVars = substitutions.values.map(allTypeParams).foldLeft(Set[TP]())(_ ++ _)
+      val unmappedVars = (usedVars intersect allTypeParams(fullSrc)) -- substitutions.keySet
+      val alphaConversions: Map[TP, TypeExpr] = unmappedVars.toSeq.map { _ → TP(freshTypeVarIdents())}(scala.collection.breakOut)
+      substitutions ++ alphaConversions
+    }
+  }
+
   /** Obtain type variable substitutions via unification of two type expressions `src` and `dst`.
     * Left-Unification consists of finding the values for type variables in `src` such that the two type expressions match.
     *
@@ -160,10 +173,10 @@ object TypeExpr {
     * @param substitutions Previously available substitutions, if any.
     * @return An updated substitution map, or an error message if unification cannot succeed.
     */
-  private[ch] def leftUnifyTypeVariables(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr] = Map()): UnifyResult = {
+  private def leftUnifyRec(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr]): UnifyResult = {
     import MonadEither._ // This is necessary to support Scala 2.11.
     def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): UnifyResult = tuples.foldLeft[UnifyResult](Right(substitutions)) { case (prev, (t, t2)) ⇒
-      prev.flatMap(p ⇒ leftUnifyTypeVariables(t, t2, p))
+      prev.flatMap(p ⇒ leftUnifyRec(t, t2, p))
     }
 
     val allDone: UnifyResult = Right(substitutions)
@@ -171,12 +184,12 @@ object TypeExpr {
     val error: UnifyResult = Left(s"Cannot unify ${src.prettyPrint} with an incompatible type ${dst.prettyPrint}")
 
     def unifyTP(tp: TP, other: TypeExpr): UnifyResult = {
-      if (false)// && TypeExpr.allTypeParams(dst) contains tp)
+      if (false) // && TypeExpr.allTypeParams(dst) contains tp)
         Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable ${tp.prettyPrint} is used in the destination type")
       else {
         // Check that the new substitution does not contradict earlier substitutions for this variable.
         substitutions.get(tp) match {
-          case Some(oldSubstitution) if other !== oldSubstitution ⇒ Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type parameter $tp requires incompatible substitutions ${oldSubstitution.prettyPrint} and ${other.prettyPrint}")
+          case Some(oldSubstitution) if other !== oldSubstitution ⇒ Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type parameter ${tp.prettyPrint} requires incompatible substitutions ${oldSubstitution.prettyPrint} and ${other.prettyPrint}")
           case _ ⇒ Right(Map(tp → other) ++ substitutions)
         }
 
@@ -184,7 +197,7 @@ object TypeExpr {
     }
 
     val result: UnifyResult = (src, dst) match {
-      case (TP(name1), TP(name2)) if name1 === name2 ⇒ allDone
+//      case (TP(name1), TP(name2)) if name1 === name2 ⇒ allDone // Let's not do this. Substitutions A -> A are useful to keep in the list, because it will prevent inconsistencies.
       // A type parameter can unify with anything, as long as it is not free there.
       case (tp@TP(_), _) ⇒ unifyTP(tp, dst)
       //      case (_, tp@TP(_)) ⇒ unifyTP(tp, src)

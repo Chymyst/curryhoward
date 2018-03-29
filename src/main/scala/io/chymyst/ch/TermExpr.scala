@@ -293,7 +293,7 @@ sealed trait TermExpr {
   def :@(terms: TermExpr*): TermExpr = t match {
     case #->(head, _) ⇒
       val arguments = if (terms.length === 1) terms.head else ConjunctE(terms)
-      TypeExpr.leftUnifyTypeVariables(head, arguments.t) match {
+      TypeExpr.leftUnify(head, arguments.t, t) match {
         case Left(errorMessage) ⇒
           throw new Exception(errorMessage)
         case Right(substitutions) ⇒
@@ -316,7 +316,7 @@ sealed trait TermExpr {
   // Function composition with automatic alpha-conversion for type variables in the first function.
   def :@@(otherTerm: TermExpr): TermExpr = (this.t, otherTerm.t) match {
     case (#->(_, body1), #->(head2, _)) ⇒
-      TypeExpr.leftUnifyTypeVariables(body1, head2) match {
+      TypeExpr.leftUnify(body1, head2, this.t) match {
         case Left(errorMessage) ⇒
           throw new Exception(s"Call to `:@@` is invalid because the function types (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) do not match: $errorMessage")
         case Right(substitutions) ⇒
@@ -330,7 +330,7 @@ sealed trait TermExpr {
   // Function composition with automatic alpha-conversion for type variables in the second function.
   def @@:(otherTerm: TermExpr): TermExpr = (otherTerm.t, this.t) match {
     case (#->(head1, body1), #->(head2, _)) ⇒
-      TypeExpr.leftUnifyTypeVariables(head2, body1) match {
+      TypeExpr.leftUnify(head2, body1, this.t) match {
         case Left(errorMessage) ⇒
           throw new Exception(s"Call to `:@@` is invalid because the function types (${this.t.prettyPrint} and ${otherTerm.t.prettyPrint}) do not match: $errorMessage")
         case Right(substitutions) ⇒
