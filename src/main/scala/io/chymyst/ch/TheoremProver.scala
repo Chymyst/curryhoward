@@ -108,7 +108,7 @@ object TheoremProver {
       case None ⇒
 
         if (sequentsAlreadyRequested contains sequent) {
-          if (debug) println(s"DEBUG: sequent $sequent is looping; will return an empty sequence of proof terms")
+          if (debug) println(s"DEBUG: sequent $sequent is looping; returning an empty sequence of proof terms")
           Seq()
         } else {
           sequentsAlreadyRequested.add(sequent)

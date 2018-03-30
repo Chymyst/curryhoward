@@ -170,7 +170,9 @@ class TermExprSpec extends FlatSpec with Matchers {
 
     val ftnA = flatten.head.lambdaTerm
     val head = fmap.asInstanceOf[CurriedE].heads.head
-    TypeExpr.leftUnify(head.t, ftnA.t, head.t).asInstanceOf[Right[_, _]].value.asInstanceOf[Map[_, _]].size shouldEqual 2
+    TypeExpr.leftUnify(head.t, ftnA.t, head.t) match {
+      case Right(m: Map[TP, TypeExpr]) ⇒ m.size shouldEqual 2
+    }
     (fmap :@ ftnA).t.prettyPrint shouldEqual "Tuple2[Tuple2[Tuple2[A,A],Tuple2[A,A]],Tuple2[Tuple2[A,A],Tuple2[A,A]]] ⇒ Tuple2[Tuple2[A,A],Tuple2[A,A]]"
     (ftnA :@@ ftnA).t.prettyPrint shouldEqual "Tuple2[Tuple2[Tuple2[A,A],Tuple2[A,A]],Tuple2[Tuple2[A,A],Tuple2[A,A]]] ⇒ Tuple2[A,A]"
     (fmap @@: fmap).t.prettyPrint shouldEqual "(A ⇒ B) ⇒ Tuple2[Tuple2[A,A],Tuple2[A,A]] ⇒ Tuple2[Tuple2[B,B],Tuple2[B,B]]"
@@ -244,6 +246,15 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
     the[Exception] thrownBy (fmap :@@ (a =>: a)) should have message "Call to `:@@` is invalid because the function types ((A ⇒ B) ⇒ Tuple2[A,A] ⇒ Tuple2[B,B] and <c>Int ⇒ <c>Int) do not match: Cannot unify Tuple2[A,A] ⇒ Tuple2[B,B] with an incompatible type <c>Int"
     the[Exception] thrownBy (a :@ (a =>: a)) should have message "Call to `:@` is invalid because the head term a of type <c>Int is not a function"
     the[Exception] thrownBy (fmap :@ a) should have message "Cannot unify A ⇒ B with an incompatible type <c>Int"
+  }
+
+  it should "generate different implementations for tuples" in {
+    def factorial(n: Int): Int = (1 to n).product
+
+    def f[A] = anyOfType[((A, A, A)) ⇒ (A, A, A, A, A)]()
+    println(f.size)
+    f[Int].map(_.lambdaTerm.prettyPrint).sorted.foreach(println)
+//    f.size shouldEqual factorial(4)
   }
 
 }

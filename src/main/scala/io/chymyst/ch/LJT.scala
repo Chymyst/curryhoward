@@ -68,14 +68,14 @@ object LJT {
     , ruleDisjunctionAtLeft
   )
 
-  def invertibleAmbiguousRules: Seq[ForwardRule] = Seq() // Seq(ruleImplicationAtLeft1)
+  def invertibleAmbiguousRules: Seq[ForwardRule] = Seq(ruleImplicationAtLeft1)
 
   def nonInvertibleRulesForSequent(sequent: Sequent): Seq[ForwardRule] = {
     // Generate all +Rn rules if the sequent has a disjunction goal.
     (sequent.goal match {
       case DisjunctT(_, _, terms) ⇒ terms.indices.map(ruleDisjunctionAtRight)
       case _ ⇒ Seq[ForwardRule]()
-    }) ++ Seq(ruleImplicationAtLeft1, ruleImplicationAtLeft4) // This is the same for all sequents.
+    }) ++ Seq(ruleImplicationAtLeft4) // This is the same for all sequents.
   }
 
   private def omitPremise[C](indexedPremises: Seq[(C, Int)], index: Int): List[C] = indexedPremises.filterNot(_._2 === index).map(_._1).toList
@@ -210,16 +210,13 @@ object LJT {
 
   // (G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1
   // Note: there may be several ways of choosing X and X ⇒ A having the same types,
-  // which lead to equivalent derivations - if so, we have an ambiguous implementation, which is an error.
-  // We can signal this error early since this rule is invertible.
+  // so this rule returns several RuleResult items. This rule is invertible.
   private def ruleImplicationAtLeft1 = ForwardRule(name = "->L1", { sequent ⇒
     val indexedPremises = sequent.premises.zipWithIndex
     for {
-      atomicPremiseXi ← indexedPremises.filter(_._1.isAtomic)
-      (atomicPremiseX, atomicPremiseI) = atomicPremiseXi
+      (atomicPremiseX, atomicPremiseI) ← indexedPremises.filter(_._1.isAtomic)
       // We only need to keep `body` and `ind` here.
-      implPremiseAi ← indexedPremises.collect { case (head #-> body, ind) if head === atomicPremiseX ⇒ (body, ind) }
-      (implPremiseA, implPremiseI) = implPremiseAi
+      (implPremiseA, implPremiseI) ← indexedPremises.collect { case (head #-> body, ind) if head === atomicPremiseX ⇒ (body, ind) }
     } yield {
       // Build the sequent (G*, X, A) |- B by excluding the premise X ⇒ A from the initial context, and by prepending A to it.
       // In other words, the new premises are (A, G* \ { X ⇒ A }).

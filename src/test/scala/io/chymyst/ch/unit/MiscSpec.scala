@@ -42,6 +42,7 @@ class MiscSpec extends FlatSpec with Matchers {
     fmap.length shouldEqual 2
     // def flattens[A] = anyOfType[P[Option[Int]] ⇒ P[Int]]()
     // flattens.length shouldEqual 128
+    //    def flattenType[A] = freshVar[P[P[A]] ⇒ P[A]].t
     //    flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), None)) // This is incorrect!
     //     flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), Some(2)))
     //     flatten((Some(None), Some(Some(2)))) shouldEqual ((None, Some(2)))
@@ -49,9 +50,7 @@ class MiscSpec extends FlatSpec with Matchers {
 
     // TODO: optimize the performance here!
     /* This takes 25 seconds.
-    def flattenType[A] = freshVar[P[P[A]] ⇒ P[A]].t
-
-    //    System.setProperty("curryhoward.log", "prover")
+    System.setProperty("curryhoward.log", "prover")
 
     val initTime = System.currentTimeMillis()
     val proofs = TheoremProver.findProofs(flattenType)
@@ -61,7 +60,7 @@ class MiscSpec extends FlatSpec with Matchers {
     proofs._1.length shouldEqual 16
     proofs._2.length shouldEqual 128
 
-    //    System.clearProperty("curryhoward.log")
+    System.clearProperty("curryhoward.log")
 */
   }
 
