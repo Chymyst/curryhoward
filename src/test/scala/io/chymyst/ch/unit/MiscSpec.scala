@@ -42,15 +42,16 @@ class MiscSpec extends FlatSpec with Matchers {
     fmap.length shouldEqual 2
     // def flattens[A] = anyOfType[P[Option[Int]] ⇒ P[Int]]()
     // flattens.length shouldEqual 128
-    //    def flattenType[A] = freshVar[P[P[A]] ⇒ P[A]].t
     //    flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), None)) // This is incorrect!
     //     flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), Some(2)))
     //     flatten((Some(None), Some(Some(2)))) shouldEqual ((None, Some(2)))
     //     flatten((Some(Some(1)), None)) shouldEqual ((Some(1), None))
 
     // TODO: optimize the performance here!
-    /* This takes 25 seconds.
+    /* This takes 25 seconds. Why is it so slow?
     System.setProperty("curryhoward.log", "prover")
+
+    def flattenType[A] = freshVar[P[P[A]] ⇒ P[A]].t
 
     val initTime = System.currentTimeMillis()
     val proofs = TheoremProver.findProofs(flattenType)
@@ -70,7 +71,7 @@ class MiscSpec extends FlatSpec with Matchers {
     def flattens[A] = anyOfType[Q[Option[Int]] ⇒ Q[Int]]()
 
     val terms = flattens.map(_.lambdaTerm)
-    terms.length shouldEqual 24
+    terms.length shouldEqual 26
   }
 
   it should "support foreign type constructors" in {
@@ -86,13 +87,13 @@ class MiscSpec extends FlatSpec with Matchers {
     f.lambdaTerm.prettyPrint shouldEqual "a ⇒ a"
   }
 
-  it should "generate 26 versions of `map` for the continuation monad" in {
+  it should "generate all implementations of `map` for the continuation monad with an extra function" in {
     type R = Int ⇒ String
     type C[T] = (T ⇒ R) ⇒ R
 
-    // TODO: this is slow! Optimize performance here.
+    // TODO: this is slow! Need to optimize performance here.
     def fmapc[A, B] = anyOfType[C[A] ⇒ (A ⇒ B) ⇒ C[B]]()
 
-    fmapc.length shouldEqual 26
+    fmapc.length shouldEqual 24
   }
 }

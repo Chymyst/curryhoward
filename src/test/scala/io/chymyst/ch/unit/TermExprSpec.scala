@@ -249,12 +249,21 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
   }
 
   it should "generate different implementations for tuples" in {
-    def factorial(n: Int): Int = (1 to n).product
+    type P[A] = Either[A, (A, A, A)]
 
-    def f[A] = anyOfType[((A, A, A)) ⇒ (A, A, A, A, A)]()
+    def fmap[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def pure[A] = ofType[A ⇒ P[A]].lambdaTerm
+
+    def flattens[A] = anyOfType[P[P[A]] ⇒ P[A]]()
+
+    println(flattens.size)
+
+    def f[A] = allOfType[Option[(A, A, A)] ⇒ Option[(A, A, A)]]()
+
     println(f.size)
-    f[Int].map(_.lambdaTerm.prettyPrint).sorted.foreach(println)
-//    f.size shouldEqual factorial(4)
+    //    f[Int].map(_.lambdaTerm.prettyPrint).sorted.foreach(println)
+    //    f.size shouldEqual factorial(4)
   }
 
 }
