@@ -620,7 +620,7 @@ So, `dUser(dString, dLong)` is the same as `dUser.t(dString, dLong)` and constru
 
 ```tut
 val dString = freshVar[String]
-var dLong = freshVar[Long]
+val dLong = freshVar[Long]
 val u = freshVar[User]
 val data = ou(su(u(dString, dLong)))
 val result1 = getId(data).simplify

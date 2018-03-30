@@ -36,18 +36,42 @@ class MiscSpec extends FlatSpec with Matchers {
 
     type P[T] = (Option[T], Option[T])
 
-    // TODO: make this work
-    //  def fmap[A, B](f: A ⇒ B):P[A] ⇒ P[B] = implement
-    //  def flatten[A]: P[Option[Int]] ⇒ P[Int] = implement
+    // TODO: make this work and return the single correct fmap
+    def fmap[A, B] = allOfType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].map(_.lambdaTerm)
+
+    fmap.length shouldEqual 2
+    // def flattens[A] = anyOfType[P[Option[Int]] ⇒ P[Int]]()
+    // flattens.length shouldEqual 128
     //    flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), None)) // This is incorrect!
     //     flatten((Some(Some(1)), Some(Some(2)))) shouldEqual ((Some(1), Some(2)))
     //     flatten((Some(None), Some(Some(2)))) shouldEqual ((None, Some(2)))
     //     flatten((Some(Some(1)), None)) shouldEqual ((Some(1), None))
 
-    def flattens[A] = anyOfType[P[Option[Int]] ⇒ P[Int]]()
+    // TODO: optimize the performance here!
+    /* This takes 25 seconds.
+    def flattenType[A] = freshVar[P[P[A]] ⇒ P[A]].t
 
-    flattens.length shouldEqual 128
+    //    System.setProperty("curryhoward.log", "prover")
 
+    val initTime = System.currentTimeMillis()
+    val proofs = TheoremProver.findProofs(flattenType)
+    val elapsed = System.currentTimeMillis() - initTime
+    println(s"Computing proofs for flatten on (1+T)x(1+T) took $elapsed ms")
+
+    proofs._1.length shouldEqual 16
+    proofs._2.length shouldEqual 128
+
+    //    System.clearProperty("curryhoward.log")
+*/
+  }
+
+  it should "correctly work with nested options" in {
+    type Q[T] = Option[Option[T]]
+
+    def flattens[A] = anyOfType[Q[Option[Int]] ⇒ Q[Int]]()
+
+    val terms = flattens.map(_.lambdaTerm)
+    terms.length shouldEqual 26
   }
 
   it should "support foreign type constructors" in {
@@ -67,6 +91,7 @@ class MiscSpec extends FlatSpec with Matchers {
     type R = Int ⇒ String
     type C[T] = (T ⇒ R) ⇒ R
 
+    // TODO: this is slow! Optimize performance here.
     def fmapc[A, B] = anyOfType[C[A] ⇒ (A ⇒ B) ⇒ C[B]]()
 
     fmapc.length shouldEqual 26

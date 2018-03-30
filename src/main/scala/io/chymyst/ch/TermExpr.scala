@@ -468,11 +468,26 @@ sealed trait TermExpr {
     case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : ${t.prettyPrint} because its type is not a conjunction")
   }
 
-  lazy val simplify: TermExpr = TermExpr.simplifyWithEtaUntilStable(this)
+  // Try optimizing the recursive `simplify` operation.
+  private[ch] var simplified: Boolean = false
+
+  lazy val simplify: TermExpr = if (simplified) this else {
+    val result = TermExpr.simplifyWithEtaUntilStable(this)
+
+    result.simplified = true
+
+    result
+  }
 
   private[ch] def simplifyOnceInternal(withEta: Boolean = false): TermExpr = this
 
-  final private[ch] def simplifyOnce(withEta: Boolean = false): TermExpr = if (withEta) simplifyOnceWithEta else simplifyOnceWithoutEta
+  final private[ch] def simplifyOnce(withEta: Boolean = false): TermExpr = if (simplified) this else {
+    val result = if (withEta) simplifyOnceWithEta else simplifyOnceWithoutEta
+    if (result === this) {
+      simplified = true
+      this
+    } else result
+  }
 
   private lazy val simplifyOnceWithEta = simplifyOnceInternal(withEta = true)
 

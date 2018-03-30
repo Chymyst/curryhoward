@@ -503,10 +503,10 @@ Let us now apply the lambda-term `fmapT` to `idA`.
 ```scala
 scala> val result = fmapT(idA)
 java.lang.Exception: Internal error: Invalid head type in application (\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3)): (A ⇒ B) ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]} must be a function with argument type A ⇒ A
-  at io.chymyst.ch.AppE.<init>(TermExpr.scala:568)
+  at io.chymyst.ch.AppE.<init>(TermExpr.scala:577)
   at io.chymyst.ch.TermExpr.apply(TermExpr.scala:367)
   at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:364)
-  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:589)
+  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:598)
   ... 48 elided
 ```
 
@@ -744,7 +744,7 @@ So, `dUser(dString, dLong)` is the same as `dUser.t(dString, dLong)` and constru
 scala> val dString = freshVar[String]
 dString: io.chymyst.ch.VarE = dString$12
 
-scala> var dLong = freshVar[Long]
+scala> val dLong = freshVar[Long]
 dLong: io.chymyst.ch.VarE = dLong$13
 
 scala> val u = freshVar[User]
