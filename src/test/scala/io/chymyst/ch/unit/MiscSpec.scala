@@ -70,7 +70,7 @@ class MiscSpec extends FlatSpec with Matchers {
     def flattens[A] = anyOfType[Q[Option[Int]] ⇒ Q[Int]]()
 
     val terms = flattens.map(_.lambdaTerm)
-    terms.length shouldEqual 26
+    terms.length shouldEqual 24
   }
 
   it should "support foreign type constructors" in {

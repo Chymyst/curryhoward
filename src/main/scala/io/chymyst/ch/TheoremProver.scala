@@ -12,8 +12,8 @@ object TheoremProver {
 
   // Heuristic to speed up the proof search: select the terms with the best scores and ignore others.
   // The number of terms to take depends on the number of premises in the sequent.
-  // We will never take less than 64 = 2 << 6 or more than a million terms (2 << 20) at any step.
-  private def maxTermsToSelect(sequent: Sequent): Int = 2 << math.min(6, math.max(20, 2 + sequent.premises.length))
+  // We will never take fewer than 64 = 1 << 6 or more than a million terms (1 << 20) at any step.
+  private def maxTermsToSelect(sequent: Sequent): Int = 1 << math.max(6, math.min(20, 2 + sequent.premises.length))
 
   private[ch] def inhabitInternal(typeStructure: TypeExpr): Either[String, (Option[String], TermExpr)] = {
     // TODO Check that there aren't repeated types among the curried arguments, print warning.
