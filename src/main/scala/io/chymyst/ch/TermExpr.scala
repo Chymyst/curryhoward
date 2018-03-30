@@ -36,6 +36,7 @@ object TermExpr {
 
   /** Approximate size of the term.
     * The computation adds 1 every time any subterms are combined in any way.
+    * For example, the size of the term `x ⇒ y ⇒ x` is 5.
     *
     * @param termExpr A term.
     * @return Number of elements in the term.
@@ -52,7 +53,7 @@ object TermExpr {
   }
 
   // Lambda-term syntax helper.
-  def lambdaTerm(f: Any): Option[TermExpr] = //Try(WithLambdaTerm(f).lambdaTerm).toOption fails to compile
+  def lambdaTerm(f: Any): Option[TermExpr] = // Try(WithLambdaTerm(f).lambdaTerm).toOption fails to compile
     f match {
       case g: Function0Lambda[_] ⇒ Some(g.lambdaTerm)
       case g: Function1Lambda[_, _] ⇒ Some(g.lambdaTerm)
