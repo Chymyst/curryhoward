@@ -5,21 +5,41 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class TermExprSpec extends FlatSpec with Matchers {
 
-  val termExpr1 = CurriedE(List(VarE("x2", TP("3")), VarE("x3", TP("2")), VarE("x4", TP("1"))), VarE("x3", TP("2")))
-  val termExpr2 = CurriedE(List(VarE("x2", TP("3")), VarE("x3", TP("2")), VarE("x4", TP("1"))), VarE("x1", TP("2")))
-  val termExpr3 = CurriedE(List(VarE("x1", TP("2"))), termExpr2)
+  val var12 = VarE("x1", TP("2"))
+  val var23 = VarE("x2", TP("3"))
+  val var32 = VarE("x3", TP("2"))
+  val termExpr1 = CurriedE(List(var23, var32, VarE("x4", TP("1"))), var32)
+  val termExpr2 = CurriedE(List(var23, var32, VarE("x4", TP("1"))), var12)
+  val termExpr3 = CurriedE(List(var12), termExpr2)
 
   behavior of "TermExpr miscellaneous methods"
 
   it should "compute term size" in {
-    TermExpr.size(termExpr1) shouldEqual 7 // x2 => x3 => x4 => x3
-    TermExpr.size(termExpr3) shouldEqual 9
+    TermExpr.size(termExpr1) shouldEqual 7 // x2 ⇒ x3 ⇒ x4 ⇒ x3
+    TermExpr.size(termExpr3) shouldEqual 9 // x1 ⇒ x2 ⇒ x3 ⇒ x4 ⇒ x1
   }
 
   it should "compare function with non-function" in {
     termExpr1 equiv termExpr1 shouldEqual true
     termExpr1 equiv termExpr2 shouldEqual false
-    termExpr1 equiv VarE("x1", TP("2")) shouldEqual false
+    termExpr1 equiv var23 shouldEqual false
+  }
+
+  it should "produce error when subst is done with non-matching type" in {
+    TermExpr.subst(var23, termExpr1, var32 =>: var23).prettyPrint shouldEqual "x3 ⇒ x2 ⇒ x3 ⇒ x4 ⇒ x3"
+
+    the[Exception] thrownBy {
+      TermExpr.subst(var23, termExpr1, var32 =>: var23.copy(t = TP("1"))) shouldEqual (var32 =>: termExpr1)
+    } should have message "Incorrect type 3 in subst(x2, \\((x2:3) ⇒ (x3:2) ⇒ (x4:1) ⇒ x3), \\((x3:2) ⇒ x2)), expected 1"
+  }
+
+  it should "recover from incorrect substitution" in {
+    val p = freshVar[(Int, Int)]
+    val x = freshVar[Int]
+    val pair = p(x, x)
+
+    the[Exception] thrownBy TermExpr.subst(var23, pair, var23 =>: var12) should // The `subst` tries to replace `var23` in `var23 =>: var12` with `pair`, which is a NamedConjunctE.
+      have message "Incorrect substitution of bound variable x2 by non-variable Tuple2(x$2, x$2) in substMap(x2 ⇒ x1)(...)"
   }
 
   behavior of "TermExpr#renameVar"

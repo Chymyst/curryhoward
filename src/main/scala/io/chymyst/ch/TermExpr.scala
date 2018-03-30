@@ -102,9 +102,15 @@ object TermExpr {
     else {
       def subst(termExpr: TermExpr): TermExpr = substMap(termExpr)(p)
 
+      def substForCurriedHeads(varExpr: VarE): VarE = substMap(varExpr)(p) match {
+        // Result must be a VarE, otherwise it's an error.
+        case v: VarE ⇒ v
+        case other ⇒ throw new Exception(s"Incorrect substitution of bound variable $varExpr by non-variable ${other.prettyPrint} in substMap(${termExpr.prettyPrint})(...)")
+      }
+
       termExpr match {
         case AppE(head, arg) ⇒ AppE(subst(head), subst(arg))
-        case CurriedE(heads, body) ⇒ CurriedE(heads.map(subst).asInstanceOf[List[VarE]], subst(body))
+        case CurriedE(heads, body) ⇒ CurriedE(heads.map(substForCurriedHeads), subst(body))
         case ConjunctE(terms) ⇒ ConjunctE(terms.map(subst))
         case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(subst), tExpr)
         case ProjectE(index, term) ⇒ ProjectE(index, subst(term))
