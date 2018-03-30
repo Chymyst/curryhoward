@@ -75,15 +75,20 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     f3.map((x: Any) ⇒ x.lambdaTerm).length shouldEqual 3
   }
 
-  it should "produce no lambda-terms when `implement` is used" in {
+  it should "produce lambda-terms when `implement` is used" in {
     val f1: Int ⇒ Int = implement
 
-    TermExpr.lambdaTerm(f1) shouldEqual None
-    the[Exception] thrownBy f1.lambdaTerm should have message "Called `.lambdaTerm` on an expression <function1> that has no attached lambda-term"
+    TermExpr.lambdaTerm(f1).nonEmpty shouldEqual true
+
+    the[Exception] thrownBy None.lambdaTerm should have message "Called `.lambdaTerm` on an expression None that has no attached lambda-term"
 
     val f2: (Int, String) ⇒ Int = implement
-    TermExpr.lambdaTerm(f2) shouldEqual None
-    the[Exception] thrownBy f2.lambdaTerm should have message "Called `.lambdaTerm` on an expression <function2> that has no attached lambda-term"
+    TermExpr.lambdaTerm(f2).nonEmpty shouldEqual true
+
+    // We do not support functions with many arguments.
+    val f3: (Int, String, String, String, String, String, String, String, String, String) ⇒ Int = implement
+    TermExpr.lambdaTerm(f3) shouldEqual None
+    the[Exception] thrownBy f3.lambdaTerm should have message "Called `.lambdaTerm` on an expression <function10> that has no attached lambda-term"
   }
 
   it should "symbolically lambda-verify identity law for map on Reader monad" in {
@@ -168,14 +173,14 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     check()
   }
 
-  it should "return lambda terms together with the function when using `ofType` but not when using `implement`" in {
+  it should "return lambda terms together with the function when using `ofType` or `implement`" in {
     def f2[A] = ofType[Unit ⇒ Either[A ⇒ A, Unit]]
 
     TermExpr.lambdaTerm(f2).map(_.prettyRenamePrint) shouldEqual Some("a ⇒ (0 + Right(a))")
 
     def f2a[A]: Unit ⇒ Either[A ⇒ A, Unit] = implement
 
-    TermExpr.lambdaTerm(f2a) shouldEqual None
+    TermExpr.lambdaTerm(f2a).map(_.prettyRenamePrint) shouldEqual Some("a ⇒ (0 + Right(a))")
   }
 
   it should "verify identity law for Either[Int, T] as in tutorial" in {
@@ -201,8 +206,6 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     def a[A] = freshVar[A]
 
     val idA = a =>: a
-
-    val apply1 = idA(a)
 
     def b[B] = freshVar[B]
 
@@ -233,7 +236,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val case2 = su =>: ol.t(sl.t(su(0)("id")))
     val getId = ou =>: ou.cases(case1, case2)
     val dString = freshVar[String]
-    var dLong = freshVar[Long]
+    val dLong = freshVar[Long]
     val u = freshVar[User]
 
     val uData = u(dString, dLong)
@@ -317,7 +320,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     val cte = ct(e1, u0)
     the[Exception] thrownBy cte(e1) should have message ".apply() must be called with 2 arguments on this type (Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]}, Unit) but it was called with 1 arguments"
 
-    var i = freshVar[Int]
+    val i = freshVar[Int]
 
     the[Exception] thrownBy i() should have message "t.apply(...) is not defined for the term i$28 of type <c>Int"
 
@@ -363,7 +366,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
       fmapTerm.prettyRenamePrint shouldEqual "a ⇒ b ⇒ c ⇒ a (b c)"
 
       val reader = freshVar[X ⇒ A]
-      val aTerm = freshVar[A]
+
       val fAB = freshVar[A ⇒ B]
       val fBC = freshVar[B ⇒ C]
 
@@ -488,7 +491,6 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     final case class Empty()
 
     val vE = freshVar[Empty]
-    val e = vE()
     val vI = freshVar[Int]
     val vU = freshVar[Unit]
 
@@ -508,7 +510,6 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "simplify tuple application" in {
-    val vI = freshVar[Int]
     val vT = freshVar[(Int, Int)]
     val tTuple = vT.t
     val f1 = vT =>: tTuple(vT(0), vT(1))

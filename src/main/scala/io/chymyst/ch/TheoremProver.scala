@@ -33,7 +33,8 @@ object TheoremProver {
     }
   }
 
-  def explode[A](src: Seq[Seq[A]]): Seq[Seq[A]] = {
+  // TODO: is this a performance bottleneck? If so, should we use Vector instead of Seq?
+  private[ch] def explode[A](src: Seq[Seq[A]]): Seq[Seq[A]] = {
     src.foldLeft[Seq[Seq[A]]](Seq(Seq())) { case (prevSeqSeq, newSeq) ⇒
       for {
         prev ← prevSeqSeq

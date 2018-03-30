@@ -36,6 +36,7 @@ object TermExpr {
 
   /** Approximate size of the term.
     * The computation adds 1 every time any subterms are combined in any way.
+    * For example, the size of the term `x ⇒ y ⇒ x` is 5.
     *
     * @param termExpr A term.
     * @return Number of elements in the term.
@@ -52,7 +53,7 @@ object TermExpr {
   }
 
   // Lambda-term syntax helper.
-  def lambdaTerm(f: Any): Option[TermExpr] = //Try(WithLambdaTerm(f).lambdaTerm).toOption fails to compile
+  def lambdaTerm(f: Any): Option[TermExpr] = // Try(WithLambdaTerm(f).lambdaTerm).toOption fails to compile
     f match {
       case g: Function0Lambda[_] ⇒ Some(g.lambdaTerm)
       case g: Function1Lambda[_, _] ⇒ Some(g.lambdaTerm)
@@ -101,9 +102,15 @@ object TermExpr {
     else {
       def subst(termExpr: TermExpr): TermExpr = substMap(termExpr)(p)
 
+      def substForCurriedHeads(varExpr: VarE): VarE = substMap(varExpr)(p) match {
+        // Result must be a VarE, otherwise it's an error.
+        case v: VarE ⇒ v
+        case other ⇒ throw new Exception(s"Incorrect substitution of bound variable $varExpr by non-variable ${other.prettyPrint} in substMap(${termExpr.prettyPrint})(...)")
+      }
+
       termExpr match {
         case AppE(head, arg) ⇒ AppE(subst(head), subst(arg))
-        case CurriedE(heads, body) ⇒ CurriedE(heads.map(subst).asInstanceOf[List[VarE]], subst(body))
+        case CurriedE(heads, body) ⇒ CurriedE(heads.map(substForCurriedHeads), subst(body))
         case ConjunctE(terms) ⇒ ConjunctE(terms.map(subst))
         case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(subst), tExpr)
         case ProjectE(index, term) ⇒ ProjectE(index, subst(term))
@@ -468,11 +475,26 @@ sealed trait TermExpr {
     case _ ⇒ throw new Exception(s"Internal error: Cannot perform projection for term $toString : ${t.prettyPrint} because its type is not a conjunction")
   }
 
-  lazy val simplify: TermExpr = TermExpr.simplifyWithEtaUntilStable(this)
+  // Try optimizing the recursive `simplify` operation.
+  private[ch] var simplified: Boolean = false
+
+  lazy val simplify: TermExpr = if (simplified) this else {
+    val result = TermExpr.simplifyWithEtaUntilStable(this)
+
+    result.simplified = true
+
+    result
+  }
 
   private[ch] def simplifyOnceInternal(withEta: Boolean = false): TermExpr = this
 
-  final private[ch] def simplifyOnce(withEta: Boolean = false): TermExpr = if (withEta) simplifyOnceWithEta else simplifyOnceWithoutEta
+  final private[ch] def simplifyOnce(withEta: Boolean = false): TermExpr = if (simplified) this else {
+    val result = if (withEta) simplifyOnceWithEta else simplifyOnceWithoutEta
+    if (result === this) {
+      simplified = true
+      this
+    } else result
+  }
 
   private lazy val simplifyOnceWithEta = simplifyOnceInternal(withEta = true)
 

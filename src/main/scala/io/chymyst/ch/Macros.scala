@@ -84,7 +84,7 @@ class Macros(val c: whitebox.Context) {
 
     typeName match {
       case "scala.Function1" | "Function1" ⇒ matchedTypeArgs.head ->: matchedTypeArgs(1)
-      case name if name matches "(scala\\.)?Function[2-9][0-9]*" ⇒
+      case name if name matches "(scala\\.)?Function[1-9][0-9]*" ⇒
         ConjunctT(matchedTypeArgs.slice(0, matchedTypeArgs.length - 1)) ->: matchedTypeArgs.last
       case "scala.Any" | "Any" ⇒ BasicT("_")
       case "scala.Nothing" | "Nothing" ⇒ NothingT("Nothing")
@@ -381,7 +381,7 @@ class Macros(val c: whitebox.Context) {
       .map { case (v, i) ⇒ (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
     val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.t ->: prev }
-    inhabitOneInternal(typeStructure, givenVars.toMap, createLambdas = true) { term ⇒
+    inhabitOneInternal(typeStructure, givenVars.toMap) { term ⇒
       givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }
     }
   }
@@ -413,22 +413,20 @@ class Macros(val c: whitebox.Context) {
     *
     * @param typeStructure A type expression to be implemented.
     * @param givenArgs     Available Scala values that can be used while implementing the type.
-    * @param createLambdas Whether to create symbolic lambda-terms together with Scala code (may be slower)
     * @param transform     A final transformation for the implemented expression (e.g. apply it to some given arguments).
     * @return A Scala expression tree for the implemented expression.
     *         Will return `null` if the theorem prover fails to find a single "best" implementation.
     */
   private def inhabitOneInternal(
     typeStructure: TypeExpr,
-    givenArgs: Map[VarE, c.Tree] = Map(),
-    createLambdas: Boolean = false
+    givenArgs: Map[VarE, c.Tree] = Map()
   )(
     transform: TermExpr ⇒ TermExpr = identity
   ): c.Tree = {
     TheoremProver.inhabitInternal(typeStructure) match {
       case Right((messageOpt, foundTerm)) ⇒
         messageOpt.foreach(message ⇒ if (verbose) c.warning(c.enclosingPosition, message))
-        returnTerm(transform(foundTerm), givenArgs, createLambdas)
+        returnTerm(transform(foundTerm), givenArgs)
       case Left(errorMessage) ⇒
         c.error(c.enclosingPosition, errorMessage)
         q"null"
@@ -436,29 +434,28 @@ class Macros(val c: whitebox.Context) {
 
   }
 
-  private def returnTerm(termFound: TermExpr, givenArgs: Map[VarE, c.Tree], createLambdas: Boolean): c.Tree = {
+  private def returnTerm(termFound: TermExpr, givenArgs: Map[VarE, c.Tree]): c.Tree = {
     import LiftedAST._
     val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
     if (verbose) c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
     val resultCodeTree = emitTermCode(termFound, givenArgs)
-    val result = if (!createLambdas) {
-      resultCodeTree
-    } else {
+    // Attach lambda-terms to functions when appropriate.
+    val result = {
+      lazy val wrapper = q"object Wrapper { val expr = $termFound }"
       termFound match {
-        case CurriedE(VarE(_, ConjunctT(termTypes)) :: _, _) if termTypes.length <= 3 ⇒
-          val functionName = TypeName(s"Function${termTypes.length}Lambda")
-          val functionNameType = tq"$functionName"
-          q"new $functionNameType($resultCodeTree, $termFound)"
-        case CurriedE(VarE(_, _) :: _, _) ⇒ q"new _root_.io.chymyst.ch.Function1Lambda($resultCodeTree, $termFound)"
+        case CurriedE(VarE(_, ConjunctT(termTypes)) :: _, _) ⇒
+          if (termTypes.length <= 3) {
+            val functionName = TypeName(s"Function${termTypes.length}Lambda")
+            val functionNameType = tq"$functionName"
+            q"$wrapper; new $functionNameType($resultCodeTree, Wrapper.expr)"
+          } else resultCodeTree
+        case CurriedE(VarE(_, _) :: _, _) ⇒ q"$wrapper; new _root_.io.chymyst.ch.Function1Lambda($resultCodeTree, Wrapper.expr)"
         case _ ⇒ resultCodeTree
       }
     }
     if (debug) c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = true)
     result
   }
-
-  // If lambda-terms are too large, the generated code will exceed the JVM method size limit and compilation will fail.
-  val MAX_TERM_SIZE_FOR_LAMBDA_EXPORT = 256
 
   private def inhabitAllInternal(
     typeStructure: TypeExpr,
@@ -474,9 +471,8 @@ class Macros(val c: whitebox.Context) {
     } else {
       lowestScoreTerms
     }
-    val createLambdas = foundTerms.map(TermExpr.size).sum < MAX_TERM_SIZE_FOR_LAMBDA_EXPORT
     val terms = foundTerms.map { foundTerm ⇒
-      returnTerm(transform(foundTerm), givenArgs, createLambdas)
+      returnTerm(transform(foundTerm), givenArgs)
     }
     q"Seq(..$terms)"
   }

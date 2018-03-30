@@ -162,6 +162,7 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 # Revision history
 
+- 0.3.6 STLC terms are now emitted for `implement` as well; the JVM bytecode limit is obviated; fixed bug with recognizing `Function10`.
 - 0.3.5 Added `:@@` and `@@:` operations to the STLC interpreter. Fixed a bug whereby `Tuple2(x._1, x._2)` was not simplified to `x`. Fixed other bugs in alpha-conversion of type parameters.
 - 0.3.4 Reduced verbosity by default. Fixed a bug uncovered during the demo in the February 2018 meetup presentation.
 - 0.3.3 Automatic renaming of type variables in lambda-terms; `anyOfType`; minor bug fixes. 
@@ -247,7 +248,7 @@ Lambda-terms can be obtained and manipulated symbolically.
 ```scala
 type R[X, A] = X ⇒ A
 
-def mapReader[X, A, B] = ofType[R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B]]
+def mapReader[X, A, B]: R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B] = implement
 // mapReader is now a compiled function of the required type
 val mapReaderTerm = mapReader.lambdaTerm
 // mapReaderTerm is a lambda-term representing the code of mapReader

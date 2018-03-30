@@ -103,7 +103,7 @@ lazy val curryhoward: Project = (project in file("."))
   .settings(common)
   .settings(
     organization := "io.chymyst",
-    version := "0.3.5",
+    version := "0.3.6",
 
     licenses := Seq("Apache License, Version 2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
     homepage := Some(url("https://github.com/Chymyst/curryhoward")),
