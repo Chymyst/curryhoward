@@ -5,11 +5,24 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class TermExprSpec extends FlatSpec with Matchers {
 
-  behavior of "TermExpr#renameVar"
-
   val termExpr1 = CurriedE(List(VarE("x2", TP("3")), VarE("x3", TP("2")), VarE("x4", TP("1"))), VarE("x3", TP("2")))
   val termExpr2 = CurriedE(List(VarE("x2", TP("3")), VarE("x3", TP("2")), VarE("x4", TP("1"))), VarE("x1", TP("2")))
   val termExpr3 = CurriedE(List(VarE("x1", TP("2"))), termExpr2)
+
+  behavior of "TermExpr miscellaneous methods"
+
+  it should "compute term size" in {
+    TermExpr.size(termExpr1) shouldEqual 7 // x2 => x3 => x4 => x3
+    TermExpr.size(termExpr3) shouldEqual 9
+  }
+
+  it should "compare function with non-function" in {
+    termExpr1 equiv termExpr1 shouldEqual true
+    termExpr1 equiv termExpr2 shouldEqual false
+    termExpr1 equiv VarE("x1", TP("2")) shouldEqual false
+  }
+
+  behavior of "TermExpr#renameVar"
 
   it should "rename one variable" in {
     termExpr1.renameAllVars(Seq("x2"), Seq("y2")) shouldEqual CurriedE(List(VarE("y2", TP("3")), VarE("x3", TP("2")), VarE("x4", TP("1"))), VarE("x3", TP("2")))
