@@ -13,7 +13,7 @@ object TheoremProver {
   // Heuristic to speed up the proof search: select the terms with the best scores and ignore others.
   // The number of terms to take depends on the number of premises in the sequent.
   // We will never take fewer than 1024 = 1 << 10 or more than a million terms (1 << 20) at any step.
-  private def maxTermsToSelect(sequent: Sequent): Int = 1 << math.max(10, math.min(20, 2 + sequent.premises.length))
+  private def maxTermsToSelect(sequent: Sequent): Int = 1 << math.max(6, math.min(10, 2 + sequent.premises.length))
 
   private[ch] def inhabitInternal(typeStructure: TypeExpr): Either[String, (Option[String], TermExpr)] = {
     // TODO Check that there aren't repeated types among the curried arguments, print warning.
@@ -58,7 +58,7 @@ object TheoremProver {
     val mainSequent = Sequent(List(), typeStructure, freshVar)
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
     val allTermExprs = findTermExprs(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename).prettyRename).distinct
-    if (debug || debugTrace) {
+    if (debugTrace) {
       val prettyPT = allTermExprs.map(p ⇒ (p.informationLossScore, s"${p.prettyRenamePrint}; score = ${p.informationLossScore}: ${TermExpr.unusedArgs(p).size} unused args: ${TermExpr.unusedArgs(p)}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyRenamePrint, i) }}"))
         .sortBy(_._1).map(_._2)
       val TermExprsMessage = if (prettyPT.isEmpty) "no final proof terms." else s"${prettyPT.length} final proof terms:\n ${prettyPT.take(maxTermsPrinted).mkString(" ;\n ")} ."
@@ -85,18 +85,20 @@ object TheoremProver {
   private[ch] def findTermExprs(sequent: Sequent): Seq[TermExpr] = {
 
     def concatProofs(ruleResult: RuleResult): Seq[TermExpr] = {
-      if (debug) println(s"DEBUG: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents.map(_.toString).mkString("; ")}")
+      if (debugTrace) println(s"DEBUG: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents.map(_.toString).mkString("; ")}")
       // All the new sequents need to be proved before we can continue. They may have several proofs each.
+      // TODO: use iterator here because some findTermExprs could be empty
+      val t0 = System.currentTimeMillis()
       val newProofs: Seq[Seq[TermExpr]] = ruleResult.newSequents.map(findTermExprs)
       val explodedNewProofs: Seq[Seq[TermExpr]] = TheoremProver.explode(newProofs)
       val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
-      val t0 = System.currentTimeMillis()
+      val t1 = System.currentTimeMillis()
 
       val result = transformedProofs.map(_.simplifyOnce()).distinct.sortBy(_.informationLossScore).take(maxTermsToSelect(sequent))
       // Note: at this point, it is a mistake to do prettyRename, because we are calling this function recursively.
       // We will call prettyRename() at the very end of the proof search.
       if (debug) {
-        println(s"DEBUG: transformedProofs.map(_.simplify()).distinct took ${System.currentTimeMillis() - t0} ms and produced ${result.size} terms out of ${transformedProofs.size} back-transformed terms; after rule ${ruleResult.ruleName}")
+        println(s"DEBUG: elapsed ${System.currentTimeMillis() - t0} ms, .map(_.simplify()).distinct took ${System.currentTimeMillis() - t1} ms, and produced ${result.size} terms out of ${transformedProofs.size} back-transformed terms; after rule ${ruleResult.ruleName} for sequent $sequent")
         //        println(s"DEBUG: for sequent $sequent, after rule ${ruleResult.ruleName}, transformed ${transformedProofs.length} proof terms:\n ${transformedProofs.mkString(" ;\n ")} ,\nafter simplifying:\n ${result.mkString(" ;\n ")} .")
       }
       result
@@ -117,16 +119,16 @@ object TheoremProver {
           val (fromIdAxiom, fromTAxiom) = followsFromAxioms(sequent) // This could be empty or non-empty.
           // If the sequent follows from Id axiom, we will ignore `fromTAxiom`, because this will most likely not yield a good solution.
           // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
-          val fromAxioms = if (fromIdAxiom.nonEmpty) fromIdAxiom else fromTAxiom
+          val fromAxioms = if (fromTAxiom.nonEmpty) fromTAxiom else fromIdAxiom
 
-          if (debug && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyRenamePrint).mkString("; ")}")
+          if (debugTrace && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyRenamePrint).mkString("; ")}")
 
           // Try each rule on sequent. If rule applies, obtain the next sequent.
           // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
 
           // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
           // We should apply that invertible rule and proceed from there.
-          val fromRules: Seq[TermExpr] = invertibleRules.view.flatMap(_.applyTo(sequent)).headOption match {
+          val fromRules: Seq[TermExpr] = invertibleRules.iterator.flatMap(_.applyTo(sequent)).take(1).toList.headOption match {
             case Some(ruleResult) ⇒ concatProofs(ruleResult) ++ fromAxioms
             case None ⇒
               // Try invertible ambiguous rules. Each of these rules may generate more than one new sequent,
@@ -153,7 +155,7 @@ object TheoremProver {
             //              }
           }
           val termsFound = fromRules.map(_.simplifyOnce()).distinct
-          if (debug || debugTrace) {
+          if (debugTrace) {
             val termsMessage = termsFound.length match {
               case 0 ⇒ "no terms"
               case x ⇒

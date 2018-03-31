@@ -255,15 +255,23 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
 
     def pure[A] = ofType[A ⇒ P[A]].lambdaTerm
 
-    def flattens[A] = anyOfType[P[P[A]] ⇒ P[A]]()
+    //    def flattens[A] = anyOfType[P[P[A]] ⇒ P[A]]()
 
-    println(flattens.size)
+    //    println(flattens.size)
 
     def f[A] = allOfType[Option[(A, A, A)] ⇒ Option[(A, A, A)]]()
 
     println(f.size)
     //    f[Int].map(_.lambdaTerm.prettyPrint).sorted.foreach(println)
     //    f.size shouldEqual factorial(4)
+  }
+
+  it should "generate match clauses" in {
+    def f[A] = anyOfType[Option[Option[A]] ⇒ Option[Option[A]]]().map(_.lambdaTerm)
+
+    println(f.size)
+    f.map(_.prettyPrint).foreach(println)
+
   }
 
 }

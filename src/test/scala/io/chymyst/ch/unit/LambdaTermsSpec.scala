@@ -174,13 +174,13 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "return lambda terms together with the function when using `ofType` or `implement`" in {
-    def f2[A] = ofType[Unit ⇒ Either[A ⇒ A, Unit]]
+    def f2[A] = anyOfType[Unit ⇒ Either[A ⇒ A, Unit]]().map(_.lambdaTerm)
 
-    TermExpr.lambdaTerm(f2).map(_.prettyRenamePrint) shouldEqual Some("a ⇒ (0 + Right(a))")
+    f2.map(_.prettyRenamePrint) shouldEqual Seq("a ⇒ (Left(b ⇒ b) + 0)", "a ⇒ (0 + Right(1))")
 
-    def f2a[A]: Unit ⇒ Either[A ⇒ A, Unit] = implement
+    def f2a[A]: (A ⇒ A) ⇒ Either[A ⇒ A, Unit] = implement
 
-    TermExpr.lambdaTerm(f2a).map(_.prettyRenamePrint) shouldEqual Some("a ⇒ (0 + Right(a))")
+    TermExpr.lambdaTerm(f2a).map(_.prettyRenamePrint) shouldEqual Some("a ⇒ (Left(a) + 0)")
   }
 
   it should "verify identity law for Either[Int, T] as in tutorial" in {
