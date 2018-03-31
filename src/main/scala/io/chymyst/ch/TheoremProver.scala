@@ -104,6 +104,29 @@ object TheoremProver {
       result
     }
 
+    /** Try invertible ambiguous rules. Each of these rules may generate more than one new sequent,
+      * and each of these sequents yields a proof if the original formula has a proof.
+      * We need to gather and concatenate all these proofs.
+      *
+      * @return A sequence of all proof terms found for a given sequent `sequent` by applying invertible rules.
+      */
+    def fromInvertibleRules: Seq[RuleResult] = invertibleRules.iterator.flatMap(_.applyTo(sequent)).take(1).toList
+
+    def fromInvertibleAmbiguousRules: Seq[TermExpr] = invertibleAmbiguousRules
+      .flatMap(_.applyTo(sequent))
+      .flatMap(concatProofs)
+
+    /** Apply all non-invertible (i.e. not guaranteed to work) rules.
+      * Each non-invertible rule will generate some proofs or none.
+      * If a rule generates no proofs, another rule should be used.
+      * Use `flatMap` to concatenate all results from all applicable non-invertible rules.
+      *
+      * @return A sequence of all proof terms found for a given sequent `sequent` by applying non-invertible rules.
+      */
+    def fromNoninvertibleRules: Seq[TermExpr] = nonInvertibleRulesForSequent(sequent)
+      .flatMap(_.applyTo(sequent))
+      .flatMap(concatProofs)
+
     // Check whether we already saw this sequent. We may already have proved it, or we may not yet proved it but already saw it.
     sequentsAlreadyProved.get(sequent) match {
       case Some(terms) ⇒ terms
@@ -117,56 +140,53 @@ object TheoremProver {
 
           // Check whether the sequent follows directly from an axiom.
           val (fromIdAxiom, fromTAxiom) = followsFromAxioms(sequent) // This could be empty or non-empty.
-          // If the sequent follows from Id axiom, we will ignore `fromTAxiom`, because this will most likely not yield a good solution.
+          // If the sequent follows from T axiom, we will ignore `fromIdAxiom`, because this will most likely not yield a good solution.
           // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
-          val fromAxioms = if (fromTAxiom.nonEmpty) fromTAxiom else fromIdAxiom
+          if (fromTAxiom.nonEmpty) fromTAxiom else {
+            val fromAxioms = fromIdAxiom
 
-          if (debugTrace && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyRenamePrint).mkString("; ")}")
+            if (debugTrace && fromAxioms.nonEmpty) println(s"DEBUG: sequent $sequent followsFromAxioms: ${fromAxioms.map(_.prettyRenamePrint).mkString("; ")}")
 
-          // Try each rule on sequent. If rule applies, obtain the next sequent.
-          // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
+            // Try each rule on sequent. If rule applies, obtain the next sequent.
+            // If all rules were invertible and non-ambiguous, we would return `fromAxioms ++ fromInvertibleRules`.
 
-          // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
-          // We should apply that invertible rule and proceed from there.
-          val fromRules: Seq[TermExpr] = invertibleRules.iterator.flatMap(_.applyTo(sequent)).take(1).toList.headOption match {
-            case Some(ruleResult) ⇒ concatProofs(ruleResult) ++ fromAxioms
-            case None ⇒
-              // Try invertible ambiguous rules. Each of these rules may generate more than one new sequent,
-              // and each of these sequents yields a proof if the original formula has a proof.
-              // We need to gather and concatenate all these proofs.
-              // We proceed to non-invertible rules only if no rules apply at this step.
-              //              val fromInvertibleAmbiguousRules = invertibleAmbiguousRules
-              //                .flatMap(_.applyTo(sequent))
-              //                .flatMap(concatProofs)
-              //              if (fromInvertibleAmbiguousRules.nonEmpty) {
-              //                fromInvertibleAmbiguousRules ++ fromAxioms
-              //              } else {
-              // No invertible rules apply, so we need to try all non-invertible (i.e. not guaranteed to work) rules.
-              // Each non-invertible rule will generate some proofs or none.
-              // If a rule generates no proofs, another rule should be used.
-              // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
-              // If no more rules apply here, we return `fromAxioms`.
-              // Use flatMap to concatenate all results from all applicable non-invertible rules.
-              val fromNoninvertibleRules: Seq[TermExpr] =
-                (invertibleAmbiguousRules ++ nonInvertibleRulesForSequent(sequent))
-                  .flatMap(_.applyTo(sequent))
-                  .flatMap(concatProofs)
-              fromNoninvertibleRules ++ fromAxioms
-            //              }
-          }
-          val termsFound = fromRules.map(_.simplifyOnce()).distinct
-          if (debugTrace) {
-            val termsMessage = termsFound.length match {
-              case 0 ⇒ "no terms"
-              case x ⇒
-                val messagePrefix = if (x > maxTermsPrinted) s"first $maxTermsPrinted out of " else ""
-                s"$messagePrefix$x terms:\n " + termsFound.take(maxTermsPrinted).map(_.prettyRenamePrint).mkString(" ;\n ") + " ,\n"
+            // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
+            // We should apply that invertible rule and proceed from there.
+            val fromRules: Seq[TermExpr] = fromInvertibleRules.headOption match {
+              case Some(ruleResult) ⇒ fromAxioms ++ concatProofs(ruleResult)
+              case None ⇒
+
+                // We proceed to non-invertible rules only if no rules apply at this step.
+                //                              val termsFromInvertibleAmbiguousRules = fromInvertibleAmbiguousRules
+                //                              if (termsFromInvertibleAmbiguousRules.nonEmpty) {
+                //                                fromAxioms ++ termsFromInvertibleAmbiguousRules
+                //                              } else {
+
+                // This does not seem to work: It fails to implement `fmap` for the functor `[A] ⇒ A + (A, A, A)` correctly.
+
+                // No invertible rules apply, so we need to try
+                // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
+                // If no more rules apply here, we return `fromAxioms`.
+
+                //                val termsFromNoninvertibleRules: Seq[TermExpr] = fromNoninvertibleRules
+
+                fromAxioms ++ fromInvertibleAmbiguousRules ++ fromNoninvertibleRules
+              //                            }
             }
-            println(s"DEBUG: returning $termsMessage for sequent $sequent")
+            val termsFound = fromRules.map(_.simplifyOnce()).distinct
+            if (debugTrace) {
+              val termsMessage = termsFound.length match {
+                case 0 ⇒ "no terms"
+                case x ⇒
+                  val messagePrefix = if (x > maxTermsPrinted) s"first $maxTermsPrinted out of " else ""
+                  s"$messagePrefix$x terms:\n " + termsFound.take(maxTermsPrinted).map(_.prettyRenamePrint).mkString(" ;\n ") + " ,\n"
+              }
+              println(s"DEBUG: returning $termsMessage for sequent $sequent")
+            }
+            // TODO: refactor this if there is a useful caching heuristic
+            sequentsAlreadyProved.update(sequent, termsFound)
+            termsFound
           }
-          // TODO: refactor this if there is a useful caching heuristic
-          sequentsAlreadyProved.update(sequent, termsFound)
-          termsFound
         }
     }
   }
