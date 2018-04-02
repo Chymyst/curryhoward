@@ -1,6 +1,6 @@
 package io.chymyst.ch.unit
 
-import io.chymyst.ch.Macros.typeExpr
+import io.chymyst.ch.typeExpr
 import org.scalatest.{FlatSpec, Matchers}
 
 class MatchTypeSpec extends FlatSpec with Matchers {
