@@ -212,7 +212,8 @@ object LJT {
 
   // (G*, X, X ⇒ A) |- B when (G*, X, A) |- B  -- rule ->L1
   // Note: there may be several ways of choosing X and X ⇒ A having the same types,
-  // so this rule returns several RuleResult items. This rule is invertible.
+  // so this rule may return several RuleResult items.
+  // This rule is invertible, but must be treated as non-invertible in order to get more proofs.
   private def ruleImplicationAtLeft1 = ForwardRule(name = "->L1", { sequent ⇒
     val indexedPremises = sequent.premises.zipWithIndex
     for {

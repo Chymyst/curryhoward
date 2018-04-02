@@ -31,7 +31,7 @@ case class Wrap2e[A](a: A) extends Wrap2
 
 class LJTSpec3 extends FlatSpec with Matchers with BeforeAndAfterEach {
 
-  override def beforeEach(): Unit = System.setProperty("curryhoward.log", "prover,macros,terms")
+  override def beforeEach(): Unit = System.setProperty("curryhoward.log", "prover,macros,terms,trace")
 
   override def afterEach(): Unit = System.clearProperty("curryhoward.log")
 
