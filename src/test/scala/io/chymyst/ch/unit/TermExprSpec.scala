@@ -8,8 +8,9 @@ class TermExprSpec extends FlatSpec with Matchers {
   val var12 = VarE("x1", TP("2"))
   val var23 = VarE("x2", TP("3"))
   val var32 = VarE("x3", TP("2"))
-  val termExpr1 = CurriedE(List(var23, var32, VarE("x4", TP("1"))), var32)
-  val termExpr2 = CurriedE(List(var23, var32, VarE("x4", TP("1"))), var12)
+  val var41 = VarE("x4", TP("1"))
+  val termExpr1 = CurriedE(List(var23, var32, var41), var32)
+  val termExpr2 = CurriedE(List(var23, var32, var41), var12)
   val termExpr3 = CurriedE(List(var12), termExpr2)
 
   behavior of "TermExpr miscellaneous methods"
@@ -26,11 +27,14 @@ class TermExprSpec extends FlatSpec with Matchers {
   }
 
   it should "produce error when subst is done with non-matching type" in {
+    val varZ = VarE("z", var23.t)
+    TermExpr.subst(var23, varZ, var32 =>: var23).prettyPrint shouldEqual "x3 ⇒ z"
+
     TermExpr.subst(var23, termExpr1, var32 =>: var23).prettyPrint shouldEqual "x3 ⇒ x2 ⇒ x3 ⇒ x4 ⇒ x3"
 
     the[Exception] thrownBy {
       TermExpr.subst(var23, termExpr1, var32 =>: var23.copy(t = TP("1"))) shouldEqual (var32 =>: termExpr1)
-    } should have message "Incorrect type 3 in subst(x2, \\((x2:3) ⇒ (x3:2) ⇒ (x4:1) ⇒ x3), \\((x3:2) ⇒ x2)), expected 1"
+    } should have message "In subst(x2, \\((x2:3) ⇒ (x3:2) ⇒ (x4:1) ⇒ x3), \\((x3:2) ⇒ x2)), found variable(s) (x2:1) with incorrect type(s), expected variable type 3"
   }
 
   it should "recover from incorrect substitution" in {
@@ -77,9 +81,9 @@ class TermExprSpec extends FlatSpec with Matchers {
   behavior of "TermExpr#freeVars"
 
   it should "detect free variables" in {
-    termExpr1.freeVars shouldEqual Seq()
-    termExpr2.freeVars shouldEqual Seq("x1")
-    termExpr3.freeVars shouldEqual Seq()
+    termExpr1.freeVarNames shouldEqual Seq()
+    termExpr2.freeVarNames shouldEqual Seq("x1")
+    termExpr3.freeVarNames shouldEqual Seq()
   }
 
   behavior of "TermExpr#equiv"

@@ -78,9 +78,9 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
   it should "produce lambda-terms when `implement` is used" in {
 
-    "val f0: () ⇒ Int = implement" shouldNot  compile
-//    TermExpr.lambdaTerm(f0).nonEmpty shouldEqual true
-//    f0.lambdaTerm.prettyPrint shouldEqual ""
+    "val f0: () ⇒ Int = implement" shouldNot compile
+    //    TermExpr.lambdaTerm(f0).nonEmpty shouldEqual true
+    //    f0.lambdaTerm.prettyPrint shouldEqual ""
 
     val f1: Int ⇒ Int = implement
     TermExpr.lambdaTerm(f1).nonEmpty shouldEqual true
@@ -552,32 +552,54 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     composition.t.prettyPrint should fullyMatch regex "\\(Z[0-9]+, A\\) ⇒ Tuple2\\[A,A\\]"
   }
 
-  it should "verify monad laws for Either" in {
-    type P[A] = Either[Int, A]
+  it should "perform alpha-conversions in match clauses" in {
+    val t = ofType[Option[Option[Int]] ⇒ Option[Int]].lambdaTerm
+    t.prettyPrint shouldEqual "a ⇒ a match { b ⇒ (None() + 0); c ⇒ c.value }"
+
+    type P[A] = Either[A, Int ⇒ A]
+
+    def ftn[A] = anyOfType[P[P[A]] ⇒ P[A]]().map(_.lambdaTerm)
 
     def px[X] = freshVar[P[X]]
 
-    def fmap[A, B] = freshVar[(A ⇒ B) ⇒ P[A] ⇒ P[B]]
+    ftn.map(_.prettyPrint) shouldEqual Seq(
+      "a ⇒ a match { b ⇒ b.value; c ⇒ (0 + Right(d ⇒ c.value d match { e ⇒ e.value; f ⇒ f.value d })) }",
+      "a ⇒ a match { b ⇒ b.value match { c ⇒ (0 + Right(d ⇒ c.value)); e ⇒ (0 + e) }; f ⇒ (0 + Right(g ⇒ f.value g match { h ⇒ h.value; i ⇒ i.value g })) }"
+    )
 
-    val fmapTerms = TheoremProver.findProofs(fmap.t)._1
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
 
-    println(s"Found ${fmapTerms.size} fmap terms ${fmapTerms.map(_.prettyPrint)}")
+    def flmTerms[A, B] = anyOfType[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]().map(_.lambdaTerm)
 
-    fmapTerms.size shouldEqual 1
-    val fmapTerm = fmapTerms.head
+    val ftnTerms = flmTerms.map(flm ⇒ (flm :@ (px =>: px)).simplify)
 
-    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+    ftnTerms.map(_.prettyPrint) shouldEqual Seq(
+      "b ⇒ b match { c ⇒ c.value; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e })) }",
+      "b ⇒ b match { c ⇒ (0 + Right(d ⇒ c.value match { e ⇒ e.value; f ⇒ f.value d })); g ⇒ (0 + Right(h ⇒ g.value h match { i ⇒ i.value; j ⇒ j.value h })) }",
+      "b ⇒ b match { c ⇒ c.value match { d ⇒ (0 + Right(e ⇒ d.value)); f ⇒ (0 + f) }; g ⇒ (0 + Right(h ⇒ g.value h match { i ⇒ i.value; j ⇒ j.value h })) }"
+    )
 
-    def pure[A] = freshVar[A ⇒ P[A]]
+    ftnTerms.filter { flatten ⇒
+      val lhs = (flatten :@@ flatten).simplify
+      val fmapFlatten = (fmapTerm :@ flatten).simplify
+      val rhs = (fmapFlatten :@@ flatten).simplify
+      lhs equiv rhs
+    }.map(_.prettyPrint) shouldEqual Seq()
+  }
+
+  behavior of "discovering monads"
+
+  def semimonadsAndMonads(fmapTerm: TermExpr, pureVar: TermExpr, flmVar: TermExpr): (Seq[TermExpr], Seq[(TermExpr, TermExpr)]) = {
+    val px = VarE("px", pureVar.t.asInstanceOf[#->].body)
 
     val initTime = System.currentTimeMillis()
-    val flmTerms = TheoremProver.findProofs(flm.t)._2
+    val flmTerms = TheoremProver.findProofs(flmVar.t)._2
     val elapsed = System.currentTimeMillis() - initTime
 
     // Compute flatten terms from flm terms
     val ftnTerms = flmTerms.map(flm ⇒ (flm :@ (px =>: px)).simplify)
 
-    val pureTerms = TheoremProver.findProofs(pure.t)._2
+    val pureTerms = TheoremProver.findProofs(pureVar.t)._2
 
     println(s"Computed ${flmTerms.size} flm terms in $elapsed ms, and ${pureTerms.size} pure terms")
 
@@ -590,6 +612,22 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
       pure ← pureTerms
       if LC.checkPureFlattenLaws(fmapTerm, pure, ftn)
     } yield (pure, ftn)
+
+    (goodSemimonads, goodMonads)
+  }
+
+  it should "verify monad laws for Either" in {
+    type P[A] = Either[Int, A]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
 
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
@@ -599,49 +637,20 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "discover polynomial monads" in {
-    type P[A] = Either[A, (A, A)]//Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)]
-// Either[A, Int ⇒ A] here triggers the bug with alpha-conversions!
+    type P[A] = Either[A, Int ⇒ A] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+    // Either[A, Int ⇒ A] here triggers the bug with alpha-conversions!
 
-    def px[X] = freshVar[P[X]]
-
-    def fmap[A, B] = freshVar[(A ⇒ B) ⇒ P[A] ⇒ P[B]]
-
-    val fmapTerms = TheoremProver.findProofs(fmap.t)._1
-
-    println(s"Found ${fmapTerms.size} fmap terms ${fmapTerms.map(_.prettyPrint)}")
-
-    fmapTerms.size shouldEqual 1
-    val fmapTerm = fmapTerms.head
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
 
     def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
 
-    // Too slow.
-    //    def ftn[A] = freshVar[P[P[A]] ⇒ P[A]]
-
     def pure[A] = freshVar[A ⇒ P[A]]
 
-    val initTime = System.currentTimeMillis()
-    val flmTerms = TheoremProver.findProofs(flm.t)._2
-    val elapsed = System.currentTimeMillis() - initTime
-
-    // Compute flatten terms from flm terms
-    val ftnTerms = flmTerms.map(flm ⇒ (flm :@ (px =>: px)).simplify)
-
-    val pureTerms = TheoremProver.findProofs(pure.t)._2
-
-    println(s"Computed ${flmTerms.size} flm terms in $elapsed ms, and ${pureTerms.size} pure terms")
-
-    val goodSemimonads: Seq[TermExpr] = ftnTerms.filter(LC.checkFlattenAssociativity(fmapTerm, _))
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
 
     println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
-
-    val goodMonads: Seq[(TermExpr, TermExpr)] = for {
-      ftn ← goodSemimonads
-      pure ← pureTerms
-      if LC.checkPureFlattenLaws(fmapTerm, pure, ftn)
-    } yield (pure, ftn)
-
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+    
   }
 }
