@@ -735,10 +735,18 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
   private[ch] override def simplifyOnceInternal(withEta: Boolean): TermExpr = {
     lazy val casesSimplified = cases.map(_.simplifyOnce(withEta))
     term.simplifyOnce(withEta) match {
+      // Match a fixed part of the disjunction; can be simplified to just one clause.
+      // Example: Left(a) match { case Left(x) => f(x); case Right(y) => ... } can be simplified to just f(a).
       case DisjunctE(index, total, termInjected, _) ⇒
         if (total === cases.length) {
           AppE(cases(index).simplifyOnce(withEta), termInjected).simplifyOnce(withEta)
         } else throw new Exception(s"Internal error: MatchE with ${cases.length} cases applied to DisjunctE with $total parts, but must be of equal size")
+
+      // Match of an inner match, can be simplified to a single match.
+      // Example: (Left(a) match { case Left(x) ⇒ ...; case Right(y) ⇒ ... }) match { case ... ⇒ ... }
+      // can be simplified to Left(a) match { case Left(x) ⇒ ... match { case ... ⇒ ...}; case Right(y) ⇒ ... match { case ... ⇒ ... } }
+      case MatchE(innerTerm, innerCases) ⇒
+        MatchE(innerTerm, innerCases map { case CurriedE(List(head), body) ⇒ CurriedE(List(head), MatchE(body, cases)) })
 
       // Detect the identity patterns:
       // MatchE(_, List(a ⇒ DisjunctE(0, total, a, _), a ⇒ DisjunctE(1, total, a, _), ...))

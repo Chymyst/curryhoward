@@ -590,5 +590,8 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+
+    goodSemimonads.size shouldEqual 1
+    goodMonads.size shouldEqual 1
   }
 }

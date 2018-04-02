@@ -15,7 +15,7 @@ object LawChecking {
     // pure . ftn = id
     val pf = (pure :@@ flatten).simplify.prettyRename // pf: F[A] ⇒ F[A]
     val faType = pf.t.asInstanceOf[#->].head // This should fail if pf is not a function.
-    val x = freshVar[Nothing].copy(t = faType)
+    val x = VarE("x", faType)
     val idFA = x =>: x
 
     // fmap pure . ftn = id
