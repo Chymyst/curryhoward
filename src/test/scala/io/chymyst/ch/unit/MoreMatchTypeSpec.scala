@@ -9,48 +9,37 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
   behavior of "tuples"
 
   it should "get type with argument tuples" in {
-    def result[A, B]: (String, String) = testType[A ⇒ ((A, B)) ⇒ A]
+    def result[A, B] = typeExpr[A ⇒ ((A, B)) ⇒ A]
 
-    val r = result
-
-    r._2 shouldEqual "Tuple2[<c>String,<c>String]"
-    r._1 shouldEqual "A ⇒ Tuple2[A,B] ⇒ A"
+    result.prettyPrint shouldEqual "A ⇒ Tuple2[A,B] ⇒ A"
   }
 
   it should "get type with nested argument tuples" in {
-    def result[A, B]: (String, String) = testType[(((A, B)) ⇒ A) ⇒ A]
+    def result[A, B] = typeExpr[(((A, B)) ⇒ A) ⇒ A]
 
-    val r = result
-
-    r._2 shouldEqual "Tuple2[<c>String,<c>String]"
-    r._1 shouldEqual "(Tuple2[A,B] ⇒ A) ⇒ A"
+    result.prettyPrint
+    "(Tuple2[A,B] ⇒ A) ⇒ A"
   }
 
   it should "get a complicated type with argument tuples" in {
-    def result[S, A, B]: (String, String) = testType[(S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S))]
+    def result[S, A, B] = typeExpr[(S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S))]
 
-    val r = result
-
-    r._2 shouldEqual "Tuple2[<c>String,<c>String]"
-    r._1 shouldEqual "(S ⇒ Tuple2[A,S]) ⇒ (Tuple2[A,S] ⇒ Tuple2[B,S]) ⇒ S ⇒ Tuple2[B,S]"
+    result.prettyPrint
+    "(S ⇒ Tuple2[A,S]) ⇒ (Tuple2[A,S] ⇒ Tuple2[B,S]) ⇒ S ⇒ Tuple2[B,S]"
   }
 
   behavior of "Java-style function argument groups"
 
   it should "get type with argument group" in {
-    def result[A, B]: (String, String) = testType[A ⇒ (A, B) ⇒ A]
+    def result[A, B] = typeExpr[A ⇒ (A, B) ⇒ A]
 
-    val r = result
-
-    r._1 shouldEqual "A ⇒ (A, B) ⇒ A"
+    result.prettyPrint shouldEqual "A ⇒ (A, B) ⇒ A"
   }
 
   it should "get type with argument group in higher-order function" in {
-    def result[A, B, C]: (String, String) = testType[A ⇒ ((A, B, C) ⇒ A) ⇒ B]
+    def result[A, B, C] = typeExpr[A ⇒ ((A, B, C) ⇒ A) ⇒ B]
 
-    val r = result
-
-    r._1 shouldEqual "A ⇒ ((A, B, C) ⇒ A) ⇒ B"
+    result.prettyPrint shouldEqual "A ⇒ ((A, B, C) ⇒ A) ⇒ B"
   }
 
   it should "use ConjunctT to emit code for Java-style argument group" in {
@@ -79,7 +68,7 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
   it should "match type with nested type parameters" in {
     def r[U, V] = freshVar[Option[U] ⇒ Option[Option[V]]].t
 
-    r.prettyPrint shouldEqual "Option[U]{None.type + Some[U]} ⇒ Option[Option[V]{None.type + Some[V]}]{None.type + Some[Option[V]{None.type + Some[V]}]}"
+    r.prettyPrintVerbose shouldEqual "Option[U]{None.type + Some[U]} ⇒ Option[Option[V]{None.type + Some[V]}]{None.type + Some[Option[V]{None.type + Some[V]}]}"
 
     val A = "A"
     val B = "B"
@@ -96,21 +85,19 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
   behavior of "other syntax"
 
   it should "get type of conventional syntax for function" in {
-    def result[A, B, C](x: A, y: B)(z: (C, C))(implicit t: Int): (String, String) = testType[A ⇒ C]
+    def result[A, B, C] = typeExpr[A ⇒ C]
 
-    val r = result(0, 0)((0, 0))(0)
-    r._1 shouldEqual "A ⇒ C"
-    r._2 shouldEqual "<tc>[A, B, C](x: A, y: B)(z: (C, C))(implicit t: Int)(String, String)"
+    result.prettyPrint shouldEqual "A ⇒ C"
   }
 
   behavior of "recursive types"
 
   it should "not hang on List type" in {
-    def result[A](x: List[A]): (String, String) = testType[A ⇒ List[A]]
+    def result[A](x: List[A]) = typeExpr[A ⇒ List[A]]
 
     val r = result(List(0))
-    r._1 shouldEqual "A ⇒ List[A]{::[A] + Nil.type}"
-    r._2 shouldEqual "<tc>[A](x: List[A])(String, String)"
+    r.prettyPrint
+    "A ⇒ List[A]"
   }
 
   it should "process List[A] ⇒ List[A]" in {
@@ -127,19 +114,15 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
 
     final case class Data[Q](f: List[(Q, Q, Int)], g: Int)
 
-    def result[A](x: Data[A]): (String, String) = testType[A ⇒ Data[A]]
+    def result[A] = typeExpr[A ⇒ Data[A]]
 
-    val r = result(Data(List((0, 0, 1)), 123))
-    r._1 shouldEqual "A ⇒ Data[A]"
-    r._2 shouldEqual "<tc>[A](x: Data[A])(String, String)"
+    result.prettyPrint shouldEqual "A ⇒ Data[A]"
   }
 
   it should "process Either containing List" in {
-    def result[P](): (String, String) = testType[P ⇒ Either[List[P], Option[P]]]
+    def result[P] = typeExpr[P ⇒ Either[List[P], Option[P]]]
 
-    val r = result()
-
-    r._1 shouldEqual "P ⇒ Either[List[P]{::[P] + Nil.type},Option[P]{None.type + Some[P]}]{Left[List[P]{::[P] + Nil.type},Option[P]{None.type + Some[P]}] + Right[List[P]{::[P] + Nil.type},Option[P]{None.type + Some[P]}]}"
+    result.prettyPrint shouldEqual "P ⇒ Either[List[P],Option[P]]"
   }
 
   it should "process a recursive case class (infinite product)" in {
@@ -164,7 +147,8 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
     val r = freshVar[InfiniteSum[Int]].t
     r shouldEqual DisjunctT("InfiniteSum", List(BasicT("Int")), List(NamedConjunctT("Element", List(BasicT("Int")), List("t"), List(BasicT("Int"))), NamedConjunctT("RecursiveSum", List(BasicT("Int")), List("s"), List(RecurseT("InfiniteSum", List(BasicT("Int")))))))
 
-    r.prettyPrint shouldEqual "InfiniteSum[<c>Int]{Element[<c>Int] + RecursiveSum[<c>Int]}"
+    r.prettyPrint shouldEqual "InfiniteSum[<c>Int]"
+    r.prettyPrintVerbose shouldEqual "InfiniteSum[<c>Int]{Element[<c>Int] + RecursiveSum[<c>Int]}"
 
     RecurseT("Abc", List(TP("A"))).prettyPrint shouldEqual "<rec>Abc[A]"
     RecurseT("Abc", Nil).caseObjectName shouldEqual None
@@ -194,11 +178,11 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
     def result[Z] = freshVar[Z ⇒ Either[A[Z], Option[B[Z]]]].t
 
     val r = result[Int]
-    r.prettyPrint shouldEqual "Z ⇒ Either[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]{Left[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}] + Right[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]}"
+    r.prettyPrintVerbose shouldEqual "Z ⇒ Either[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]{Left[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}] + Right[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]}"
 
     val typeAInt = freshVar[A[Int]].t
     typeAInt shouldEqual DisjunctT("A", List(BasicT("Int")), List(NamedConjunctT("A1", List(BasicT("Int")), List("b1"), List(DisjunctT("B", List(BasicT("Int")), List(NamedConjunctT("B1", List(BasicT("Int")), List("a1"), List(RecurseT("A", List(BasicT("Int"))))), NamedConjunctT("B2", List(BasicT("Int")), List("b2"), List(RecurseT("B", List(BasicT("Int"))))))))), NamedConjunctT("A2", List(BasicT("Int")), List("a2"), List(RecurseT("A", List(BasicT("Int")))))))
-    typeAInt.prettyPrint shouldEqual "A[<c>Int]{A1[<c>Int] + A2[<c>Int]}"
+    typeAInt.prettyPrintVerbose shouldEqual "A[<c>Int]{A1[<c>Int] + A2[<c>Int]}"
   }
 
 }

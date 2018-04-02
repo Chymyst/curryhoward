@@ -334,15 +334,12 @@ class Macros(val c: whitebox.Context) {
     c.Expr[VarE](q"VarE($ident, $typeUExpr)")
   }
 
-  // This function is for testing buildTypeExpr().
-  def testTypeImpl[T: c.WeakTypeTag]: c.Expr[(String, String)] = {
+  def typeExprImpl[T: c.WeakTypeTag]: c.Expr[TypeExpr] = {
     val typeT: c.Type = c.weakTypeOf[T]
-    val enclosingType = c.internal.enclosingOwner.typeSignature
 
-    val s1 = buildTypeExpr(typeT).prettyPrint
-    val s2 = buildTypeExpr(enclosingType).prettyPrint
-
-    c.Expr[(String, String)](q"($s1,$s2)")
+    val s1 = buildTypeExpr(typeT)
+    import LiftedAST._
+    c.Expr[TypeExpr](q"$s1")
   }
 
   // Obtain one implementation of the type U. Detect the type U as given on the left-hand side.
@@ -485,7 +482,4 @@ object Macros {
     * @return The set of options defined by the user.
     */
   private[ch] def options: Set[String] = Option(System.getProperty("curryhoward.log")).getOrElse("").split(",").toSet
-
-  // These methods are for testing only.
-  private[ch] def testType[U]: (String, String) = macro Macros.testTypeImpl[U]
 }

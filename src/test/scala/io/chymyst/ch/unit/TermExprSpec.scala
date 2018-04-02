@@ -8,11 +8,19 @@ class TermExprSpec extends FlatSpec with Matchers {
   val var12 = VarE("x1", TP("2"))
   val var23 = VarE("x2", TP("3"))
   val var32 = VarE("x3", TP("2"))
-  val termExpr1 = CurriedE(List(var23, var32, VarE("x4", TP("1"))), var32)
-  val termExpr2 = CurriedE(List(var23, var32, VarE("x4", TP("1"))), var12)
+  val var41 = VarE("x4", TP("1"))
+  val termExpr1 = CurriedE(List(var23, var32, var41), var32)
+  val termExpr2 = CurriedE(List(var23, var32, var41), var12)
   val termExpr3 = CurriedE(List(var12), termExpr2)
 
   behavior of "TermExpr miscellaneous methods"
+
+  it should "compute identity function" in {
+    def idAB[A, B] = TermExpr.id(typeExpr[A ⇒ B])
+    idAB.prettyPrint shouldEqual "x ⇒ x"
+    idAB.toString shouldEqual "\\((x:A ⇒ B) ⇒ x)"
+    idAB.t.prettyPrint shouldEqual "(A ⇒ B) ⇒ A ⇒ B"
+  }
 
   it should "compute term size" in {
     TermExpr.size(termExpr1) shouldEqual 7 // x2 ⇒ x3 ⇒ x4 ⇒ x3
@@ -26,11 +34,14 @@ class TermExprSpec extends FlatSpec with Matchers {
   }
 
   it should "produce error when subst is done with non-matching type" in {
+    val varZ = VarE("z", var23.t)
+    TermExpr.subst(var23, varZ, var32 =>: var23).prettyPrint shouldEqual "x3 ⇒ z"
+
     TermExpr.subst(var23, termExpr1, var32 =>: var23).prettyPrint shouldEqual "x3 ⇒ x2 ⇒ x3 ⇒ x4 ⇒ x3"
 
     the[Exception] thrownBy {
       TermExpr.subst(var23, termExpr1, var32 =>: var23.copy(t = TP("1"))) shouldEqual (var32 =>: termExpr1)
-    } should have message "Incorrect type 3 in subst(x2, \\((x2:3) ⇒ (x3:2) ⇒ (x4:1) ⇒ x3), \\((x3:2) ⇒ x2)), expected 1"
+    } should have message "In subst(x2, \\((x2:3) ⇒ (x3:2) ⇒ (x4:1) ⇒ x3), \\((x3:2) ⇒ x2)), found variable(s) (x2:1) with incorrect type(s), expected variable type 3"
   }
 
   it should "recover from incorrect substitution" in {
@@ -39,8 +50,12 @@ class TermExprSpec extends FlatSpec with Matchers {
     val x = xV.copy(name = "x") // Rename this variable to avoid non-determinism in variable name during tests.
     val pair = p(x, x)
 
-    the[Exception] thrownBy TermExpr.subst(var23, pair, var23 =>: var12) should // The `subst` tries to replace `var23` in `var23 =>: var12` with `pair`, which is a NamedConjunctE.
-      have message "Incorrect substitution of bound variable x2 by non-variable Tuple2(x, x) in substMap(x2 ⇒ x1)(...)"
+    TermExpr.subst(var23, pair, var23 =>: var12) shouldEqual var23 =>: var12
+
+    the[Exception] thrownBy TermExpr.substMap(var23 =>: var12) {
+      case VarE(_, _) ⇒ pair
+    } should // The `subst` tries to replace `var23` in `var23 =>: var12` with `pair`, which is a NamedConjunctE.
+      have message "Incorrect substitution of bound variable x2 by non-variable Tuple2(x, x) in substMap(x2 ⇒ x1){...}"
   }
 
   behavior of "TermExpr#renameVar"
@@ -77,9 +92,9 @@ class TermExprSpec extends FlatSpec with Matchers {
   behavior of "TermExpr#freeVars"
 
   it should "detect free variables" in {
-    termExpr1.freeVars shouldEqual Seq()
-    termExpr2.freeVars shouldEqual Seq("x1")
-    termExpr3.freeVars shouldEqual Seq()
+    termExpr1.freeVarNames shouldEqual Seq()
+    termExpr2.freeVarNames shouldEqual Seq("x1")
+    termExpr3.freeVarNames shouldEqual Seq()
   }
 
   behavior of "TermExpr#equiv"
@@ -170,7 +185,9 @@ class TermExprSpec extends FlatSpec with Matchers {
 
     val ftnA = flatten.head.lambdaTerm
     val head = fmap.asInstanceOf[CurriedE].heads.head
-    TypeExpr.leftUnify(head.t, ftnA.t, head.t).asInstanceOf[Right[_, _]].value.asInstanceOf[Map[_, _]].size shouldEqual 2
+    TypeExpr.leftUnify(head.t, ftnA.t, head.t) match {
+      case Right(m: Map[TP, TypeExpr]) ⇒ m.size shouldEqual 2
+    }
     (fmap :@ ftnA).t.prettyPrint shouldEqual "Tuple2[Tuple2[Tuple2[A,A],Tuple2[A,A]],Tuple2[Tuple2[A,A],Tuple2[A,A]]] ⇒ Tuple2[Tuple2[A,A],Tuple2[A,A]]"
     (ftnA :@@ ftnA).t.prettyPrint shouldEqual "Tuple2[Tuple2[Tuple2[A,A],Tuple2[A,A]],Tuple2[Tuple2[A,A],Tuple2[A,A]]] ⇒ Tuple2[A,A]"
     (fmap @@: fmap).t.prettyPrint shouldEqual "(A ⇒ B) ⇒ Tuple2[Tuple2[A,A],Tuple2[A,A]] ⇒ Tuple2[Tuple2[B,B],Tuple2[B,B]]"
@@ -244,6 +261,32 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
     the[Exception] thrownBy (fmap :@@ (a =>: a)) should have message "Call to `:@@` is invalid because the function types ((A ⇒ B) ⇒ Tuple2[A,A] ⇒ Tuple2[B,B] and <c>Int ⇒ <c>Int) do not match: Cannot unify Tuple2[A,A] ⇒ Tuple2[B,B] with an incompatible type <c>Int"
     the[Exception] thrownBy (a :@ (a =>: a)) should have message "Call to `:@` is invalid because the head term a of type <c>Int is not a function"
     the[Exception] thrownBy (fmap :@ a) should have message "Cannot unify A ⇒ B with an incompatible type <c>Int"
+  }
+
+  it should "generate different implementations for tuples" in {
+    type P[A] = Either[A, (A, A, A)]
+
+    def fmap[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def pure[A] = ofType[A ⇒ P[A]].lambdaTerm
+
+    //    def flattens[A] = anyOfType[P[P[A]] ⇒ P[A]]()
+
+    //    println(flattens.size)
+
+    def f[A] = allOfType[Option[(A, A, A)] ⇒ Option[(A, A, A)]]()
+
+    println(f.size)
+    //    f[Int].map(_.lambdaTerm.prettyPrint).sorted.foreach(println)
+    //    f.size shouldEqual factorial(4)
+  }
+
+  it should "generate match clauses" in {
+    def f[A] = anyOfType[Option[Option[A]] ⇒ Option[Option[A]]]().map(_.lambdaTerm)
+
+    println(f.size)
+    f.map(_.prettyPrint).foreach(println)
+
   }
 
 }

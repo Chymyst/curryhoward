@@ -95,6 +95,19 @@ package object ch {
     */
   def freshVar[X]: VarE = macro Macros.freshVarImpl[X]
 
+  /** Construct a lambda-calculus type expression of a specified Scala type.
+    *
+    * Example usage:
+    *
+    * {{{
+    *   val tInt = typeExpr[Int]
+    *   def idAType[A] = typeExpr[A ⇒ A]
+    * }}}
+    *
+    * @tparam U The Scala type for which the type expression is requested. Can use type parameters.
+    * @return A [[TypeExpr]] corresponding to the given Scala type.
+    */
+  def typeExpr[U]: TypeExpr = macro Macros.typeExprImpl[U]
 }
 
 // Note: for some reason, a macro with arguments cannot properly infer types.

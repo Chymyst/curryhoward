@@ -1,6 +1,7 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
+import io.chymyst.ch.data.{LawChecking => LC}
 import org.scalatest.{Assertion, FlatSpec, Matchers}
 
 class LambdaTermsSpec extends FlatSpec with Matchers {
@@ -76,14 +77,20 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "produce lambda-terms when `implement` is used" in {
-    val f1: Int ⇒ Int = implement
 
+    "val f0: () ⇒ Int = implement" shouldNot compile
+    //    TermExpr.lambdaTerm(f0).nonEmpty shouldEqual true
+    //    f0.lambdaTerm.prettyPrint shouldEqual ""
+
+    val f1: Int ⇒ Int = implement
     TermExpr.lambdaTerm(f1).nonEmpty shouldEqual true
+    f1.lambdaTerm.prettyPrint shouldEqual "a ⇒ a"
 
     the[Exception] thrownBy None.lambdaTerm should have message "Called `.lambdaTerm` on an expression None that has no attached lambda-term"
 
     val f2: (Int, String) ⇒ Int = implement
     TermExpr.lambdaTerm(f2).nonEmpty shouldEqual true
+    f2.lambdaTerm.prettyPrint shouldEqual "a ⇒ a._1"
 
     // We do not support functions with many arguments.
     val f3: (Int, String, String, String, String, String, String, String, String, String) ⇒ Int = implement
@@ -174,13 +181,13 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "return lambda terms together with the function when using `ofType` or `implement`" in {
-    def f2[A] = ofType[Unit ⇒ Either[A ⇒ A, Unit]]
+    def f2[A] = anyOfType[Unit ⇒ Either[A ⇒ A, Unit]]().map(_.lambdaTerm)
 
-    TermExpr.lambdaTerm(f2).map(_.prettyRenamePrint) shouldEqual Some("a ⇒ (0 + Right(a))")
+    f2.map(_.prettyRenamePrint) shouldEqual Seq("a ⇒ (Left(b ⇒ b) + 0)", "a ⇒ (0 + Right(1))")
 
-    def f2a[A]: Unit ⇒ Either[A ⇒ A, Unit] = implement
+    def f2a[A]: (A ⇒ A) ⇒ Either[A ⇒ A, Unit] = implement
 
-    TermExpr.lambdaTerm(f2a).map(_.prettyRenamePrint) shouldEqual Some("a ⇒ (0 + Right(a))")
+    TermExpr.lambdaTerm(f2a).map(_.prettyRenamePrint) shouldEqual Some("a ⇒ (Left(a) + 0)")
   }
 
   it should "verify identity law for Either[Int, T] as in tutorial" in {
@@ -293,15 +300,15 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     e1.t.typeParams shouldEqual Seq(BasicT("String"), BasicT("Int"))
 
-    the[Exception] thrownBy e1.accessor(1) should have message "Internal error: Cannot perform projection for term e1$25 : Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} because its type is not a conjunction"
+    the[Exception] thrownBy e1.accessor(1) should have message "Internal error: Cannot perform projection for term e1$25 : Either[<c>String,<c>Int] because its type is not a conjunction"
 
-    the[Exception] thrownBy e1() should have message "Calling .apply() on type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} requires one argument (disjunction injection value)"
+    the[Exception] thrownBy e1() should have message "Calling .apply() on type Either[<c>String,<c>Int] requires one argument (disjunction injection value)"
 
-    the[Exception] thrownBy e1.t() should have message "Calling .apply() on type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} requires one argument (disjunction injection value)"
+    the[Exception] thrownBy e1.t() should have message "Calling .apply() on type Either[<c>String,<c>Int] requires one argument (disjunction injection value)"
 
-    the[Exception] thrownBy e1(x) should have message "Cannot inject into disjunction since the given disjunction type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} does not contain the type None.type of the given term x$23"
+    the[Exception] thrownBy e1(x) should have message "Cannot inject into disjunction since the given disjunction type Either[<c>String,<c>Int] does not contain the type None.type of the given term x$23"
 
-    the[Exception] thrownBy e1.cases() should have message "Case match on Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} must use a sequence of 2 functions with matching types of arguments (Left[<c>String,<c>Int]; Right[<c>String,<c>Int]) and bodies, but have "
+    the[Exception] thrownBy e1.cases() should have message "Case match on Either[<c>String,<c>Int] must use a sequence of 2 functions with matching types of arguments (Left[<c>String,<c>Int]; Right[<c>String,<c>Int]) and bodies, but have "
 
     val u0 = freshVar[Unit]
     val u00 = u0()
@@ -318,7 +325,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val ct = ConjunctT(Seq(e1.t, u0.t))
     val cte = ct(e1, u0)
-    the[Exception] thrownBy cte(e1) should have message ".apply() must be called with 2 arguments on this type (Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]}, Unit) but it was called with 1 arguments"
+    the[Exception] thrownBy cte(e1) should have message ".apply() must be called with 2 arguments on this type (Either[<c>String,<c>Int], Unit) but it was called with 1 arguments"
 
     val i = freshVar[Int]
 
@@ -462,8 +469,8 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     (vF :@ (vInt, vUnit, vFloatFloat)).t shouldEqual vInt.t
 
     the[Exception] thrownBy (vF :@ (vInt, vUnit, vFloatInt)).t should have message "Cannot unify B with <c>Int because type parameter B requires incompatible substitutions <c>Float and <c>Int"
-    the[Exception] thrownBy (vF :@ vFloatFloat).t should have message "Cannot unify (A, Unit, Option[Tuple2[B,B]]{None.type + Some[Tuple2[B,B]]}) with an incompatible type Option[Tuple2[<c>Float,<c>Float]]{None.type + Some[Tuple2[<c>Float,<c>Float]]}"
-    (vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrint shouldEqual "A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]}"
+    the[Exception] thrownBy (vF :@ vFloatFloat).t should have message "Cannot unify (A, Unit, Option[Tuple2[B,B]]) with an incompatible type Option[Tuple2[<c>Float,<c>Float]]"
+    (vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrintVerbose shouldEqual "A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]}"
   }
 
   it should "have correct types for Option[Option[Int]]" in {
@@ -524,10 +531,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     def f[A, B] = freshVar[A ⇒ B]
 
     val leftSide = f @@: pure
-    leftSide.t.prettyPrint shouldEqual "A ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}"
+    leftSide.t.prettyPrint shouldEqual "A ⇒ Either[<c>Int,B]"
 
     val fmapF = fmapT :@ f
-    fmapF.t.prettyPrint shouldEqual "Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}"
+    fmapF.t.prettyPrint shouldEqual "Either[<c>Int,A] ⇒ Either[<c>Int,B]"
 
     val rightSide = pure :@@ (fmapT :@ f)
     leftSide equiv rightSide shouldEqual true
@@ -543,5 +550,215 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val composition = f :@@ pure
     composition.t.prettyPrint should fullyMatch regex "\\(Z[0-9]+, A\\) ⇒ Tuple2\\[A,A\\]"
+  }
+
+  it should "perform alpha-conversions in match clauses" in {
+    val t = ofType[Option[Option[Int]] ⇒ Option[Int]].lambdaTerm
+    t.prettyPrint shouldEqual "a ⇒ a match { b ⇒ (None() + 0); c ⇒ c.value }"
+
+    type P[A] = Either[A, Int ⇒ A]
+
+    def ftn[A] = anyOfType[P[P[A]] ⇒ P[A]]().map(_.lambdaTerm)
+
+    def px[X] = freshVar[P[X]]
+
+    ftn.map(_.prettyPrint) shouldEqual Seq(
+      "a ⇒ a match { b ⇒ b.value; c ⇒ (0 + Right(d ⇒ c.value d match { e ⇒ e.value; f ⇒ f.value d })) }",
+      "a ⇒ a match { b ⇒ b.value match { c ⇒ (0 + Right(d ⇒ c.value)); e ⇒ (0 + e) }; f ⇒ (0 + Right(g ⇒ f.value g match { h ⇒ h.value; i ⇒ i.value g })) }"
+    )
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flmTerms[A, B] = anyOfType[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]().map(_.lambdaTerm)
+
+    val ftnTerms = flmTerms.map(flm ⇒ (flm :@ (px =>: px)).simplify)
+
+    ftnTerms.map(_.prettyPrint) shouldEqual Seq(
+      "b ⇒ b match { c ⇒ c.value; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e })) }",
+      "b ⇒ b match { c ⇒ (0 + Right(d ⇒ c.value match { e ⇒ e.value; f ⇒ f.value d })); g ⇒ (0 + Right(h ⇒ g.value h match { i ⇒ i.value; j ⇒ j.value h })) }",
+      "b ⇒ b match { c ⇒ c.value match { d ⇒ (0 + Right(e ⇒ d.value)); f ⇒ (0 + f) }; g ⇒ (0 + Right(h ⇒ g.value h match { i ⇒ i.value; j ⇒ j.value h })) }"
+    )
+
+    val flatten = ftnTerms.head
+
+    val lhs = (flatten :@@ flatten).simplify
+    val expected = " match { c ⇒ c.value match { c ⇒ c.value; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e })) }; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value match { f ⇒ f.value; g ⇒ g.value e }; g ⇒ g.value e match { f ⇒ f.value; g ⇒ g.value e } })) }"
+    lhs.prettyPrint should endWith(expected)
+
+    val fmapFlatten = (fmapTerm :@ flatten).simplify
+    val rhs = (fmapFlatten :@@ flatten).simplify
+    rhs.prettyPrint should endWith(" match { c ⇒ c.value match { c ⇒ c.value; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e })) }; d ⇒ (0 + Right(e ⇒ d.value e match { c ⇒ c.value match { f ⇒ f.value; g ⇒ g.value e }; d ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e } })) }")
+    // TODO: should be able to rename to `expected`!
+  }
+
+  behavior of "discovering monads"
+
+  def semimonadsAndMonads(fmapTerm: TermExpr, pureVar: TermExpr, flmVar: TermExpr, debug: Boolean = false): (Seq[TermExpr], Seq[(TermExpr, TermExpr)]) = {
+    val px = VarE("px", pureVar.t.asInstanceOf[#->].body)
+
+    val initTime = System.currentTimeMillis()
+    val flmTerms = TheoremProver.findProofs(flmVar.t)._2
+    val elapsed = System.currentTimeMillis() - initTime
+
+    // Compute flatten terms from flm terms
+    val ftnTerms = flmTerms.map(flm ⇒ (flm :@ (px =>: px)).simplify)
+    if (debug) println(s"flatten terms: ${ftnTerms.map(_.prettyPrint)}")
+
+    val pureTerms = TheoremProver.findProofs(pureVar.t)._2
+    if (debug) println(s"pure terms: ${pureTerms.map(_.prettyPrint)}")
+
+    println(s"Computed ${flmTerms.size} flm terms in $elapsed ms, and ${pureTerms.size} pure terms")
+
+    val goodSemimonads: Seq[TermExpr] = ftnTerms.filter(LC.checkFlattenAssociativity(fmapTerm, _))
+
+    val goodMonads: Seq[(TermExpr, TermExpr)] = for {
+      ftn ← goodSemimonads
+      pure ← pureTerms
+      if LC.checkPureFlattenLaws(fmapTerm, pure, ftn)
+    } yield (pure, ftn)
+
+    (goodSemimonads, goodMonads)
+  }
+
+  it should "discover monad instance and verify monad laws for Either" in {
+    type P[A] = Either[Int, A]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
+
+    goodSemimonads.size shouldEqual 1
+    goodMonads.size shouldEqual 1
+  }
+
+  //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+
+  it should "check A + (C ⇒ A) monad" in {
+    type P[A] = Either[A, Int ⇒ A]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
+
+    goodSemimonads.size shouldEqual 2
+    goodMonads.size shouldEqual 1
+  }
+
+  it should "check 1 + A x A monad" in {
+    type P[A] = Option[(A, A)]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
+
+    goodSemimonads.size shouldEqual 5
+    goodMonads.size shouldEqual 0
+  }
+
+  it should "check C + A x A monad" in {
+    type P[A] = Either[Int, (A, A)]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
+
+    goodSemimonads.size shouldEqual 4
+    goodMonads.size shouldEqual 0
+  }
+
+  it should "check A + A monad" in {
+    type P[A] = Either[A, A]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
+
+    goodSemimonads.size shouldEqual 13
+    goodMonads.size shouldEqual 6
+  }
+
+  it should "check A + A x A monad" in {
+    type P[A] = Either[A, (A, A)]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
+
+    goodSemimonads.size shouldEqual 12
+    goodMonads.size shouldEqual 2
+  }
+
+  it should "check A + (1 ⇒ A) monad" in {
+    type P[A] = Either[A, Unit ⇒ A]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm, debug = true)
+
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
+
+    goodSemimonads.size shouldEqual 2
+    goodMonads.size shouldEqual 1
   }
 }

@@ -69,22 +69,27 @@ sealed trait TypeExpr {
     case ConstructorT(name, tParams) ⇒ ConstructorT(name, tParams.map(_.substTypeVars(substitutions)))
   }
 
-  lazy val prettyPrint: String = prettyPrintWithParentheses(0)
+  lazy val prettyPrint: String = prettyPrintWithParentheses(0, showDisjunctionParts = false)
 
-  private[ch] def prettyPrintWithParentheses(level: Int): String = this match {
-    case DisjunctT(constructor, tParams, terms) ⇒ s"$constructor${TypeExpr.tParamString(tParams)}{${terms.map(_.prettyPrintWithParentheses(1)).mkString(" + ")}}"
-    case ConjunctT(terms) ⇒ s"(${terms.map(_.prettyPrintWithParentheses(0)).mkString(", ")})"
+  lazy val prettyPrintVerbose: String = prettyPrintWithParentheses(0, showDisjunctionParts = true)
+
+  private[ch] def prettyPrintWithParentheses(level: Int, showDisjunctionParts: Boolean): String = this match {
+    case DisjunctT(constructor, tParams, terms) ⇒
+      val constructorString = s"$constructor${TypeExpr.tParamString(tParams, showDisjunctionParts)}"
+      val partsString = s"{${terms.map(_.prettyPrintWithParentheses(1, showDisjunctionParts)).mkString(" + ")}}"
+      if (showDisjunctionParts) constructorString + partsString else constructorString
+    case ConjunctT(terms) ⇒ s"(${terms.map(_.prettyPrintWithParentheses(0, showDisjunctionParts)).mkString(", ")})"
     case head #-> body ⇒
-      val r = s"${head.prettyPrintWithParentheses(1)} ⇒ ${body.prettyPrintWithParentheses(0)}"
+      val r = s"${head.prettyPrintWithParentheses(1, showDisjunctionParts)} ⇒ ${body.prettyPrintWithParentheses(0, showDisjunctionParts)}"
       if (level === 1) s"($r)" else r
     case BasicT(name) ⇒ s"<c>$name" // a basic, non-parameter type such as Int
-    case ConstructorT(fullExpr, tParams) ⇒ s"<tc>$fullExpr${TypeExpr.tParamString(tParams)}" // A type constructor (e.g. `Seq[Int]`), possibly with type arguments.
+    case ConstructorT(fullExpr, tParams) ⇒ s"<tc>$fullExpr${TypeExpr.tParamString(tParams, showDisjunctionParts)}" // A type constructor (e.g. `Seq[Int]`), possibly with type arguments.
     case TP(name) ⇒ s"$name"
     case NamedConjunctT(constructor, tParams, _, wrapped@_) ⇒
       //      val termString = "(" + wrapped.map(_.prettyPrint).mkString(",") + ")" // Too verbose.
       val typeSuffix = if (caseObjectName.isDefined) ".type" else ""
-      s"$constructor${TypeExpr.tParamString(tParams)}$typeSuffix"
-    case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams)}" // recursive instance of type
+      s"$constructor${TypeExpr.tParamString(tParams, showDisjunctionParts)}$typeSuffix"
+    case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams, showDisjunctionParts)}" // recursive instance of type
     case NothingT(_) ⇒ "0"
     case UnitT(name) ⇒ s"$name"
   }
@@ -176,7 +181,7 @@ object TypeExpr {
     * @return An updated substitution map, or an error message if unification cannot succeed.
     */
   private def leftUnifyRec(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr]): UnifyResult = {
-    import MonadEither._ // This is necessary to support Scala 2.11.
+    import MonadEither._ // This is necessary to support Scala 2.11. Do not remove this import.
     def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): UnifyResult = tuples.foldLeft[UnifyResult](Right(substitutions)) { case (prev, (t, t2)) ⇒
       prev.flatMap(p ⇒ leftUnifyRec(t, t2, p))
     }
@@ -186,16 +191,16 @@ object TypeExpr {
     val error: UnifyResult = Left(s"Cannot unify ${src.prettyPrint} with an incompatible type ${dst.prettyPrint}")
 
     def unifyTP(tp: TP, other: TypeExpr): UnifyResult = {
-      if (false) // && TypeExpr.allTypeParams(dst) contains tp)
-        Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable ${tp.prettyPrint} is used in the destination type")
-      else {
+//      if (TypeExpr.allTypeParams(dst) contains tp)
+//        Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable ${tp.prettyPrint} is used in the destination type")
+//      else {
         // Check that the new substitution does not contradict earlier substitutions for this variable.
         substitutions.get(tp) match {
           case Some(oldSubstitution) if other !== oldSubstitution ⇒ Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type parameter ${tp.prettyPrint} requires incompatible substitutions ${oldSubstitution.prettyPrint} and ${other.prettyPrint}")
           case _ ⇒ Right(Map(tp → other) ++ substitutions)
         }
 
-      }
+//      }
     }
 
     val result: UnifyResult = (src, dst) match {
@@ -230,11 +235,11 @@ object TypeExpr {
     result
   }
 
-  private[ch] def tParamString(tParams: Seq[TypeExpr]): String =
+  private[ch] def tParamString(tParams: Seq[TypeExpr], showDisjunctionParts: Boolean): String =
     if (tParams.isEmpty)
       ""
     else
-      s"[${tParams.map(_.prettyPrintWithParentheses(0)).mkString(",")}]"
+      s"[${tParams.map(_.prettyPrintWithParentheses(0, showDisjunctionParts)).mkString(",")}]"
 
   private def makeImplication(tpe1: TypeExpr, tpe2: TypeExpr): TypeExpr = #->(tpe1, tpe2)
 

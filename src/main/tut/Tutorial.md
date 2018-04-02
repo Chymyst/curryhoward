@@ -406,6 +406,13 @@ val b = freshVar[Int]
 a =>: b =>: a
 ```
 
+Identity functions are often required when checking algebraic laws.
+For convenience, the `TermExpr.id()` and `typeExpr` methods are provided, so that we could define `idA` like this:
+
+```tut
+def idA[A] = TermExpr.id(typeExpr[A])
+```
+
 Let us now apply the lambda-term `fmapT` to `idA`.
 
 ```tut:fail
@@ -523,7 +530,7 @@ For manipulating conjunction and disjunction types, the current API of the `curr
 - create a named disjunction from a given part
 - match on a given named disjunction, mapping each part via a given function
 
-## Example of working with lambda-terms
+## More examples of working with lambda-terms
 
 To illustrate these facilities, let us construct a lambda-term representing a function `getId` of type `Option[User] ⇒ Option[Long]` and apply that function to some test data.
 We will then implement this function automatically using the `curryhoward` library, and compare the resulting lambda-terms.
@@ -574,32 +581,37 @@ We need to inject `None.type` into the disjunction `Option[Long]`.
 
 This is done in three steps:
 
-- create a fresh variable `n` of type `Option[Long]`
-- create a value of type `None.type` using `n.t()` -- note that `None.type` is essentially a "named `Unit`", and we can always create values of a `Unit` type
-- using the variable `ol`'s type expression, lift the value of type `None.type` into the disjunction type `Option[Long]` using `ol.t()`
+- create a type expression `ol` for the Scala type `Option[Long]`
+- create a value of type `None.type` using `n.t()` -- note that `None.type` is essentially a "named `Unit`", and we can always create values of a `Unit` type with no extra data required
+- using the `apply` method of the type expression `ol`, lift the value of type `None.type` into the disjunction type `Option[Long]`
 
 ```tut
-val ol = freshVar[Option[Long]]
-val case1 = n =>: ol.t(n.t())
+val ol = typeExpr[Option[Long]]
+val case1 = n =>: ol(n.t())
 ```
+
+Instead of defining `ol` as a type expression, we could have defined it as a `freshVar` and accessed the variable's type expression as `.t`.
+When we do not need a variable separately, we can make a type expression directly using `typeExpr[]`.
 
 To implement the second case clause, we need to decompose `s` of type `Some[User]`.
 
-In STLC, the type `Some[User]` is a named conjunction consisting of a single part, of type `User`, which is again a named conjunction consisting of two parts.
-To access the parts of conjunctions, we can use the `apply` method with a zero-based index or an accessor name.
+In STLC, the type `Some[User]` is a named conjunction consisting of a single part (which is of type `User`).
+The type `User` is itself a named conjunction consisting of two parts.
+
+To access a specific part of a conjunction, we can use the `apply` method with a zero-based index or an accessor name.
 Let us use the index `0` to access the value of `Some`, and the name `"id"` to access the part of the `User` value.
 Thus, the user's `id` is accessed as `s(0)("id")`.
 
 It remains to construct the value of type `Option[Long]` out of the user's `id`.
 This is done using the following steps:
 
-- create a fresh variable of type `Some[Long]`
-- using that variable's type expression, create a named conjunction of type `Some[Long]` containing `id` as its only part
+- create a STLC type expression for the Scala type `Some[Long]`
+- using that type expression's `apply` method, create a named conjunction of type `Some[Long]` containing `id` as its only part
 - inject that value into the disjunction type `Option[Long]`
 
 ```tut
-val sl = freshVar[Some[Long]]
-val case2 = su =>: ol.t(sl.t(su(0)("id")))
+val sl = typeExpr[Some[Long]]
+val case2 = su =>: ol(sl(su(0)("id")))
 ```
 
 Now we are ready to write the match statement, which is done by using the `.cases` function on the disjunction value `u`:
@@ -628,16 +640,16 @@ We have obtained the resulting term, and we can see that it is what we expected 
 We will now check that the same lambda-term is obtained when implementing the function `getId` automatically using `curryhoward`.
 
 ```tut
-val getIdAuto = ofType[Option[User] ⇒ Option[Long]]
+val getIdAuto: Option[User] ⇒ Option[Long] = implement
 val getIdAutoTerm = getIdAuto.lambdaTerm
 getIdAutoTerm.prettyPrint
 getId.prettyPrint
 ``` 
 
 The `prettyRename` method will rename all variables in a given term to names `a`, `b`, `c`, and so on.
-Note that `prettyRenamePrint` performs a `prettyRename` before printing the term, and that `ofType` will always perform `prettyRename` as well, before returning a term.
+Note that `prettyRenamePrint` performs a `prettyRename` before printing the term, and that the macros `implement` and `ofType` will always perform `prettyRename` as well, before returning a term.
 
-Therefore, we need to run `prettyRename` on our term `getId` so that it becomes syntactically equal to `getIdAutoTerm`.
+For terms we constructed ourselves, such as `getId`, we need to run `prettyRename` so that the term becomes syntactically equal to `getIdAutoTerm`.
 The method `equiv` will do this automatically:
 
 ```tut
@@ -654,7 +666,8 @@ getIdAutoTerm equiv getId.prettyRename
 | `t.prettyRename` | `TermExpr ⇒ TermExpr` | rename variables in a term to `a`, `b`, `c`, etc., so that the term becomes more readable |
 | `t.prettyRenamePrint` | `TermExpr ⇒ String` | shorthand for `.prettyRename.prettyPrint` |
 | `a.t` | `TermExpr ⇒ TypeExpr` | get the type expression for a given term |
-| `freshVar[T]` | `VarE` | create a STLC variable with assigned type expression `T` -- here `T` can be a type parameter or a type expression such as `Int ⇒ Option[A]`  |
+| `typeExpr[T]` | type `T` | create a STLC type expression representing the Scala type `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int ⇒ Option[A]`   |
+| `freshVar[T]` | `VarE` | create a STLC variable with assigned Scala type expression `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int ⇒ Option[A]`; the name of the variable will be created automatically; shortcut for `VarE("name", typeExpr[T]`  |
 | `a =>: b` | `VarE ⇒ TermExpr ⇒ TermExpr` | create a STLC function term (lambda-calculus "abstraction") |
 | `a(b)` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` |
 | `a :@ b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term with automatic substitution of type variables in `a` -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` after some type variables in `a` have been substituted |

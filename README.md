@@ -28,7 +28,7 @@ def f[X, Y]: (X ⇒ Y) ⇒ (Int ⇒ X) ⇒ (Int ⇒ Y) = implement
 
 // The macro `implement` will automatically generate this code for the function body:
 // {
-//  (f: X ⇒ Y) ⇒ (r: Int ⇒ X) ⇒ (e: Int) ⇒ f(r(e))
+//  (g: X ⇒ Y) ⇒ (r: Int ⇒ X) ⇒ (e: Int) ⇒ g(r(e))
 // }
 
 ```
@@ -162,6 +162,7 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 # Revision history
 
+- 0.3.7 Implement the `typeExpr` macro instead of the old test-only API. Minor performance improvements and bug fixes (alpha-conversion for STLC terms). Tests for automatic discovery of some monads.
 - 0.3.6 STLC terms are now emitted for `implement` as well; the JVM bytecode limit is obviated; fixed bug with recognizing `Function10`.
 - 0.3.5 Added `:@@` and `@@:` operations to the STLC interpreter. Fixed a bug whereby `Tuple2(x._1, x._2)` was not simplified to `x`. Fixed other bugs in alpha-conversion of type parameters.
 - 0.3.4 Reduced verbosity by default. Fixed a bug uncovered during the demo in the February 2018 meetup presentation.

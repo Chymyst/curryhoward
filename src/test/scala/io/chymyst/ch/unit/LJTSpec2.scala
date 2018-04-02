@@ -298,9 +298,9 @@ class LJTSpec2 extends FlatSpec with Matchers {
 
     allOfType[((Int, String)) ⇒ Int].length shouldEqual 1
 
-    final case class A(x: Int, y: String)
+    final case class AA(x: Int, y: String)
 
-    allOfType[A ⇒ Int].length shouldEqual 1
+    allOfType[AA ⇒ Int].length shouldEqual 1
 
     allOfType[Either[Int, String] ⇒ (Int ⇒ Boolean) ⇒ (String ⇒ Boolean) ⇒ Boolean].length shouldEqual 1
 

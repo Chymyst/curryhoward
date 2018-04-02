@@ -1,10 +1,31 @@
 package io.chymyst.ch
 
 import io.chymyst.ch.Helper._
+import io.chymyst.ch.data.Monoid
+import io.chymyst.ch.data.Monoid.MonoidSyntax
 
 import scala.annotation.tailrec
 
 object TermExpr {
+
+  /** Convenience method to produce the identity function term of a given type.
+    *
+    * Example usage:
+    *
+    * {{{
+    *   def idAB[A, B] = TermExpr.id(typeExpr[A ⇒ B])
+    *   idAB.prettyPrint == "x ⇒ x"
+    *   idAB.t.prettyPrint == "(A ⇒ B) ⇒ A ⇒ B"
+    * }}}
+    *
+    * @param t Type for the argument of the identity function.
+    * @return A term for the identity function.
+    */
+  def id(t: TypeExpr): TermExpr = {
+    val v = VarE("x", t)
+    v =>: v
+  }
+
   @tailrec
   private[ch] def simplifyWithEtaUntilStable(t: TermExpr): TermExpr = {
     val simplified = t.simplifyOnce(withEta = true)
@@ -15,7 +36,6 @@ object TermExpr {
     if (p isDefinedAt termExpr)
       p(termExpr)
     else {
-      import io.chymyst.ch.Monoid.MonoidSyntax
       lazy val empty = Monoid.empty[R]
 
       def foldmap(termExpr: TermExpr): R = foldMap(termExpr)(p)
@@ -88,7 +108,7 @@ object TermExpr {
         // rename all vars to new names
         val vars1 = heads1.map(_.name)
         val vars2 = heads2.map(_.name)
-        val freshNames = allFreshNames(vars1, vars2, body1.freeVars ++ body2.freeVars)
+        val freshNames = allFreshNames(vars1, vars2, body1.freeVarNames ++ body2.freeVarNames)
         heads1.map(_.renameAllVars(vars1, freshNames)) === heads2.map(_.renameAllVars(vars2, freshNames)) &&
           equiv(body1.renameAllVars(vars1, freshNames), body2.renameAllVars(vars2, freshNames))
       case _ ⇒ false
@@ -105,7 +125,7 @@ object TermExpr {
       def substForCurriedHeads(varExpr: VarE): VarE = substMap(varExpr)(p) match {
         // Result must be a VarE, otherwise it's an error.
         case v: VarE ⇒ v
-        case other ⇒ throw new Exception(s"Incorrect substitution of bound variable $varExpr by non-variable ${other.prettyPrint} in substMap(${termExpr.prettyPrint})(...)")
+        case other ⇒ throw new Exception(s"Incorrect substitution of bound variable $varExpr by non-variable ${other.prettyPrint} in substMap(${termExpr.prettyPrint}){...}")
       }
 
       termExpr match {
@@ -121,17 +141,42 @@ object TermExpr {
       }
     }
 
-  def subst(replaceVar: VarE, expr: TermExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
-    case VarE(name, tExpr) if name === replaceVar.name ⇒
-      if (tExpr === replaceVar.t || TypeExpr.isDisjunctionPart(tExpr, replaceVar.t))
-        expr
-      else throw new Exception(s"Incorrect type ${replaceVar.t.prettyPrint} in subst($replaceVar, $expr, $inExpr), expected ${tExpr.prettyPrint}")
+  private def varMatchesType(thisVar: VarE, otherVar: VarE): Boolean = {
+    thisVar.name === otherVar.name && (thisVar.t === otherVar.t || TypeExpr.isDisjunctionPart(thisVar.t, otherVar.t))
   }
 
-  def substTypeVar(replaceTypeVar: TP, newTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
-    case VarE(name, tExpr) ⇒ VarE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
-    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)), tExpr.substTypeVar(replaceTypeVar, newTypeExpr).asInstanceOf[NamedConjunctT])
-    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
+  /** Replace all non-free occurrences of variable `replaceVar` by expression `byExpr` in `origExpr`.
+    *
+    * @param replaceVar A variable that may occur freely in `origExpr`.
+    * @param byExpr     A new expression to replace all free occurrences of that variable.
+    * @param origExpr   The original expression.
+    * @return A new expression where the variable has been substituted.
+    */
+  def subst(replaceVar: VarE, byExpr: TermExpr, origExpr: TermExpr): TermExpr = {
+    // Check that all instances of replaceVar in origExpr have the correct type.
+    val badVars = origExpr.freeVars.filter(_.name === replaceVar.name).filterNot(varMatchesType(_, replaceVar))
+    if (badVars.nonEmpty) {
+      throw new Exception(s"In subst($replaceVar, $byExpr, $origExpr), found variable(s) ${badVars.map(v ⇒ s"(${v.name}:${v.t.prettyPrint})").mkString(", ")} with incorrect type(s), expected variable type ${replaceVar.t.prettyPrint}")
+    }
+    // Do we need an alpha-conversion? Better be safe than sorry.
+    val (convertedReplaceVar, convertedOrigExpr) = if (byExpr.usedVarNames contains replaceVar.name) {
+      val convertedVar = VarE(freshIdents(), replaceVar.t)
+      val convertedExpr = subst(replaceVar, convertedVar, origExpr)
+      (convertedVar, convertedExpr)
+    } else (replaceVar, origExpr)
+
+    substMap(convertedOrigExpr) {
+      case c@CurriedE(heads, _) if heads.exists(_.name === convertedReplaceVar.name) ⇒ c
+      // If a variable from `heads` collides with `convertedReplaceVar`, we do not replace anything in the body.
+
+      case v@VarE(_, _) if varMatchesType(v, convertedReplaceVar) ⇒ byExpr
+    }
+  }
+
+  def substTypeVar(replaceTypeVar: TP, byTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
+    case VarE(name, tExpr) ⇒ VarE(name, tExpr.substTypeVar(replaceTypeVar, byTypeExpr))
+    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, byTypeExpr, _)), tExpr.substTypeVar(replaceTypeVar, byTypeExpr).asInstanceOf[NamedConjunctT])
+    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, byTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, byTypeExpr))
   }
 
   def substTypeVars(inExpr: TermExpr, substitutions: Map[TP, TypeExpr]): TermExpr = substMap(inExpr) {
@@ -194,6 +239,12 @@ object TermExpr {
     override def empty: Seq[T] = Seq()
 
     override def combine(x: Seq[T], y: Seq[T]): Seq[T] = x ++ y
+  }
+
+  implicit def monoidSet[T]: Monoid[Set[T]] = new Monoid[Set[T]] {
+    override def empty: Set[T] = Set()
+
+    override def combine(x: Set[T], y: Set[T]): Set[T] = x ++ y
   }
 
   // How many times each function uses its argument. Only counts when an argument is used more than once.
@@ -280,7 +331,7 @@ object TermExpr {
       override def combine(x: Set[String], y: Set[String]): Set[String] = x ++ y
     }
     foldMap(termExpr) {
-      case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVars) ++ unusedArgs(body)
+      case CurriedE(heads, body) ⇒ (heads.map(_.name).toSet -- body.freeVarNames) ++ unusedArgs(body)
       case MatchE(term, cases) ⇒ unusedArgs(term) ++ cases.flatMap {
         // The unused heads in this CurriedE are counted separately by `unusedMatchClauseVars`.
         case CurriedE(List(_), body) ⇒ unusedArgs(body)
@@ -461,12 +512,23 @@ sealed trait TermExpr {
     letter ← ('a' to 'z').toIterator
   } yield s"$letter$number"
 
-  lazy val prettyRename: TermExpr = {
-    val oldVars = usedVars diff freeVars // Do not rename free variables, since this leads to incorrect code!
+  private lazy val renameBoundVars: TermExpr = TermExpr.substMap(this) {
+    case CurriedE(heads, body) ⇒
+      val oldAndNewVars = heads.map { v ⇒ (v, VarE(TermExpr.freshIdents(), v.t)) }
+      val renamedBody = oldAndNewVars.foldLeft(body.renameBoundVars) { case (prev, (oldVar, newVar)) ⇒
+        TermExpr.subst(oldVar, newVar, prev)
+      }
+      CurriedE(oldAndNewVars.map(_._2), renamedBody)
+  }
+
+  lazy val prettyRename: TermExpr = renameBoundVars.prettyRenameVars
+
+  private lazy val prettyRenameVars: TermExpr = {
+    val oldVars = usedVarNames diff freeVarNames // Do not rename free variables, since this leads to incorrect code!
     // Use a `Seq` here rather than a `Set` for the list of variable names.
     // This achieves deterministic renaming, which is important for checking that different terms are equivalent up to renaming.
     val newVars = prettyVars.take(oldVars.length).toSeq
-    this.renameAllVars(oldVars, newVars)
+    renameAllVars(oldVars, newVars)
   }
 
   private[ch] def accessor(index: Int): String = t match {
@@ -505,7 +567,7 @@ sealed trait TermExpr {
     TermExpr.foldMap[Double](this) {
       case MatchE(_, cases) ⇒ cases.map {
         case CurriedE(List(prop), body) ⇒
-          val thisValue = if (body.freeVars contains prop.name) 0.0 else 1.0
+          val thisValue = if (body.freeVarNames contains prop.name) 0.0 else 1.0
           thisValue + body.unusedMatchClauseVars
         case c ⇒ c.unusedMatchClauseVars
       }.sum / cases.length.toDouble
@@ -541,21 +603,30 @@ sealed trait TermExpr {
     }
   }
 
-  lazy val freeVars: Seq[String] = {
+  lazy val freeVarNames: Seq[String] = {
     import TermExpr.monoidSeq
     TermExpr.foldMap(this) {
       case VarE(name, _) ⇒ Seq(name)
-      case CurriedE(heads, body) ⇒ body.freeVars.filterNot(heads.map(_.name).toSet.contains)
-      case p: ProjectE ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
+      case CurriedE(heads, body) ⇒ body.freeVarNames.filterNot(heads.map(_.name).toSet.contains)
+      case p: ProjectE ⇒ p.getProjection.map(_.freeVarNames).getOrElse(p.term.freeVarNames)
     }.distinct
   }
 
-  lazy val usedVars: Seq[String] = {
+  lazy val usedVarNames: Seq[String] = {
     import TermExpr.monoidSeq
     TermExpr.foldMap(this) {
       case VarE(name, _) ⇒ Seq(name)
-      case p: ProjectE ⇒ p.getProjection.map(_.usedVars).getOrElse(p.term.usedVars)
+      case p: ProjectE ⇒ p.getProjection.map(_.usedVarNames).getOrElse(p.term.usedVarNames)
     }.distinct
+  }
+
+  lazy val freeVars: Set[VarE] = {
+    import TermExpr.monoidSet
+    TermExpr.foldMap(this) {
+      case v@VarE(_, _) ⇒ Set(v)
+      case CurriedE(heads, body) ⇒ body.freeVars -- heads.toSet
+      case p: ProjectE ⇒ p.getProjection.map(_.freeVars).getOrElse(p.term.freeVars)
+    }
   }
 
   def varCount(varName: String): Int = {
@@ -565,7 +636,7 @@ sealed trait TermExpr {
     }
   }
 
-  // Rename all variable at once *everywhere* in the expression. (This is not the alpha-conversion!)
+  // Rename all variable at once *everywhere* in the expression. (This is not an alpha-conversion!)
   def renameAllVars(oldNames: Seq[String], newNames: Seq[String]): TermExpr = {
     renameAllVars(oldNames.zip(newNames).toMap)
   }
@@ -622,7 +693,7 @@ final case class CurriedE(heads: List[VarE], body: TermExpr) extends TermExpr {
         headsLength > 0 && {
         val lastHead = heads(headsLength - 1)
         lastHead.asInstanceOf[TermExpr] === fBody &&
-          !fHead.freeVars.contains(lastHead.name) // Cannot replace a ⇒ f(... a ... ) a by f (... a ...)!
+          !fHead.freeVarNames.contains(lastHead.name) // Cannot replace a ⇒ f(... a ... ) a by f (... a ...)!
       } ⇒
         if (headsLength > 1)
           CurriedE(heads.slice(0, headsLength - 1), fHead)
@@ -734,10 +805,18 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
   private[ch] override def simplifyOnceInternal(withEta: Boolean): TermExpr = {
     lazy val casesSimplified = cases.map(_.simplifyOnce(withEta))
     term.simplifyOnce(withEta) match {
+      // Match a fixed part of the disjunction; can be simplified to just one clause.
+      // Example: Left(a) match { case Left(x) => f(x); case Right(y) => ... } can be simplified to just f(a).
       case DisjunctE(index, total, termInjected, _) ⇒
         if (total === cases.length) {
           AppE(cases(index).simplifyOnce(withEta), termInjected).simplifyOnce(withEta)
         } else throw new Exception(s"Internal error: MatchE with ${cases.length} cases applied to DisjunctE with $total parts, but must be of equal size")
+
+      // Match of an inner match, can be simplified to a single match.
+      // Example: (Left(a) match { case Left(x) ⇒ ...; case Right(y) ⇒ ... }) match { case ... ⇒ ... }
+      // can be simplified to Left(a) match { case Left(x) ⇒ ... match { case ... ⇒ ...}; case Right(y) ⇒ ... match { case ... ⇒ ... } }
+      case MatchE(innerTerm, innerCases) ⇒
+        MatchE(innerTerm, innerCases map { case CurriedE(List(head), body) ⇒ CurriedE(List(head), MatchE(body, cases)) })
 
       // Detect the identity patterns:
       // MatchE(_, List(a ⇒ DisjunctE(0, total, a, _), a ⇒ DisjunctE(1, total, a, _), ...))
