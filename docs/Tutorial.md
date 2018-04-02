@@ -454,7 +454,7 @@ scala> def fmap[A, B]: (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] = impleme
 fmap: [A, B]=> (A => B) => (Either[Int,A] => Either[Int,B])
 
 scala> val fmapT = fmap.lambdaTerm // No need to specify type parameters here.
-fmapT: io.chymyst.ch.TermExpr = \((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))}))
+fmapT: io.chymyst.ch.TermExpr = \((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))}))
 
 scala> fmapT.prettyPrint
 res14: String = a ⇒ b ⇒ b match { c ⇒ (Left(c.value) + 0); d ⇒ (0 + Right(a d.value)) }
@@ -497,11 +497,11 @@ Let us now apply the lambda-term `fmapT` to `idA`.
 
 ```scala
 scala> val result = fmapT(idA)
-java.lang.Exception: Internal error: Invalid head type in application (\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3)): (A ⇒ B) ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]} must be a function with argument type A ⇒ A
-  at io.chymyst.ch.AppE.<init>(TermExpr.scala:583)
-  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:367)
-  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:364)
-  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:604)
+java.lang.Exception: Internal error: Invalid head type in application (\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3)): (A ⇒ B) ⇒ Either[<c>Int,A] ⇒ Either[<c>Int,B] must be a function with argument type A ⇒ A
+  at io.chymyst.ch.AppE.<init>(TermExpr.scala:591)
+  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:375)
+  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:372)
+  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:612)
   ... 48 elided
 ```
 
@@ -516,10 +516,10 @@ To do the type variable reassignment easier, we can use the method `:@` like thi
 
 ```scala
 scala> val f2 = fmapT :@ idA
-f2: io.chymyst.ch.TermExpr = (\((a:A ⇒ A) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3))
+f2: io.chymyst.ch.TermExpr = (\((a:A ⇒ A) ⇒ (b:Either[<c>Int,A]) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3))
 
 scala> f2.t.prettyPrint
-res16: String = Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}
+res16: String = Either[<c>Int,A] ⇒ Either[<c>Int,A]
 ```
 
 You can see from the type of `f2` that the type variables in `fmapT` have been automatically adjusted to match the given argument `idA`.
@@ -597,7 +597,7 @@ scala> val leftSide = f @@: pureT
 leftSide: io.chymyst.ch.TermExpr = \((x1:A) ⇒ (\((a:B) ⇒ (0 + Right(a))) (f$6 x1)))
 
 scala> val rightSide = pureT :@@ (fmapT :@ f)
-rightSide: io.chymyst.ch.TermExpr = \((x2:A) ⇒ ((\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) f$6) (\((a:A) ⇒ (0 + Right(a))) x2)))
+rightSide: io.chymyst.ch.TermExpr = \((x2:A) ⇒ ((\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) f$6) (\((a:A) ⇒ (0 + Right(a))) x2)))
 
 scala> assert(leftSide equiv rightSide)
 ```
@@ -727,7 +727,7 @@ Now we are ready to write the match statement, which is done by using the `.case
 
 ```scala
 scala> val getId = ou =>: ou.cases(case1, case2)
-getId: io.chymyst.ch.TermExpr = \((ou$7:Option[User]{None.type + Some[User]}) ⇒ (ou$7 match { \((n$8:None.type) ⇒ (<co>None() + 0)); \((su$9:Some[User]) ⇒ (0 + Some(su$9.value.id)))}))
+getId: io.chymyst.ch.TermExpr = \((ou$7:Option[User]) ⇒ (ou$7 match { \((n$8:None.type) ⇒ (<co>None() + 0)); \((su$9:Some[User]) ⇒ (0 + Some(su$9.value.id)))}))
 
 scala> getId.prettyPrint
 res20: String = ou$7 ⇒ ou$7 match { n$8 ⇒ (None() + 0); su$9 ⇒ (0 + Some(su$9.value.id)) }
@@ -762,7 +762,7 @@ We will now check that the same lambda-term is obtained when implementing the fu
 
 ```scala
 scala> val getIdAuto = ofType[Option[User] ⇒ Option[Long]]
-<console>:17: warning: type Option[User]{None.type + Some[User]} ⇒ Option[<c>Long]{None.type + Some[<c>Long]} has 2 implementations (laws need checking?):
+<console>:17: warning: type Option[User] ⇒ Option[<c>Long] has 2 implementations (laws need checking?):
  a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) } [score: (0,15000,0,0,0)];
  a ⇒ (None() + 0) [score: (1,0,0,0,0)].
        val getIdAuto = ofType[Option[User] ⇒ Option[Long]]
@@ -773,7 +773,7 @@ scala> val getIdAuto = ofType[Option[User] ⇒ Option[Long]]
 getIdAuto: io.chymyst.ch.Function1Lambda[Option[User],Option[Long]] = <function1>
 
 scala> val getIdAutoTerm = getIdAuto.lambdaTerm
-getIdAutoTerm: io.chymyst.ch.TermExpr = \((a:Option[User]{None.type + Some[User]}) ⇒ (a match { \((b:None.type) ⇒ (<co>None() + 0)); \((c:Some[User]) ⇒ (0 + Some(c.value.id)))}))
+getIdAutoTerm: io.chymyst.ch.TermExpr = \((a:Option[User]) ⇒ (a match { \((b:None.type) ⇒ (<co>None() + 0)); \((c:Some[User]) ⇒ (0 + Some(c.value.id)))}))
 
 scala> getIdAutoTerm.prettyPrint
 res21: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
@@ -803,7 +803,8 @@ res23: Boolean = true
 | `t.prettyRename` | `TermExpr ⇒ TermExpr` | rename variables in a term to `a`, `b`, `c`, etc., so that the term becomes more readable |
 | `t.prettyRenamePrint` | `TermExpr ⇒ String` | shorthand for `.prettyRename.prettyPrint` |
 | `a.t` | `TermExpr ⇒ TypeExpr` | get the type expression for a given term |
-| `freshVar[T]` | `VarE` | create a STLC variable with assigned type expression `T` -- here `T` can be a type parameter or a type expression such as `Int ⇒ Option[A]`  |
+| `typeExpr[T]` | type `T` | create a STLC type expression representing the Scala type `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int ⇒ Option[A]`   |
+| `freshVar[T]` | `VarE` | create a STLC variable with assigned Scala type expression `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int ⇒ Option[A]`; the name of the variable will be created automatically; shortcut for `VarE("name", typeExpr[T]`  |
 | `a =>: b` | `VarE ⇒ TermExpr ⇒ TermExpr` | create a STLC function term (lambda-calculus "abstraction") |
 | `a(b)` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` |
 | `a :@ b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term with automatic substitution of type variables in `a` -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` after some type variables in `a` have been substituted |

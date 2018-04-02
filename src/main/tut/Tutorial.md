@@ -654,7 +654,8 @@ getIdAutoTerm equiv getId.prettyRename
 | `t.prettyRename` | `TermExpr ⇒ TermExpr` | rename variables in a term to `a`, `b`, `c`, etc., so that the term becomes more readable |
 | `t.prettyRenamePrint` | `TermExpr ⇒ String` | shorthand for `.prettyRename.prettyPrint` |
 | `a.t` | `TermExpr ⇒ TypeExpr` | get the type expression for a given term |
-| `freshVar[T]` | `VarE` | create a STLC variable with assigned type expression `T` -- here `T` can be a type parameter or a type expression such as `Int ⇒ Option[A]`  |
+| `typeExpr[T]` | type `T` | create a STLC type expression representing the Scala type `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int ⇒ Option[A]`   |
+| `freshVar[T]` | `VarE` | create a STLC variable with assigned Scala type expression `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int ⇒ Option[A]`; the name of the variable will be created automatically; shortcut for `VarE("name", typeExpr[T]`  |
 | `a =>: b` | `VarE ⇒ TermExpr ⇒ TermExpr` | create a STLC function term (lambda-calculus "abstraction") |
 | `a(b)` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` |
 | `a :@ b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term with automatic substitution of type variables in `a` -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` after some type variables in `a` have been substituted |
