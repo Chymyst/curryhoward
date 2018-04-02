@@ -69,25 +69,27 @@ sealed trait TypeExpr {
     case ConstructorT(name, tParams) ⇒ ConstructorT(name, tParams.map(_.substTypeVars(substitutions)))
   }
 
-  lazy val prettyPrint: String = prettyPrintWithParentheses(0)
+  lazy val prettyPrint: String = prettyPrintWithParentheses(0, showDisjunctionParts = false)
 
-  private[ch] def prettyPrintWithParentheses(level: Int): String = this match {
+  lazy val prettyPrintVerbose: String = prettyPrintWithParentheses(0, showDisjunctionParts = true)
+
+  private[ch] def prettyPrintWithParentheses(level: Int, showDisjunctionParts: Boolean): String = this match {
     case DisjunctT(constructor, tParams, terms) ⇒
-      val constructorString = s"$constructor${TypeExpr.tParamString(tParams)}"
-      val partsString = "{${terms.map(_.prettyPrintWithParentheses(1)).mkString(" + ")}}"
-      constructorString // + partsString
-    case ConjunctT(terms) ⇒ s"(${terms.map(_.prettyPrintWithParentheses(0)).mkString(", ")})"
+      val constructorString = s"$constructor${TypeExpr.tParamString(tParams, showDisjunctionParts)}"
+      val partsString = s"{${terms.map(_.prettyPrintWithParentheses(1, showDisjunctionParts)).mkString(" + ")}}"
+      if (showDisjunctionParts) constructorString + partsString else constructorString
+    case ConjunctT(terms) ⇒ s"(${terms.map(_.prettyPrintWithParentheses(0, showDisjunctionParts)).mkString(", ")})"
     case head #-> body ⇒
-      val r = s"${head.prettyPrintWithParentheses(1)} ⇒ ${body.prettyPrintWithParentheses(0)}"
+      val r = s"${head.prettyPrintWithParentheses(1, showDisjunctionParts)} ⇒ ${body.prettyPrintWithParentheses(0, showDisjunctionParts)}"
       if (level === 1) s"($r)" else r
     case BasicT(name) ⇒ s"<c>$name" // a basic, non-parameter type such as Int
-    case ConstructorT(fullExpr, tParams) ⇒ s"<tc>$fullExpr${TypeExpr.tParamString(tParams)}" // A type constructor (e.g. `Seq[Int]`), possibly with type arguments.
+    case ConstructorT(fullExpr, tParams) ⇒ s"<tc>$fullExpr${TypeExpr.tParamString(tParams, showDisjunctionParts)}" // A type constructor (e.g. `Seq[Int]`), possibly with type arguments.
     case TP(name) ⇒ s"$name"
     case NamedConjunctT(constructor, tParams, _, wrapped@_) ⇒
       //      val termString = "(" + wrapped.map(_.prettyPrint).mkString(",") + ")" // Too verbose.
       val typeSuffix = if (caseObjectName.isDefined) ".type" else ""
-      s"$constructor${TypeExpr.tParamString(tParams)}$typeSuffix"
-    case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams)}" // recursive instance of type
+      s"$constructor${TypeExpr.tParamString(tParams, showDisjunctionParts)}$typeSuffix"
+    case RecurseT(name, tParams) ⇒ s"<rec>$name${TypeExpr.tParamString(tParams, showDisjunctionParts)}" // recursive instance of type
     case NothingT(_) ⇒ "0"
     case UnitT(name) ⇒ s"$name"
   }
@@ -233,11 +235,11 @@ object TypeExpr {
     result
   }
 
-  private[ch] def tParamString(tParams: Seq[TypeExpr]): String =
+  private[ch] def tParamString(tParams: Seq[TypeExpr], showDisjunctionParts: Boolean): String =
     if (tParams.isEmpty)
       ""
     else
-      s"[${tParams.map(_.prettyPrintWithParentheses(0)).mkString(",")}]"
+      s"[${tParams.map(_.prettyPrintWithParentheses(0, showDisjunctionParts)).mkString(",")}]"
 
   private def makeImplication(tpe1: TypeExpr, tpe2: TypeExpr): TypeExpr = #->(tpe1, tpe2)
 

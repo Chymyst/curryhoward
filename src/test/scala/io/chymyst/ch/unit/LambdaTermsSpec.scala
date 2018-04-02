@@ -294,15 +294,15 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     e1.t.typeParams shouldEqual Seq(BasicT("String"), BasicT("Int"))
 
-    the[Exception] thrownBy e1.accessor(1) should have message "Internal error: Cannot perform projection for term e1$25 : Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} because its type is not a conjunction"
+    the[Exception] thrownBy e1.accessor(1) should have message "Internal error: Cannot perform projection for term e1$25 : Either[<c>String,<c>Int] because its type is not a conjunction"
 
-    the[Exception] thrownBy e1() should have message "Calling .apply() on type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} requires one argument (disjunction injection value)"
+    the[Exception] thrownBy e1() should have message "Calling .apply() on type Either[<c>String,<c>Int] requires one argument (disjunction injection value)"
 
-    the[Exception] thrownBy e1.t() should have message "Calling .apply() on type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} requires one argument (disjunction injection value)"
+    the[Exception] thrownBy e1.t() should have message "Calling .apply() on type Either[<c>String,<c>Int] requires one argument (disjunction injection value)"
 
-    the[Exception] thrownBy e1(x) should have message "Cannot inject into disjunction since the given disjunction type Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} does not contain the type None.type of the given term x$23"
+    the[Exception] thrownBy e1(x) should have message "Cannot inject into disjunction since the given disjunction type Either[<c>String,<c>Int] does not contain the type None.type of the given term x$23"
 
-    the[Exception] thrownBy e1.cases() should have message "Case match on Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]} must use a sequence of 2 functions with matching types of arguments (Left[<c>String,<c>Int]; Right[<c>String,<c>Int]) and bodies, but have "
+    the[Exception] thrownBy e1.cases() should have message "Case match on Either[<c>String,<c>Int] must use a sequence of 2 functions with matching types of arguments (Left[<c>String,<c>Int]; Right[<c>String,<c>Int]) and bodies, but have "
 
     val u0 = freshVar[Unit]
     val u00 = u0()
@@ -319,7 +319,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val ct = ConjunctT(Seq(e1.t, u0.t))
     val cte = ct(e1, u0)
-    the[Exception] thrownBy cte(e1) should have message ".apply() must be called with 2 arguments on this type (Either[<c>String,<c>Int]{Left[<c>String,<c>Int] + Right[<c>String,<c>Int]}, Unit) but it was called with 1 arguments"
+    the[Exception] thrownBy cte(e1) should have message ".apply() must be called with 2 arguments on this type (Either[<c>String,<c>Int], Unit) but it was called with 1 arguments"
 
     val i = freshVar[Int]
 
@@ -463,8 +463,8 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     (vF :@ (vInt, vUnit, vFloatFloat)).t shouldEqual vInt.t
 
     the[Exception] thrownBy (vF :@ (vInt, vUnit, vFloatInt)).t should have message "Cannot unify B with <c>Int because type parameter B requires incompatible substitutions <c>Float and <c>Int"
-    the[Exception] thrownBy (vF :@ vFloatFloat).t should have message "Cannot unify (A, Unit, Option[Tuple2[B,B]]{None.type + Some[Tuple2[B,B]]}) with an incompatible type Option[Tuple2[<c>Float,<c>Float]]{None.type + Some[Tuple2[<c>Float,<c>Float]]}"
-    (vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrint shouldEqual "A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]}"
+    the[Exception] thrownBy (vF :@ vFloatFloat).t should have message "Cannot unify (A, Unit, Option[Tuple2[B,B]]) with an incompatible type Option[Tuple2[<c>Float,<c>Float]]"
+    (vF :@ (vA =>: vFloatInt, vUnit, vFloatFloat)).t.prettyPrintVerbose shouldEqual "A ⇒ Option[Tuple2[<c>Float,<c>Int]]{None.type + Some[Tuple2[<c>Float,<c>Int]]}"
   }
 
   it should "have correct types for Option[Option[Int]]" in {
@@ -525,10 +525,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     def f[A, B] = freshVar[A ⇒ B]
 
     val leftSide = f @@: pure
-    leftSide.t.prettyPrint shouldEqual "A ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}"
+    leftSide.t.prettyPrint shouldEqual "A ⇒ Either[<c>Int,B]"
 
     val fmapF = fmapT :@ f
-    fmapF.t.prettyPrint shouldEqual "Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]} ⇒ Either[<c>Int,B]{Left[<c>Int,B] + Right[<c>Int,B]}"
+    fmapF.t.prettyPrint shouldEqual "Either[<c>Int,A] ⇒ Either[<c>Int,B]"
 
     val rightSide = pure :@@ (fmapT :@ f)
     leftSide equiv rightSide shouldEqual true
