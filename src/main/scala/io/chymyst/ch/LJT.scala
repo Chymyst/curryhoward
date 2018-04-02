@@ -237,8 +237,8 @@ object LJT {
 
         val valueA = AppE(implPremiseVar, atomicPremiseVar)
         // The list of vars is (A, P1, P2, ..., X, ... PN)
-        val oldPremisesWithoutImplPremiseA = omitPremise(sequent.premiseVars.zipWithIndex, premiseXAIndex)
-        val result = TermExpr.applyCurried(proofTerm, valueA :: oldPremisesWithoutImplPremiseA)
+        val oldPremisesWithoutPremiseXA = omitPremise(sequent.premiseVars.zipWithIndex, premiseXAIndex)
+        val result = TermExpr.applyCurried(proofTerm, valueA :: oldPremisesWithoutPremiseXA)
         sequent.constructResultTerm(result)
       })
     }

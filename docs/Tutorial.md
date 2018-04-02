@@ -498,10 +498,10 @@ Let us now apply the lambda-term `fmapT` to `idA`.
 ```scala
 scala> val result = fmapT(idA)
 java.lang.Exception: Internal error: Invalid head type in application (\((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((a$3:A) ⇒ a$3)): (A ⇒ B) ⇒ Either[<c>Int,A] ⇒ Either[<c>Int,B] must be a function with argument type A ⇒ A
-  at io.chymyst.ch.AppE.<init>(TermExpr.scala:591)
-  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:375)
-  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:372)
-  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:612)
+  at io.chymyst.ch.AppE.<init>(TermExpr.scala:642)
+  at io.chymyst.ch.TermExpr.apply(TermExpr.scala:406)
+  at io.chymyst.ch.TermExpr.apply$(TermExpr.scala:403)
+  at io.chymyst.ch.CurriedE.apply(TermExpr.scala:663)
   ... 48 elided
 ```
 
