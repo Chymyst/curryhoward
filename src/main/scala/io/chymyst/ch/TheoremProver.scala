@@ -86,14 +86,14 @@ object TheoremProver {
     def obtainAndConcatProofs(ruleResult: RuleResult): Seq[TermExpr] = {
       if (debugTrace) println(s"DEBUG: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents.map(_.toString).mkString("; ")}")
       // All the new sequents need to be proved before we can continue. They may have several proofs each.
-      // TODO: use iterator here because some findTermExprs could be empty
+      // TODO: use iterator here because some findTermExprs could be empty?
       val t0 = System.currentTimeMillis()
       val newProofs: Seq[Seq[TermExpr]] = ruleResult.newSequents.map(findTermExprs)
       val explodedNewProofs: Seq[Seq[TermExpr]] = TheoremProver.explode(newProofs)
       val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
       val t1 = System.currentTimeMillis()
 
-      val result = transformedProofs.map(_.simplifyOnce()).distinct.sortBy(_.informationLossScore).take(maxTermsToSelect(sequent))
+      val result = transformedProofs.sortBy(_.informationLossScore).take(maxTermsToSelect(sequent))
       // Note: at this point, it is a mistake to do prettyRename, because we are calling this function recursively.
       // We will call prettyRename() at the very end of the proof search.
       if (debug) {

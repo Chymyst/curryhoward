@@ -217,27 +217,27 @@ object LJT {
   private def ruleImplicationAtLeft1 = ForwardRule(name = "->L1", { sequent ⇒
     val indexedPremises = sequent.premises.zipWithIndex
     for {
-      (implPremiseA, implPremiseI, atomicPremiseX) ← indexedPremises.collect { case (head #-> body, ind) ⇒ (body, ind, head) }
-      atomicPremiseI ← indexedPremises.filter(_._1 === atomicPremiseX).map(_._2)
+      (premiseXA, premiseXAIndex, premiseX) ← indexedPremises.collect { case (head #-> body, ind) ⇒ (body, ind, head) }
+      premiseXIndex ← indexedPremises.filter(_._1 === premiseX).map(_._2) // Use `find` here to take only one premise X.
     } yield {
       // Build the sequent (G*, X, A) |- B by excluding the premise X ⇒ A from the initial context, and by prepending A to it.
-      // In other words, the new premises are (A, G* \ { X ⇒ A }).
-      val newPremises = implPremiseA :: omitPremise(indexedPremises, implPremiseI)
+      // So the new premises are (A, G* \ { X ⇒ A }).
+      val newPremises = premiseXA :: omitPremise(indexedPremises, premiseXAIndex)
       val newSequent = sequent.copy(premises = newPremises)
       RuleResult("->L1", seq(newSequent), { proofTerms ⇒
         // This rule expects only one sub-proof term.
         val proofTerm = proofTerms.head
         // This term is of the type A => G* \ { X ⇒ A } => B.
-        // We need to build the term G* => B, knowing that X is in G* at index atomicPremiseI, and X ⇒ A at index implPremiseI.
+        // We need to build the term G* => B, knowing that X is in G* at index premiseXIndex, and X ⇒ A at index premiseXAIndex.
         // The arguments of TermExpr is the list (A, P1, P2, ..., X, ... PN) of some variables. We need to use sequent.premiseVars instead, or else sequent.constructResultTerm won't work.
         // That is, we need to apply the term CurriedE(heads, f) to our sequent's premise vars, slightly reordered.
-        val implPremiseVar = sequent.premiseVars(implPremiseI) // X ⇒ A
+        val implPremiseVar = sequent.premiseVars(premiseXAIndex) // X ⇒ A
 
-        val atomicPremiseVar = sequent.premiseVars(atomicPremiseI) // X
+        val atomicPremiseVar = sequent.premiseVars(premiseXIndex) // X
 
         val valueA = AppE(implPremiseVar, atomicPremiseVar)
         // The list of vars is (A, P1, P2, ..., X, ... PN)
-        val oldPremisesWithoutImplPremiseA = omitPremise(sequent.premiseVars.zipWithIndex, implPremiseI)
+        val oldPremisesWithoutImplPremiseA = omitPremise(sequent.premiseVars.zipWithIndex, premiseXAIndex)
         val result = TermExpr.applyCurried(proofTerm, valueA :: oldPremisesWithoutImplPremiseA)
         sequent.constructResultTerm(result)
       })
