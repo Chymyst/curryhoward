@@ -579,12 +579,16 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
       "b ⇒ b match { c ⇒ c.value match { d ⇒ (0 + Right(e ⇒ d.value)); f ⇒ (0 + f) }; g ⇒ (0 + Right(h ⇒ g.value h match { i ⇒ i.value; j ⇒ j.value h })) }"
     )
 
-    ftnTerms.filter { flatten ⇒
-      val lhs = (flatten :@@ flatten).simplify
-      val fmapFlatten = (fmapTerm :@ flatten).simplify
-      val rhs = (fmapFlatten :@@ flatten).simplify
-      lhs equiv rhs
-    }.map(_.prettyPrint) shouldEqual Seq()
+    val flatten = ftnTerms.head
+
+    val lhs = (flatten :@@ flatten).simplify
+    val expected = " match { c ⇒ c.value match { c ⇒ c.value; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e })) }; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value match { f ⇒ f.value; g ⇒ g.value e }; g ⇒ g.value e match { f ⇒ f.value; g ⇒ g.value e } })) }"
+    lhs.prettyPrint should endWith(expected)
+
+    val fmapFlatten = (fmapTerm :@ flatten).simplify
+    val rhs = (fmapFlatten :@@ flatten).simplify
+    rhs.prettyPrint should endWith (" match { c ⇒ c.value match { c ⇒ c.value; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e })) }; d ⇒ (0 + Right(e ⇒ d.value e match { c ⇒ c.value match { f ⇒ f.value; g ⇒ g.value e }; d ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e } })) }")
+    // TODO: should be able to rename to `expected`!
   }
 
   behavior of "discovering monads"
@@ -598,10 +602,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     // Compute flatten terms from flm terms
     val ftnTerms = flmTerms.map(flm ⇒ (flm :@ (px =>: px)).simplify)
-    if(debug) println(s"flatten terms: ${ftnTerms.map(_.prettyPrint)}")
+    if (debug) println(s"flatten terms: ${ftnTerms.map(_.prettyPrint)}")
 
     val pureTerms = TheoremProver.findProofs(pureVar.t)._2
-    if(debug) println(s"pure terms: ${pureTerms.map(_.prettyPrint)}")
+    if (debug) println(s"pure terms: ${pureTerms.map(_.prettyPrint)}")
 
     println(s"Computed ${flmTerms.size} flm terms in $elapsed ms, and ${pureTerms.size} pure terms")
 
@@ -655,8 +659,8 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
 
-    goodSemimonads.size shouldEqual 0
-    goodMonads.size shouldEqual 0
+    goodSemimonads.size shouldEqual 2
+    goodMonads.size shouldEqual 1
   }
 
   it should "check 1 + A x A monad" in {
@@ -674,7 +678,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
 
-    goodSemimonads.size shouldEqual 3
+    goodSemimonads.size shouldEqual 5
     goodMonads.size shouldEqual 0
   }
 
@@ -693,7 +697,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
 
-    goodSemimonads.size shouldEqual 2
+    goodSemimonads.size shouldEqual 4
     goodMonads.size shouldEqual 0
   }
 
@@ -712,8 +716,8 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
 
-    goodSemimonads.size shouldEqual 1
-    goodMonads.size shouldEqual 0
+    goodSemimonads.size shouldEqual 13
+    goodMonads.size shouldEqual 6
   }
 
   it should "check Id + A x A monad" in {
@@ -731,8 +735,8 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
 
-    goodSemimonads.size shouldEqual 2
-    goodMonads.size shouldEqual 0
+    goodSemimonads.size shouldEqual 12
+    goodMonads.size shouldEqual 2
   }
 
   it should "check A + 1 ⇒ A monad" in {
@@ -750,7 +754,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
 
-    goodSemimonads.size shouldEqual 0
-    goodMonads.size shouldEqual 0
+    goodSemimonads.size shouldEqual 2
+    goodMonads.size shouldEqual 1
   }
 }

@@ -43,8 +43,12 @@ class TermExprSpec extends FlatSpec with Matchers {
     val x = xV.copy(name = "x") // Rename this variable to avoid non-determinism in variable name during tests.
     val pair = p(x, x)
 
-    the[Exception] thrownBy TermExpr.subst(var23, pair, var23 =>: var12) should // The `subst` tries to replace `var23` in `var23 =>: var12` with `pair`, which is a NamedConjunctE.
-      have message "Incorrect substitution of bound variable x2 by non-variable Tuple2(x, x) in substMap(x2 ⇒ x1)(...)"
+    TermExpr.subst(var23, pair, var23 =>: var12) shouldEqual var23 =>: var12
+
+    the[Exception] thrownBy TermExpr.substMap(var23 =>: var12) {
+      case VarE(_, _) ⇒ pair
+    } should // The `subst` tries to replace `var23` in `var23 =>: var12` with `pair`, which is a NamedConjunctE.
+      have message "Incorrect substitution of bound variable x2 by non-variable Tuple2(x, x) in substMap(x2 ⇒ x1){...}"
   }
 
   behavior of "TermExpr#renameVar"

@@ -8,7 +8,7 @@ object LawChecking {
     // fmap ftn . ftn = ftn . ftn
     val lhs = flatten :@@ flatten
     val rhs = (fmap :@ flatten) :@@ flatten
-    //    println(s"check associativity laws for flatten = ${flatten.prettyPrint}:\n\tlhs = ${lhs.simplify.prettyRenamePrint}\n\trhs = ${rhs.simplify.prettyRenamePrint}")
+    //        println(s"check associativity laws for flatten = ${flatten.prettyPrint}:\n\tlhs = ${lhs.simplify.prettyRenamePrint}\n\trhs = ${rhs.simplify.prettyRenamePrint}")
     lhs equiv rhs
   }
 

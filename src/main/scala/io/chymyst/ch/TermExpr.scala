@@ -106,7 +106,7 @@ object TermExpr {
       def substForCurriedHeads(varExpr: VarE): VarE = substMap(varExpr)(p) match {
         // Result must be a VarE, otherwise it's an error.
         case v: VarE ⇒ v
-        case other ⇒ throw new Exception(s"Incorrect substitution of bound variable $varExpr by non-variable ${other.prettyPrint} in substMap(${termExpr.prettyPrint})(...)")
+        case other ⇒ throw new Exception(s"Incorrect substitution of bound variable $varExpr by non-variable ${other.prettyPrint} in substMap(${termExpr.prettyPrint}){...}")
       }
 
       termExpr match {
@@ -126,6 +126,13 @@ object TermExpr {
     thisVar.name === otherVar.name && (thisVar.t === otherVar.t || TypeExpr.isDisjunctionPart(thisVar.t, otherVar.t))
   }
 
+  /** Replace all non-free occurrences of variable `replaceVar` by expression `byExpr` in `origExpr`.
+    *
+    * @param replaceVar A variable that may occur freely in `origExpr`.
+    * @param byExpr     A new expression to replace all free occurrences of that variable.
+    * @param origExpr   The original expression.
+    * @return A new expression where the variable has been substituted.
+    */
   def subst(replaceVar: VarE, byExpr: TermExpr, origExpr: TermExpr): TermExpr = {
     // Check that all instances of replaceVar in origExpr have the correct type.
     val badVars = origExpr.freeVars.filter(_.name === replaceVar.name).filterNot(varMatchesType(_, replaceVar))
@@ -140,8 +147,8 @@ object TermExpr {
     } else (replaceVar, origExpr)
 
     substMap(convertedOrigExpr) {
-//      case CurriedE(heads, body) if heads.exists(_.name === convertedReplaceVar.name) ⇒
-      // At most one variable from `heads` may collide with `convertedReplaceVar`.
+      case c@CurriedE(heads, _) if heads.exists(_.name === convertedReplaceVar.name) ⇒ c
+      // If a variable from `heads` collides with `convertedReplaceVar`, we do not replace anything in the body.
 
       case v@VarE(_, _) if varMatchesType(v, convertedReplaceVar) ⇒ byExpr
     }
@@ -486,12 +493,23 @@ sealed trait TermExpr {
     letter ← ('a' to 'z').toIterator
   } yield s"$letter$number"
 
-  lazy val prettyRename: TermExpr = {
+  private lazy val renameBoundVars: TermExpr = TermExpr.substMap(this) {
+    case CurriedE(heads, body) ⇒
+      val oldAndNewVars = heads.map { v ⇒ (v, VarE(TermExpr.freshIdents(), v.t)) }
+      val renamedBody = oldAndNewVars.foldLeft(body.renameBoundVars) { case (prev, (oldVar, newVar)) ⇒
+        TermExpr.subst(oldVar, newVar, prev)
+      }
+      CurriedE(oldAndNewVars.map(_._2), renamedBody)
+  }
+
+  lazy val prettyRename: TermExpr = renameBoundVars.prettyRenameVars
+
+  private lazy val prettyRenameVars: TermExpr = {
     val oldVars = usedVarNames diff freeVarNames // Do not rename free variables, since this leads to incorrect code!
     // Use a `Seq` here rather than a `Set` for the list of variable names.
     // This achieves deterministic renaming, which is important for checking that different terms are equivalent up to renaming.
     val newVars = prettyVars.take(oldVars.length).toSeq
-    this.renameAllVars(oldVars, newVars)
+    renameAllVars(oldVars, newVars)
   }
 
   private[ch] def accessor(index: Int): String = t match {
