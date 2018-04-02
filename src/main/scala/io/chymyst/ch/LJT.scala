@@ -217,9 +217,10 @@ object LJT {
   private def ruleImplicationAtLeft1 = ForwardRule(name = "->L1", { sequent ⇒
     val indexedPremises = sequent.premises.zipWithIndex
     for {
-      (atomicPremiseX, atomicPremiseI) ← indexedPremises.filter(_._1.isAtomic)
+      (implPremiseA, implPremiseI, atomicPremiseX) ← indexedPremises.collect { case (head #-> body, ind) ⇒ (body, ind, head) }
+      atomicPremiseI ← indexedPremises.filter(_._1 === atomicPremiseX).map(_._2)
       // We only need to keep `body` and `ind` here.
-      (implPremiseA, implPremiseI) ← indexedPremises.collect { case (head #-> body, ind) if head === atomicPremiseX ⇒ (body, ind) }
+//      (implPremiseA, implPremiseI) ← indexedPremises.collect { case (head #-> body, ind) if head === atomicPremiseX ⇒ (body, ind) }
     } yield {
       // Build the sequent (G*, X, A) |- B by excluding the premise X ⇒ A from the initial context, and by prepending A to it.
       // In other words, the new premises are (A, G* \ { X ⇒ A }).

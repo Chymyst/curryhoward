@@ -83,7 +83,7 @@ object TheoremProver {
   // we might add more rules and/or modify the calculus LJT in the future.
   private[ch] def findTermExprs(sequent: Sequent): Seq[TermExpr] = {
 
-    def concatProofs(ruleResult: RuleResult): Seq[TermExpr] = {
+    def obtainAndConcatProofs(ruleResult: RuleResult): Seq[TermExpr] = {
       if (debugTrace) println(s"DEBUG: applied rule ${ruleResult.ruleName} to sequent $sequent, new sequents ${ruleResult.newSequents.map(_.toString).mkString("; ")}")
       // All the new sequents need to be proved before we can continue. They may have several proofs each.
       // TODO: use iterator here because some findTermExprs could be empty
@@ -113,7 +113,7 @@ object TheoremProver {
 
     def fromInvertibleAmbiguousRules: Seq[TermExpr] = invertibleAmbiguousRules
       .flatMap(_.applyTo(sequent))
-      .flatMap(concatProofs)
+      .flatMap(obtainAndConcatProofs)
 
     /** Apply all non-invertible (i.e. not guaranteed to work) rules.
       * Each non-invertible rule will generate some proofs or none.
@@ -124,7 +124,7 @@ object TheoremProver {
       */
     def fromNoninvertibleRules: Seq[TermExpr] = nonInvertibleRulesForSequent(sequent)
       .flatMap(_.applyTo(sequent))
-      .flatMap(concatProofs)
+      .flatMap(obtainAndConcatProofs)
 
     // Check whether we already saw this sequent. We may already have proved it, or we may not yet proved it but already saw it.
     sequentsAlreadyProved.get(sequent) match {
@@ -152,7 +152,7 @@ object TheoremProver {
             // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
             // We should apply that invertible rule and proceed from there.
             val fromRules: Seq[TermExpr] = fromInvertibleRules.headOption match {
-              case Some(ruleResult) ⇒ fromAxioms ++ concatProofs(ruleResult)
+              case Some(ruleResult) ⇒ fromAxioms ++ obtainAndConcatProofs(ruleResult)
               case None ⇒ fromAxioms ++ fromInvertibleAmbiguousRules ++ fromNoninvertibleRules
             }
             val termsFound = fromRules.map(_.simplifyOnce()).distinct
