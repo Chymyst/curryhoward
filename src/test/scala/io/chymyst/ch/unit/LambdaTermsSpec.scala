@@ -589,7 +589,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
   behavior of "discovering monads"
 
-  def semimonadsAndMonads(fmapTerm: TermExpr, pureVar: TermExpr, flmVar: TermExpr): (Seq[TermExpr], Seq[(TermExpr, TermExpr)]) = {
+  def semimonadsAndMonads(fmapTerm: TermExpr, pureVar: TermExpr, flmVar: TermExpr, debug: Boolean = false): (Seq[TermExpr], Seq[(TermExpr, TermExpr)]) = {
     val px = VarE("px", pureVar.t.asInstanceOf[#->].body)
 
     val initTime = System.currentTimeMillis()
@@ -598,8 +598,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     // Compute flatten terms from flm terms
     val ftnTerms = flmTerms.map(flm ⇒ (flm :@ (px =>: px)).simplify)
+    if(debug) println(s"flatten terms: ${ftnTerms.map(_.prettyPrint)}")
 
     val pureTerms = TheoremProver.findProofs(pureVar.t)._2
+    if(debug) println(s"pure terms: ${pureTerms.map(_.prettyPrint)}")
 
     println(s"Computed ${flmTerms.size} flm terms in $elapsed ms, and ${pureTerms.size} pure terms")
 
@@ -658,7 +660,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "check 1 + A x A monad" in {
-    type P[A] = Option[(A, A)] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+    type P[A] = Option[(A, A)]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
 
@@ -677,7 +679,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "check C + A x A monad" in {
-    type P[A] = Either[Int, (A, A)] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+    type P[A] = Either[Int, (A, A)]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
 
@@ -696,7 +698,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "check Id + Id monad" in {
-    type P[A] = Either[A, A] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+    type P[A] = Either[A, A]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
 
@@ -715,7 +717,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "check Id + A x A monad" in {
-    type P[A] = Either[A, (A, A)] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+    type P[A] = Either[A, (A, A)]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
 
@@ -730,6 +732,25 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
 
     goodSemimonads.size shouldEqual 2
+    goodMonads.size shouldEqual 0
+  }
+
+  it should "check A + 1 ⇒ A monad" in {
+    type P[A] = Either[A, Unit ⇒ A]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm, debug = true)
+
+    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+
+    goodSemimonads.size shouldEqual 0
     goodMonads.size shouldEqual 0
   }
 }
