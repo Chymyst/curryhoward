@@ -122,17 +122,17 @@ object TermExpr {
       }
     }
 
-  def subst(replaceVar: VarE, expr: TermExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
+  def subst(replaceVar: VarE, byExpr: TermExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
     case VarE(name, tExpr) if name === replaceVar.name ⇒
       if (tExpr === replaceVar.t || TypeExpr.isDisjunctionPart(tExpr, replaceVar.t))
-        expr
-      else throw new Exception(s"Incorrect type ${replaceVar.t.prettyPrint} in subst($replaceVar, $expr, $inExpr), expected ${tExpr.prettyPrint}")
+        byExpr
+      else throw new Exception(s"Incorrect type ${replaceVar.t.prettyPrint} in subst($replaceVar, $byExpr, $inExpr), expected ${tExpr.prettyPrint}")
   }
 
-  def substTypeVar(replaceTypeVar: TP, newTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
-    case VarE(name, tExpr) ⇒ VarE(name, tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
-    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, newTypeExpr, _)), tExpr.substTypeVar(replaceTypeVar, newTypeExpr).asInstanceOf[NamedConjunctT])
-    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, newTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, newTypeExpr))
+  def substTypeVar(replaceTypeVar: TP, byTypeExpr: TypeExpr, inExpr: TermExpr): TermExpr = substMap(inExpr) {
+    case VarE(name, tExpr) ⇒ VarE(name, tExpr.substTypeVar(replaceTypeVar, byTypeExpr))
+    case NamedConjunctE(terms, tExpr) ⇒ NamedConjunctE(terms.map(substTypeVar(replaceTypeVar, byTypeExpr, _)), tExpr.substTypeVar(replaceTypeVar, byTypeExpr).asInstanceOf[NamedConjunctT])
+    case DisjunctE(index, total, term, tExpr) ⇒ DisjunctE(index, total, substTypeVar(replaceTypeVar, byTypeExpr, term), tExpr.substTypeVar(replaceTypeVar, byTypeExpr))
   }
 
   def substTypeVars(inExpr: TermExpr, substitutions: Map[TP, TypeExpr]): TermExpr = substMap(inExpr) {

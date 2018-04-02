@@ -77,14 +77,20 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
   }
 
   it should "produce lambda-terms when `implement` is used" in {
-    val f1: Int ⇒ Int = implement
 
+    "val f0: () ⇒ Int = implement" shouldNot  compile
+//    TermExpr.lambdaTerm(f0).nonEmpty shouldEqual true
+//    f0.lambdaTerm.prettyPrint shouldEqual ""
+
+    val f1: Int ⇒ Int = implement
     TermExpr.lambdaTerm(f1).nonEmpty shouldEqual true
+    f1.lambdaTerm.prettyPrint shouldEqual "a ⇒ a"
 
     the[Exception] thrownBy None.lambdaTerm should have message "Called `.lambdaTerm` on an expression None that has no attached lambda-term"
 
     val f2: (Int, String) ⇒ Int = implement
     TermExpr.lambdaTerm(f2).nonEmpty shouldEqual true
+    f2.lambdaTerm.prettyPrint shouldEqual "a ⇒ a._1"
 
     // We do not support functions with many arguments.
     val f3: (Int, String, String, String, String, String, String, String, String, String) ⇒ Int = implement

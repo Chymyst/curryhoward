@@ -181,7 +181,7 @@ object TypeExpr {
     * @return An updated substitution map, or an error message if unification cannot succeed.
     */
   private def leftUnifyRec(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr]): UnifyResult = {
-    import MonadEither._ // This is necessary to support Scala 2.11.
+    import MonadEither._ // This is necessary to support Scala 2.11. Do not remove this import.
     def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): UnifyResult = tuples.foldLeft[UnifyResult](Right(substitutions)) { case (prev, (t, t2)) ⇒
       prev.flatMap(p ⇒ leftUnifyRec(t, t2, p))
     }
@@ -191,16 +191,16 @@ object TypeExpr {
     val error: UnifyResult = Left(s"Cannot unify ${src.prettyPrint} with an incompatible type ${dst.prettyPrint}")
 
     def unifyTP(tp: TP, other: TypeExpr): UnifyResult = {
-      if (false) // && TypeExpr.allTypeParams(dst) contains tp)
-        Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable ${tp.prettyPrint} is used in the destination type")
-      else {
+//      if (TypeExpr.allTypeParams(dst) contains tp)
+//        Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable ${tp.prettyPrint} is used in the destination type")
+//      else {
         // Check that the new substitution does not contradict earlier substitutions for this variable.
         substitutions.get(tp) match {
           case Some(oldSubstitution) if other !== oldSubstitution ⇒ Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type parameter ${tp.prettyPrint} requires incompatible substitutions ${oldSubstitution.prettyPrint} and ${other.prettyPrint}")
           case _ ⇒ Right(Map(tp → other) ++ substitutions)
         }
 
-      }
+//      }
     }
 
     val result: UnifyResult = (src, dst) match {
