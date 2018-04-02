@@ -72,7 +72,10 @@ sealed trait TypeExpr {
   lazy val prettyPrint: String = prettyPrintWithParentheses(0)
 
   private[ch] def prettyPrintWithParentheses(level: Int): String = this match {
-    case DisjunctT(constructor, tParams, terms) ⇒ s"$constructor${TypeExpr.tParamString(tParams)}{${terms.map(_.prettyPrintWithParentheses(1)).mkString(" + ")}}"
+    case DisjunctT(constructor, tParams, terms) ⇒
+      val constructorString = s"$constructor${TypeExpr.tParamString(tParams)}"
+      val partsString = "{${terms.map(_.prettyPrintWithParentheses(1)).mkString(" + ")}}"
+      constructorString // + partsString
     case ConjunctT(terms) ⇒ s"(${terms.map(_.prettyPrintWithParentheses(0)).mkString(", ")})"
     case head #-> body ⇒
       val r = s"${head.prettyPrintWithParentheses(1)} ⇒ ${body.prettyPrintWithParentheses(0)}"
