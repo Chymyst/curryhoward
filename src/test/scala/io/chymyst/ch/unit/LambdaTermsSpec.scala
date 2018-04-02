@@ -611,8 +611,6 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val goodSemimonads: Seq[TermExpr] = ftnTerms.filter(LC.checkFlattenAssociativity(fmapTerm, _))
 
-    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
-
     val goodMonads: Seq[(TermExpr, TermExpr)] = for {
       ftn ← goodSemimonads
       pure ← pureTerms
@@ -622,7 +620,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     (goodSemimonads, goodMonads)
   }
 
-  it should "verify monad laws for Either" in {
+  it should "discover monad instance and verify monad laws for Either" in {
     type P[A] = Either[Int, A]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
@@ -633,10 +631,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
 
-    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
 
     println("Good monads:")
-    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
     goodSemimonads.size shouldEqual 1
     goodMonads.size shouldEqual 1
@@ -644,7 +642,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
   //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
 
-  it should "check Id + Reader monad" in {
+  it should "check A + (C ⇒ A) monad" in {
     type P[A] = Either[A, Int ⇒ A]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
@@ -655,9 +653,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
 
-    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
     println("Good monads:")
-    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
     goodSemimonads.size shouldEqual 2
     goodMonads.size shouldEqual 1
@@ -674,9 +673,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
 
-    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
     println("Good monads:")
-    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
     goodSemimonads.size shouldEqual 5
     goodMonads.size shouldEqual 0
@@ -693,15 +693,16 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
 
-    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
     println("Good monads:")
-    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
     goodSemimonads.size shouldEqual 4
     goodMonads.size shouldEqual 0
   }
 
-  it should "check Id + Id monad" in {
+  it should "check A + A monad" in {
     type P[A] = Either[A, A]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
@@ -712,15 +713,16 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
 
-    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
     println("Good monads:")
-    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
     goodSemimonads.size shouldEqual 13
     goodMonads.size shouldEqual 6
   }
 
-  it should "check Id + A x A monad" in {
+  it should "check A + A x A monad" in {
     type P[A] = Either[A, (A, A)]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
@@ -731,15 +733,16 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
 
-    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
     println("Good monads:")
-    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
     goodSemimonads.size shouldEqual 12
     goodMonads.size shouldEqual 2
   }
 
-  it should "check A + 1 ⇒ A monad" in {
+  it should "check A + (1 ⇒ A) monad" in {
     type P[A] = Either[A, Unit ⇒ A]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
@@ -750,9 +753,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm, debug = true)
 
-    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
     println("Good monads:")
-    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
     goodSemimonads.size shouldEqual 2
     goodMonads.size shouldEqual 1
