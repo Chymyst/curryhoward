@@ -8,7 +8,7 @@ object LawChecking {
     // fmap ftn . ftn = ftn . ftn
     val lhs = flatten :@@ flatten
     val rhs = (fmap :@ flatten) :@@ flatten
-    println(s"check associativity laws for flatten = ${flatten.prettyPrint}:\n\tlhs = ${lhs.simplify.prettyRenamePrint}\n\trhs = ${rhs.simplify.prettyRenamePrint}")
+    //    println(s"check associativity laws for flatten = ${flatten.prettyPrint}:\n\tlhs = ${lhs.simplify.prettyRenamePrint}\n\trhs = ${rhs.simplify.prettyRenamePrint}")
     lhs equiv rhs
   }
 
@@ -21,7 +21,8 @@ object LawChecking {
 
     // fmap pure . ftn = id
     val fpf = (fmap :@ pure) :@@ flatten
-    println(s"check identity laws for pure = ${pure.prettyPrint} and flatten = ${flatten.prettyPrint}:\n\tlhs1 = ${pf.simplify.prettyPrint}\n\trhs1 = ${idFA.simplify.prettyPrint}\n\tlhs2 = ${fpf.simplify.prettyPrint}\n\trhs2 = ${idFA.simplify.prettyPrint}")
+
+    //    println(s"check identity laws for pure = ${pure.prettyPrint} and flatten = ${flatten.prettyPrint}:\n\tlhs1 = ${pf.simplify.prettyPrint}\n\trhs1 = ${idFA.simplify.prettyPrint}\n\tlhs2 = ${fpf.simplify.prettyPrint}\n\trhs2 = ${idFA.simplify.prettyPrint}")
     (pf equiv idFA) && (fpf equiv idFA)
   }
 

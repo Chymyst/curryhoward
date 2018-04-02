@@ -636,9 +636,10 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     goodMonads.size shouldEqual 1
   }
 
-  it should "discover polynomial monads" in {
-    type P[A] = Either[A, Int ⇒ A] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
-    // Either[A, Int ⇒ A] here triggers the bug with alpha-conversions!
+  //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+
+  it should "check Id + Reader monad" in {
+    type P[A] = Either[A, Int ⇒ A]
 
     def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
 
@@ -651,6 +652,84 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
-    
+
+    goodSemimonads.size shouldEqual 0
+    goodMonads.size shouldEqual 0
+  }
+
+  it should "check 1 + A x A monad" in {
+    type P[A] = Option[(A, A)] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+
+    goodSemimonads.size shouldEqual 3
+    goodMonads.size shouldEqual 0
+  }
+
+  it should "check C + A x A monad" in {
+    type P[A] = Either[Int, (A, A)] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+
+    goodSemimonads.size shouldEqual 2
+    goodMonads.size shouldEqual 0
+  }
+
+  it should "check Id + Id monad" in {
+    type P[A] = Either[A, A] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+
+    goodSemimonads.size shouldEqual 1
+    goodMonads.size shouldEqual 0
+  }
+
+  it should "check Id + A x A monad" in {
+    type P[A] = Either[A, (A, A)] //Either[A, Int ⇒ A]//Option[(A, A)]// Either[Int, (A,A)] // Either[A, A] // Either[A, (A, A)]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads: flatten is one of ${goodSemimonads.map(_.prettyPrint)}")
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
+
+    goodSemimonads.size shouldEqual 2
+    goodMonads.size shouldEqual 0
   }
 }
