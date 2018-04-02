@@ -482,18 +482,4 @@ object Macros {
     * @return The set of options defined by the user.
     */
   private[ch] def options: Set[String] = Option(System.getProperty("curryhoward.log")).getOrElse("").split(",").toSet
-
-  /** Construct a lambda-calculus type expression of a specified Scala type.
-    *
-    * Example usage:
-    *
-    * {{{
-    *   val tInt = typeExpr[Int]
-    *   def idA[A] = typeExpr[A ⇒ A]
-    * }}}
-    *
-    * @tparam U The Scala type for which the type expression is requested. Can use type parameters.
-    * @return A [[TypeExpr]] corresponding to the given Scala type.
-    */
-  def typeExpr[U]: TypeExpr = macro Macros.typeExprImpl[U]
 }

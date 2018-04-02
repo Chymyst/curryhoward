@@ -587,7 +587,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val fmapFlatten = (fmapTerm :@ flatten).simplify
     val rhs = (fmapFlatten :@@ flatten).simplify
-    rhs.prettyPrint should endWith (" match { c ⇒ c.value match { c ⇒ c.value; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e })) }; d ⇒ (0 + Right(e ⇒ d.value e match { c ⇒ c.value match { f ⇒ f.value; g ⇒ g.value e }; d ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e } })) }")
+    rhs.prettyPrint should endWith(" match { c ⇒ c.value match { c ⇒ c.value; d ⇒ (0 + Right(e ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e })) }; d ⇒ (0 + Right(e ⇒ d.value e match { c ⇒ c.value match { f ⇒ f.value; g ⇒ g.value e }; d ⇒ d.value e match { f ⇒ f.value; g ⇒ g.value e } })) }")
     // TODO: should be able to rename to `expected`!
   }
 

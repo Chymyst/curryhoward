@@ -7,6 +7,25 @@ import io.chymyst.ch.data.Monoid.MonoidSyntax
 import scala.annotation.tailrec
 
 object TermExpr {
+
+  /** Convenience method to produce the identity function term of a given type.
+    *
+    * Example usage:
+    *
+    * {{{
+    *   def idAB[A, B] = TermExpr.id(typeExpr[A ⇒ B])
+    *   idAB.prettyPrint == "x ⇒ x"
+    *   idAB.t.prettyPrint == "(A ⇒ B) ⇒ A ⇒ B"
+    * }}}
+    *
+    * @param t Type for the argument of the identity function.
+    * @return A term for the identity function.
+    */
+  def id(t: TypeExpr): TermExpr = {
+    val v = VarE("x", t)
+    v =>: v
+  }
+
   @tailrec
   private[ch] def simplifyWithEtaUntilStable(t: TermExpr): TermExpr = {
     val simplified = t.simplifyOnce(withEta = true)

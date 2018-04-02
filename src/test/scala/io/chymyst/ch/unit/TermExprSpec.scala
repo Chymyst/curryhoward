@@ -15,6 +15,13 @@ class TermExprSpec extends FlatSpec with Matchers {
 
   behavior of "TermExpr miscellaneous methods"
 
+  it should "compute identity function" in {
+    def idAB[A, B] = TermExpr.id(typeExpr[A ⇒ B])
+    idAB.prettyPrint shouldEqual "x ⇒ x"
+    idAB.toString shouldEqual "\\((x:A ⇒ B) ⇒ x)"
+    idAB.t.prettyPrint shouldEqual "(A ⇒ B) ⇒ A ⇒ B"
+  }
+
   it should "compute term size" in {
     TermExpr.size(termExpr1) shouldEqual 7 // x2 ⇒ x3 ⇒ x4 ⇒ x3
     TermExpr.size(termExpr3) shouldEqual 9 // x1 ⇒ x2 ⇒ x3 ⇒ x4 ⇒ x1
