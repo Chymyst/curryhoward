@@ -33,9 +33,8 @@ object TheoremProver {
     }
   }
 
-  // TODO: is this a performance bottleneck? If so, should we use Vector instead of Seq?
   private[ch] def explode[A](src: Seq[Seq[A]]): Seq[Seq[A]] = {
-    src.foldLeft[Seq[Seq[A]]](Seq(Seq())) { case (prevSeqSeq, newSeq) ⇒
+    src.foldLeft[Seq[Seq[A]]](Vector(Vector())) { case (prevSeqSeq, newSeq) ⇒
       for {
         prev ← prevSeqSeq
         next ← newSeq
@@ -134,14 +133,14 @@ object TheoremProver {
 
         if (sequentsAlreadyRequested contains sequent) {
           if (debug) println(s"DEBUG: sequent $sequent is looping; returning an empty sequence of proof terms")
-          Seq()
+          Vector()
         } else {
           sequentsAlreadyRequested.add(sequent)
 
           // Check whether the sequent follows directly from an axiom.
           val (fromIdAxiom, fromTAxiom) = followsFromAxioms(sequent) // This could be empty or non-empty.
-          // If the sequent follows from T axiom, we will ignore `fromIdAxiom`, because this will most likely not yield a good solution.
-          // If it follows from axioms, we will still try applying other rules, in hopes of getting more proofs.
+          // If the sequent follows from T axiom, we will ignore all other proofs, because they will most likely not yield good implementations.
+          // If it follows from Id axiom, we will still try applying other rules, because we will be sometimes getting better proofs from other rules.
           if (fromTAxiom.nonEmpty) fromTAxiom else {
             val fromAxioms = fromIdAxiom
 
@@ -154,24 +153,7 @@ object TheoremProver {
             // We should apply that invertible rule and proceed from there.
             val fromRules: Seq[TermExpr] = fromInvertibleRules.headOption match {
               case Some(ruleResult) ⇒ fromAxioms ++ concatProofs(ruleResult)
-              case None ⇒
-
-                // We proceed to non-invertible rules only if no rules apply at this step.
-                //                              val termsFromInvertibleAmbiguousRules = fromInvertibleAmbiguousRules
-                //                              if (termsFromInvertibleAmbiguousRules.nonEmpty) {
-                //                                fromAxioms ++ termsFromInvertibleAmbiguousRules
-                //                              } else {
-
-                // This does not seem to work: It fails to implement `fmap` for the functor `[A] ⇒ A + (A, A, A)` correctly.
-
-                // No invertible rules apply, so we need to try
-                // If a rule generates some proofs, we append them to `fromAxioms` and keep trying another rule.
-                // If no more rules apply here, we return `fromAxioms`.
-
-                //                val termsFromNoninvertibleRules: Seq[TermExpr] = fromNoninvertibleRules
-
-                fromAxioms ++ fromInvertibleAmbiguousRules ++ fromNoninvertibleRules
-              //                            }
+              case None ⇒ fromAxioms ++ fromInvertibleAmbiguousRules ++ fromNoninvertibleRules
             }
             val termsFound = fromRules.map(_.simplifyOnce()).distinct
             if (debugTrace) {

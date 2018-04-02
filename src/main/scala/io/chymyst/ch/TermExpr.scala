@@ -1,6 +1,8 @@
 package io.chymyst.ch
 
 import io.chymyst.ch.Helper._
+import io.chymyst.ch.data.Monoid
+import io.chymyst.ch.data.Monoid.MonoidSyntax
 
 import scala.annotation.tailrec
 
@@ -15,7 +17,6 @@ object TermExpr {
     if (p isDefinedAt termExpr)
       p(termExpr)
     else {
-      import io.chymyst.ch.Monoid.MonoidSyntax
       lazy val empty = Monoid.empty[R]
 
       def foldmap(termExpr: TermExpr): R = foldMap(termExpr)(p)

@@ -1,6 +1,7 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
+import io.chymyst.ch.data.{LawChecking => LC}
 import org.scalatest.{Assertion, FlatSpec, Matchers}
 
 class LambdaTermsSpec extends FlatSpec with Matchers {
@@ -543,5 +544,51 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val composition = f :@@ pure
     composition.t.prettyPrint should fullyMatch regex "\\(Z[0-9]+, A\\) ⇒ Tuple2\\[A,A\\]"
+  }
+
+  it should "verify monad laws for Either" in {
+    type P[A] = Either[Int, A]
+
+    def px[X] = freshVar[P[X]]
+
+    def fmap[A, B] = freshVar[(A ⇒ B) ⇒ P[A] ⇒ P[B]]
+
+    val fmapTerms = TheoremProver.findProofs(fmap.t)._1
+
+    println(s"Found ${fmapTerms.size} fmap terms ${fmapTerms.map(_.prettyPrint)}")
+
+    fmapTerms.size shouldEqual 1
+    val fmapTerm = fmapTerms.head
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    // Too slow.
+    //    def ftn[A] = freshVar[P[P[A]] ⇒ P[A]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val initTime = System.currentTimeMillis()
+    val flmTerms = TheoremProver.findProofs(flm.t)._2
+    val elapsed = System.currentTimeMillis() - initTime
+
+    // Compute flatten terms from flm terms
+    val ftnTerms = flmTerms.map(flm ⇒ (flm :@ (px =>: px)).simplify)
+
+    val pureTerms = TheoremProver.findProofs(pure.t)._2
+
+    println(s"Computed ${flmTerms.size} flm terms in $elapsed ms, and ${pureTerms.size} pure terms")
+
+    val goodSemimonads: Seq[TermExpr] = ftnTerms.filter(LC.checkFlattenAssociativity(fmapTerm, _))
+
+    println(s"Good semimonads: ${goodSemimonads.map(_.prettyPrint)}")
+
+    val goodMonads: Seq[(TermExpr, TermExpr)] = for {
+      ftn ← goodSemimonads
+      pure ← pureTerms
+      if LC.checkPureFlattenLaws(fmapTerm, pure, ftn)
+    } yield (pure, ftn)
+
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" })
   }
 }
