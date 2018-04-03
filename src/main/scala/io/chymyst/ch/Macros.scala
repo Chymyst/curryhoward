@@ -1,7 +1,7 @@
 package io.chymyst.ch
 
 import scala.language.experimental.macros
-import io.chymyst.ch.Helper.AnyOpsEquals
+import io.chymyst.ch.Helper._
 
 import scala.reflect.macros.whitebox // Does not work with blackbox.
 
@@ -342,14 +342,32 @@ class Macros(val c: whitebox.Context) {
     c.Expr[TypeExpr](q"$s1")
   }
 
+  private def enclosingClassValues = {
+    Seq(c.internal.enclosingOwner.owner).find(_.isClass) match {
+      case Some(enclosingClass) ⇒ enclosingClass.asType.toType.decls.filter(s ⇒
+        // Select only `val`s out of the class declarations.
+        s.isTerm && !(s.isMethod || s.isClass || s.isConstructor || s.isType || s.isImplementationArtifact || s.isSynthetic)
+      ).takeWhile { s ⇒ s.name.decodedName !== c.internal.enclosingOwner.name.decodedName }
+        // Select only `val`s that occur before the class declaration we are processing now.
+        .toList
+      case None ⇒ List()
+    }
+  }
+
   // Obtain one implementation of the type U. Detect the type U as given on the left-hand side.
   def inhabitImpl[U]: c.Tree = {
     val typeU = c.internal.enclosingOwner.typeSignature
     // Detect whether we are given a function with arguments.
-    val result = typeU.paramLists match {
+    // Also detect whether the immediate enclosing class has some declared values that we can use.
+    val availableSymbols = (typeU.paramLists.flatten ++ enclosingClassValues)
+      .map(s ⇒ VarE(s.name.decodedName.toString, buildTypeExpr(s.typeSignature)))
+      // Reject values containing recursive types. These might kill performance.
+      .filterNot(v ⇒ TypeExpr.findFirst(v.t) { case RecurseT(_, _) ⇒ }.nonEmpty)
+    val result = availableSymbols match {
       case Nil ⇒ inhabitOneInternal(buildTypeExpr(typeU))()
       case lists ⇒
-        val givenVars = lists.flatten.map(s ⇒ VarE(s.name.decodedName.toString, buildTypeExpr(s.typeSignature)))
+        //        c.info(c.enclosingPosition, s"DEBUG: have availableSymbols=${availableSymbols.map(_.name)}", force = true)
+        val givenVars = lists
         val resultType = buildTypeExpr(typeU.finalResultType)
         val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.t ->: prev }
         inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }

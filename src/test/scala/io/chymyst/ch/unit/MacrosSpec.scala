@@ -143,4 +143,28 @@ class MacrosSpec extends FlatSpec with Matchers {
     val t1l = List(t1)
     t shouldEqual DisjunctT("Option", t1l, List(NamedConjunctT("None", List(), List(), Nil), NamedConjunctT("Some", t1l, List("value"), t1l)))
   }
+
+  behavior of "enclosing class detection"
+
+  it should "use previous values but not methods from enclosing class" in {
+
+    abstract class A(x: Int, p: String) {
+      def y: String
+      val z: Boolean = true
+      def t: (Int, Boolean) = implement // Should not access `u`.
+      val u: (Int, String) = implement
+      val v: Long = 0L
+      val w: Long = implement // Should not access `q`.
+      val q: Long = 1L
+    }
+
+    val x = new A(123, "abc") {
+      override def y: String = "qqq"
+
+      override val z: Boolean = false
+    }
+    x.t shouldEqual ((123, true)) // The overridden value of `z` is not visible.
+    x.u shouldEqual ((123, "abc"))
+    x.w shouldEqual 0L
+  }
 }
