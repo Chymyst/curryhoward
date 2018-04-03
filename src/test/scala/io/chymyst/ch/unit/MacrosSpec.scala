@@ -152,6 +152,8 @@ class MacrosSpec extends FlatSpec with Matchers {
       def y: String
 
       val l: List[Int] = List(1, 2, 3)
+      val n: TypeExpr = typeExpr[Int]
+      
       val z: Boolean = true
 
       def t: (Int, Boolean) = implement // Should not access `u`.
