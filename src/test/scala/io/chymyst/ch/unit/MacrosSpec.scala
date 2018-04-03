@@ -1,5 +1,6 @@
 package io.chymyst.ch.unit
 
+import com.sun.tools.internal.xjc.reader.xmlschema.bindinfo.BIConversion.User
 import io.chymyst.ch._
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -150,7 +151,9 @@ class MacrosSpec extends FlatSpec with Matchers {
 
     abstract class A(x: Int, p: String) {
       def y: String
+
       val z: Boolean = true
+
       def t: (Int, Boolean) = implement // Should not access `u`.
       val u: (Int, String) = implement
       val v: Long = 0L
@@ -166,5 +169,19 @@ class MacrosSpec extends FlatSpec with Matchers {
     x.t shouldEqual ((123, true)) // The overridden value of `z` is not visible.
     x.u shouldEqual ((123, "abc"))
     x.w shouldEqual 0L
+  }
+
+  it should "generate code for tutorial" in {
+    final case class User2[A](name: String, id: A) {
+      def map[B](f: A ⇒ B): User2[B] = implement
+
+      val count: Int = name.length // whatever
+
+      val generated: (Int, String, A) = implement
+    }
+
+    val user = User2("abc", 123) // User[Int]
+    assert(user.generated == ((3, "abc", 123)))
+    assert(user.map(_ + 1).generated._3 == 124)
   }
 }

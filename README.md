@@ -162,7 +162,7 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 # Revision history
 
-- 0.3.7 Implement the `typeExpr` macro instead of the old test-only API. Minor performance improvements and bug fixes (alpha-conversion for STLC terms). Tests for automatic discovery of some monads.
+- 0.3.7 Implement the `typeExpr` macro instead of the old test-only API. Detect and use `val`s from the immediately enclosing class. Minor performance improvements and bug fixes (alpha-conversion for STLC terms). Tests for automatic discovery of some monads.
 - 0.3.6 STLC terms are now emitted for `implement` as well; the JVM bytecode limit is obviated; fixed bug with recognizing `Function10`.
 - 0.3.5 Added `:@@` and `@@:` operations to the STLC interpreter. Fixed a bug whereby `Tuple2(x._1, x._2)` was not simplified to `x`. Fixed other bugs in alpha-conversion of type parameters.
 - 0.3.4 Reduced verbosity by default. Fixed a bug uncovered during the demo in the February 2018 meetup presentation.
@@ -281,11 +281,22 @@ def f2[T, U](x: T): (T ⇒ U) ⇒ (T, U) = implement
 def f3[T, U]: T ⇒ (T ⇒ U) ⇒ (T, U) = implement
 
 // Generating code within expressions.
-case class User(name: String, id: Long)
+final case class User(name: String, id: Long)
 
 val f: Int ⇒ Long = _.toLong
 
 ofType[User](123, "abc", f).id // This expression evaluates to `123L`.
+
+```
+
+If the `implement` macro is used as the body of a class method, values from the class constructor will be used:
+
+```scala
+import io.chymyst.ch._
+
+final class User[A](name: String, id: A) {
+  def map[B](f: A ⇒ B): User[B] = implement
+}
 
 ```
 

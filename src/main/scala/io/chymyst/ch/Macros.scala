@@ -344,11 +344,11 @@ class Macros(val c: whitebox.Context) {
 
   private def enclosingClassValues = {
     Seq(c.internal.enclosingOwner.owner).find(_.isClass) match {
-      case Some(enclosingClass) ⇒ enclosingClass.asType.toType.decls.filter(s ⇒
-        // Select only `val`s out of the class declarations.
-        s.isTerm && !(s.isMethod || s.isClass || s.isConstructor || s.isType || s.isImplementationArtifact || s.isSynthetic)
-      ).takeWhile { s ⇒ s.name.decodedName !== c.internal.enclosingOwner.name.decodedName }
+      case Some(enclosingClass) ⇒ enclosingClass.asType.toType.decls
         // Select only `val`s that occur before the class declaration we are processing now.
+        .takeWhile(s ⇒ s.name.decodedName !== c.internal.enclosingOwner.name.decodedName)
+        // Select only `val`s out of the class declarations.
+        .filter(s ⇒ s.isTerm && !(s.isMethod || s.isClass || s.isConstructor || s.isType || s.isImplementationArtifact || s.isSynthetic))
         .toList
       case None ⇒ List()
     }

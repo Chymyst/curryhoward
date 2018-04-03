@@ -107,6 +107,30 @@ Here is the applicative `map2` function for the Reader monad:
 def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
 ```
 
+## Using class values
+
+If the `implement` macro is used to generate a class method or `val` class member, value members from the class will be used automatically:
+
+```tut
+import io.chymyst.ch._
+
+final case class User2[A](name: String, id: A) {
+  def map[B](f: A ⇒ B): User2[B] = implement
+  val count: Int = name.length // whatever
+  val generated: (Int, String, A) = implement
+}
+
+val user = User2("abc", 123) // User2[Int]
+assert(user.generated == ((3, "abc", 123)))
+assert(user.map(_ + 1).generated._3 == 124)
+```
+
+In this example, the `generated` value will be defined as the tuple `(count, name, id)` since these are the only available values of the requested types.
+
+This functionality may give unexpected results if too many values are visible to the automatically derived expression.
+In order to reduce the possibilities of errors, the `implement` macro will only look at the _immediate_ class enclosing the definition, and will only use `val`s that are not lazy, not abstract, and are defined _before_ the method being generated.
+
+
 ## Expressions
 
 The macro `implement` is designed to be used when defining new methods, as shown above.
