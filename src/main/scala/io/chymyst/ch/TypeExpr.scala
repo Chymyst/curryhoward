@@ -39,7 +39,7 @@ sealed trait TypeExpr {
   def substTypeVar(typeVar: TP, replaceBy: TypeExpr): TypeExpr = this match {
     case DisjunctT(constructor, tParams, terms) ⇒
       DisjunctT(constructor, tParams.map(_.substTypeVar(typeVar, replaceBy)),
-        terms.map(_.substTypeVar(typeVar, replaceBy)).asInstanceOf[Seq[NamedConjunctT]])
+        terms.map(_.substTypeVar(typeVar, replaceBy)))
     case ConjunctT(terms) ⇒ ConjunctT(terms.map(_.substTypeVar(typeVar, replaceBy)))
     case #->(head, body) ⇒ #->(head.substTypeVar(typeVar, replaceBy), body.substTypeVar(typeVar, replaceBy))
     case NothingT(_) ⇒ this
@@ -54,7 +54,7 @@ sealed trait TypeExpr {
   def substTypeVars(substitutions: Map[TP, TypeExpr]): TypeExpr = this match {
     case DisjunctT(constructor, tParams, terms) ⇒
       DisjunctT(constructor, tParams.map(_.substTypeVars(substitutions)),
-        terms.map(_.substTypeVars(substitutions)).asInstanceOf[Seq[NamedConjunctT]])
+        terms.map(_.substTypeVars(substitutions)))
     case ConjunctT(terms) ⇒ ConjunctT(terms.map(_.substTypeVars(substitutions)))
     case #->(head, body) ⇒ #->(head.substTypeVars(substitutions), body.substTypeVars(substitutions))
     case NothingT(_) ⇒ this
@@ -118,6 +118,26 @@ sealed trait AtomicTypeExpr {
 }
 
 object TypeExpr {
+
+  def findFirst[R](inExpr: TypeExpr)(pred: PartialFunction[TypeExpr, R]): Option[R] = {
+    def ffirst(expr: TypeExpr): Option[R] = findFirst(expr)(pred)
+
+    Some(inExpr).collect(pred).orElse {
+      inExpr match {
+        case DisjunctT(constructor, typeParams, terms) ⇒ terms.find(t ⇒ ffirst(t).nonEmpty).flatMap(ffirst)
+        case ConjunctT(terms) ⇒ terms.find(t ⇒ ffirst(t).nonEmpty).flatMap(ffirst)
+        case #->(head, body) ⇒ ffirst(head).orElse(ffirst(body))
+        case NothingT(name) ⇒ None
+        case UnitT(name) ⇒ None
+        case TP(name) ⇒ None
+        case RecurseT(name, typeParams) ⇒ None
+        case BasicT(name) ⇒ None
+        case NamedConjunctT(constructor, typeParams, accessors, wrapped) ⇒ wrapped.find(t ⇒ ffirst(t).nonEmpty).flatMap(ffirst)
+        case ConstructorT(name, typeParams) ⇒ None
+      }
+    }
+  }
+
   def allTypeParams(typeExpr: TypeExpr): Set[TP] = typeExpr match {
     case DisjunctT(_, tParams, terms) ⇒ (tParams ++ terms).flatMap(allTypeParams).toSet
     case ConjunctT(terms) ⇒ terms.flatMap(allTypeParams).toSet
@@ -137,7 +157,7 @@ object TypeExpr {
 
     typeExpr match {
       case DisjunctT(constructor, tParams, terms) ⇒
-        DisjunctT(constructor, tParams.map(subst), terms.map(subst).asInstanceOf[Seq[NamedConjunctT]])
+        DisjunctT(constructor, tParams.map(subst), terms.map(subst))
       case ConjunctT(terms) ⇒ ConjunctT(terms.map(subst))
       case #->(head, body) ⇒ #->(subst(head), subst(body))
       case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒
@@ -149,8 +169,14 @@ object TypeExpr {
     }
   }
 
+  private def containsConstructor(typeExpr: TypeExpr, constructorName: String): Boolean = typeExpr match {
+    case NamedConjunctT(c, _, _, _) ⇒ c === constructorName
+    case RecurseT(c, _) ⇒ c === constructorName
+    case _ ⇒ false
+  }
+
   private[ch] def isDisjunctionPart(disj: TypeExpr, part: TypeExpr): Boolean = (disj, part) match {
-    case (DisjunctT(_, _, terms), NamedConjunctT(ncName, _, _, _)) if terms.map(_.constructor) contains ncName ⇒ true
+    case (DisjunctT(_, _, terms), NamedConjunctT(ncName, _, _, _)) if terms.exists(containsConstructor(_, ncName)) ⇒ true
     case _ ⇒ false
   }
 
@@ -191,16 +217,16 @@ object TypeExpr {
     val error: UnifyResult = Left(s"Cannot unify ${src.prettyPrint} with an incompatible type ${dst.prettyPrint}")
 
     def unifyTP(tp: TP, other: TypeExpr): UnifyResult = {
-//      if (TypeExpr.allTypeParams(dst) contains tp)
-//        Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable ${tp.prettyPrint} is used in the destination type")
-//      else {
-        // Check that the new substitution does not contradict earlier substitutions for this variable.
-        substitutions.get(tp) match {
-          case Some(oldSubstitution) if other !== oldSubstitution ⇒ Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type parameter ${tp.prettyPrint} requires incompatible substitutions ${oldSubstitution.prettyPrint} and ${other.prettyPrint}")
-          case _ ⇒ Right(Map(tp → other) ++ substitutions)
-        }
+      //      if (TypeExpr.allTypeParams(dst) contains tp)
+      //        Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type variable ${tp.prettyPrint} is used in the destination type")
+      //      else {
+      // Check that the new substitution does not contradict earlier substitutions for this variable.
+      substitutions.get(tp) match {
+        case Some(oldSubstitution) if other !== oldSubstitution ⇒ Left(s"Cannot unify ${src.prettyPrint} with ${dst.prettyPrint} because type parameter ${tp.prettyPrint} requires incompatible substitutions ${oldSubstitution.prettyPrint} and ${other.prettyPrint}")
+        case _ ⇒ Right(Map(tp → other) ++ substitutions)
+      }
 
-//      }
+      //      }
     }
 
     val result: UnifyResult = (src, dst) match {
@@ -249,7 +275,8 @@ object TypeExpr {
 
 }
 
-final case class DisjunctT(constructor: String, override val typeParams: Seq[TypeExpr], terms: Seq[NamedConjunctT]) extends TypeExpr with NonAtomicTypeExpr
+// `terms` is the list of the defined parts of the disjunction. They may be of types `NamedConjunctT` or `RecurseT`.
+final case class DisjunctT(constructor: String, override val typeParams: Seq[TypeExpr], terms: Seq[TypeExpr]) extends TypeExpr with NonAtomicTypeExpr
 
 final case class ConjunctT(terms: Seq[TypeExpr]) extends TypeExpr with NonAtomicTypeExpr
 

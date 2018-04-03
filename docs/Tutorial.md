@@ -137,6 +137,41 @@ scala> def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C
 map2: [E, A, B, C](readerA: E => A, readerB: E => B, f: A => (B => C))E => C
 ```
 
+## Using class values
+
+If the `implement` macro is used to generate a class method or `val` class member, value members from the class will be used automatically:
+
+```scala
+scala> import io.chymyst.ch._
+import io.chymyst.ch._
+
+scala> final case class User2[A](name: String, id: A) {
+     |   def map[B](f: A ⇒ B): User2[B] = implement
+     |   val count: Int = name.length // whatever
+     |   val generated: (Int, String, A) = implement
+     | }
+<console>:19: Returning term: (a ⇒ b ⇒ c ⇒ User2(b, a c)) f name  id
+         def map[B](f: A ⇒ B): User2[B] = implement
+                                          ^
+<console>:21: Returning term: (a ⇒ b ⇒ c ⇒ Tuple3(c, a, b)) name  id  count
+         val generated: (Int, String, A) = implement
+                                           ^
+defined class User2
+
+scala> val user = User2("abc", 123) // User2[Int]
+user: User2[Int] = User2(abc,123)
+
+scala> assert(user.generated == ((3, "abc", 123)))
+
+scala> assert(user.map(_ + 1).generated._3 == 124)
+```
+
+In this example, the `generated` value will be defined as the tuple `(count, name, id)` since these are the only available values of the requested types.
+
+This functionality may give unexpected results if too many values are visible to the automatically derived expression.
+In order to reduce the possibilities of errors, the `implement` macro will only look at the _immediate_ class enclosing the definition, and will only use `val`s that are not lazy, not abstract, and are defined _before_ the method being generated.
+
+
 ## Expressions
 
 The macro `implement` is designed to be used when defining new methods, as shown above.
@@ -161,10 +196,10 @@ we now write
 
 ```scala
 scala> ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
-<console>:18: Returning term: (a ⇒ b ⇒ User(a, b a)) arg1 arg2
+<console>:21: Returning term: (a ⇒ b ⇒ User(a, b a)) arg1 arg2
        ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
                                 ^
-res4: User[Int,String] = User(123,id:12300)
+res6: User[Int,String] = User(123,id:12300)
 ```
 
 The macro `ofType[T](x, y, ..., z)` generates an expression of type `T` built up from the given values `x`, `y`, ..., `z`.
@@ -175,7 +210,7 @@ The macro `ofType()` will not work without specifying a type expression as its t
 
 ```scala
 scala> val x: Int = ofType(123)
-<console>:15: error: type <c>Int ⇒ 0 cannot be implemented
+<console>:18: error: type <c>Int ⇒ 0 cannot be implemented
        val x: Int = ofType(123)
                           ^
 ```
@@ -232,12 +267,12 @@ As an example, consider the `map` function for the State monad:
 
 ```scala
 scala> def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
-<console>:15: warning: type (S ⇒ Tuple2[A,S]) ⇒ (A ⇒ B) ⇒ S ⇒ Tuple2[B,S] has 2 implementations (laws need checking?):
+<console>:18: warning: type (S ⇒ Tuple2[A,S]) ⇒ (A ⇒ B) ⇒ S ⇒ Tuple2[B,S] has 2 implementations (laws need checking?):
  a ⇒ b ⇒ c ⇒ Tuple2(b a c._1, a c._2) [score: (0,0,0,2,2)];
  a ⇒ b ⇒ c ⇒ Tuple2(b a c._1, c) [score: (0,10000,0,1,1)].
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
-<console>:15: Returning term: a ⇒ b ⇒ c ⇒ Tuple2(b a c._1, a c._2)
+<console>:18: Returning term: a ⇒ b ⇒ c ⇒ Tuple2(b a c._1, a c._2)
        def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
                                                                  ^
 map: [S, A, B]=> (S => (A, S)) => ((A => B) => (S => (B, S)))
@@ -260,7 +295,7 @@ If there are several such implementations then no automatic choice is possible, 
 
 ```scala
 scala> def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
-<console>:15: error: type A ⇒ A ⇒ (A ⇒ B) ⇒ B can be implemented in 2 inequivalent ways:
+<console>:18: error: type A ⇒ A ⇒ (A ⇒ B) ⇒ B can be implemented in 2 inequivalent ways:
  a ⇒ b ⇒ c ⇒ c b [score: (1,0,0,0,0)];
  a ⇒ b ⇒ c ⇒ c a [score: (1,0,0,0,0)].
        def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
@@ -278,16 +313,16 @@ As a simple example, consider a function of type `Int ⇒ Int ⇒ Int`:
 
 ```scala
 scala> val fs = allOfType[Int ⇒ Int ⇒ Int]
-<console>:15: Returning term: a ⇒ b ⇒ b
+<console>:18: Returning term: a ⇒ b ⇒ b
        val fs = allOfType[Int ⇒ Int ⇒ Int]
                          ^
-<console>:15: Returning term: a ⇒ b ⇒ a
+<console>:18: Returning term: a ⇒ b ⇒ a
        val fs = allOfType[Int ⇒ Int ⇒ Int]
                          ^
 fs: Seq[io.chymyst.ch.Function1Lambda[Int,Int => Int]] = List(<function1>, <function1>)
 
 scala> fs.map(f ⇒ f(1)(2))
-res5: Seq[Int] = List(2, 1)
+res7: Seq[Int] = List(2, 1)
 ```
 
 The list `fs` contains the two chosen implementations, both of them having equal levels of "information loss".
@@ -351,10 +386,10 @@ Let us now look at the STLC terms corresponding to these implementations:
 
 ```scala
 scala> fs(0).lambdaTerm
-res6: io.chymyst.ch.TermExpr = \((a:<c>Int) ⇒ (b:<c>Int) ⇒ b)
+res8: io.chymyst.ch.TermExpr = \((a:<c>Int) ⇒ (b:<c>Int) ⇒ b)
 
 scala> fs(1).lambdaTerm
-res7: io.chymyst.ch.TermExpr = \((a:<c>Int) ⇒ (b:<c>Int) ⇒ a)
+res9: io.chymyst.ch.TermExpr = \((a:<c>Int) ⇒ (b:<c>Int) ⇒ a)
 ```
 
 ## What can we do with lambda-terms?
@@ -365,10 +400,10 @@ There are several ways in which we can use lambda-terms:
 
 ```scala
 scala> fs(0).lambdaTerm.prettyPrint
-res8: String = a ⇒ b ⇒ b
+res10: String = a ⇒ b ⇒ b
 
 scala> fs(0).lambdaTerm.toString
-res9: String = \((a:<c>Int) ⇒ (b:<c>Int) ⇒ b)
+res11: String = \((a:<c>Int) ⇒ (b:<c>Int) ⇒ b)
 ```
 
 - perform symbolic computations with the lambda-terms, e.g. apply functions to arguments and simplify the resulting terms
@@ -402,21 +437,21 @@ Note that the results are unevaluated STLC terms representing function applicati
 
 ```scala
 scala> results.map(_.prettyPrint)
-res10: Seq[String] = List((a ⇒ b ⇒ b) x$1 y$2, (a ⇒ b ⇒ a) x$1 y$2)
+res12: Seq[String] = List((a ⇒ b ⇒ b) x$1 y$2, (a ⇒ b ⇒ a) x$1 y$2)
 ```
 
 We can use the `.simplify` method to perform symbolic evaluation of these terms:
 
 ```scala
 scala> results.map(_.simplify)
-res11: Seq[io.chymyst.ch.TermExpr] = List(y$2, x$1)
+res13: Seq[io.chymyst.ch.TermExpr] = List(y$2, x$1)
 ```
 
 To determine whether the required law holds, we can use the `.equiv` method that automatically performs simplification:
 
 ```scala
 scala> results.filter(r ⇒ r equiv x)
-res12: Seq[io.chymyst.ch.TermExpr] = List(((\((a:<c>Int) ⇒ (b:<c>Int) ⇒ a) x$1) y$2))
+res14: Seq[io.chymyst.ch.TermExpr] = List(((\((a:<c>Int) ⇒ (b:<c>Int) ⇒ a) x$1) y$2))
 ```
 
 This leaves only one implementation that satisfies the law.
@@ -432,7 +467,7 @@ Now we can use the good implementation:
 
 ```scala
 scala> goodF(123)(456)
-res13: Int = 123
+res15: Int = 123
 ```
 
 ## How to use lambda-terms with type parameters?
@@ -448,7 +483,7 @@ We begin by auto-generating `fmap` using the `ofType` method. (The `implement` m
 
 ```scala
 scala> def fmap[A, B]: (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] = implement 
-<console>:15: Returning term: a ⇒ b ⇒ b match { c ⇒ (Left(c.value) + 0); d ⇒ (0 + Right(a d.value)) }
+<console>:18: Returning term: a ⇒ b ⇒ b match { c ⇒ (Left(c.value) + 0); d ⇒ (0 + Right(a d.value)) }
        def fmap[A, B]: (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] = implement
                                                                    ^
 fmap: [A, B]=> (A => B) => (Either[Int,A] => Either[Int,B])
@@ -457,7 +492,7 @@ scala> val fmapT = fmap.lambdaTerm // No need to specify type parameters here.
 fmapT: io.chymyst.ch.TermExpr = \((a:A ⇒ B) ⇒ (b:Either[<c>Int,A]) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))}))
 
 scala> fmapT.prettyPrint
-res14: String = a ⇒ b ⇒ b match { c ⇒ (Left(c.value) + 0); d ⇒ (0 + Right(a d.value)) }
+res16: String = a ⇒ b ⇒ b match { c ⇒ (Left(c.value) + 0); d ⇒ (0 + Right(a d.value)) }
 ```
 
 We have thus extracted the STLC term `fmapT` corresponding to the generated code of `fmap`. 
@@ -490,7 +525,7 @@ scala> val b = freshVar[Int]
 b: io.chymyst.ch.VarE = b$4
 
 scala> a =>: b =>: a
-res15: io.chymyst.ch.TermExpr = \((a$3:A) ⇒ \((b$4:<c>Int) ⇒ a$3))
+res17: io.chymyst.ch.TermExpr = \((a$3:A) ⇒ \((b$4:<c>Int) ⇒ a$3))
 ```
 
 Identity functions are often required when checking algebraic laws.
@@ -527,7 +562,7 @@ scala> val f2 = fmapT :@ idA
 f2: io.chymyst.ch.TermExpr = (\((a:A ⇒ A) ⇒ (b:Either[<c>Int,A]) ⇒ (b match { \((c:Left[<c>Int,A]) ⇒ (Left(c.value) + 0)); \((d:Right[<c>Int,A]) ⇒ (0 + Right((a d.value))))})) \((x:A) ⇒ x))
 
 scala> f2.t.prettyPrint
-res16: String = Either[<c>Int,A] ⇒ Either[<c>Int,A]
+res18: String = Either[<c>Int,A] ⇒ Either[<c>Int,A]
 ```
 
 You can see from the type of `f2` that the type variables in `fmapT` have been automatically adjusted to match the given argument `idA`.
@@ -543,7 +578,7 @@ scala> def optA[A] = freshVar[Either[Int, A]]
 optA: [A]=> io.chymyst.ch.VarE
 
 scala> f2(optA).simplify
-res17: io.chymyst.ch.TermExpr = optA$5
+res19: io.chymyst.ch.TermExpr = optA$5
 ```
 
 We see that, after simplification, we obtain the original term `optA`.
@@ -575,7 +610,7 @@ To illustrate the use of these operators, consider the function `pure`, which is
 
 ```scala
 scala> def pure[A]: A ⇒ Either[Int, A] = implement
-<console>:15: Returning term: a ⇒ (0 + Right(a))
+<console>:18: Returning term: a ⇒ (0 + Right(a))
        def pure[A]: A ⇒ Either[Int, A] = implement
                                          ^
 pure: [A]=> A => Either[Int,A]
@@ -743,7 +778,7 @@ scala> val getId = ou =>: ou.cases(case1, case2)
 getId: io.chymyst.ch.TermExpr = \((ou$7:Option[User]) ⇒ (ou$7 match { \((n$8:None.type) ⇒ (<co>None() + 0)); \((su$9:Some[User]) ⇒ (0 + Some(su$9.value.id)))}))
 
 scala> getId.prettyPrint
-res20: String = ou$7 ⇒ ou$7 match { n$8 ⇒ (None() + 0); su$9 ⇒ (0 + Some(su$9.value.id)) }
+res22: String = ou$7 ⇒ ou$7 match { n$8 ⇒ (None() + 0); su$9 ⇒ (0 + Some(su$9.value.id)) }
 ```
 
 Let us now apply this function term to some data and verify that it works as expected.
@@ -775,12 +810,12 @@ We will now check that the same lambda-term is obtained when implementing the fu
 
 ```scala
 scala> val getIdAuto: Option[User] ⇒ Option[Long] = implement
-<console>:17: warning: type Option[User] ⇒ Option[<c>Long] has 2 implementations (laws need checking?):
+<console>:20: warning: type Option[User] ⇒ Option[<c>Long] has 2 implementations (laws need checking?):
  a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) } [score: (0,15000,0,0,0)];
  a ⇒ (None() + 0) [score: (1,0,0,0,0)].
        val getIdAuto: Option[User] ⇒ Option[Long] = implement
                                                     ^
-<console>:17: Returning term: a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
+<console>:20: Returning term: a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
        val getIdAuto: Option[User] ⇒ Option[Long] = implement
                                                     ^
 getIdAuto: Option[User] => Option[Long] = <function1>
@@ -789,10 +824,10 @@ scala> val getIdAutoTerm = getIdAuto.lambdaTerm
 getIdAutoTerm: io.chymyst.ch.TermExpr = \((a:Option[User]) ⇒ (a match { \((b:None.type) ⇒ (<co>None() + 0)); \((c:Some[User]) ⇒ (0 + Some(c.value.id)))}))
 
 scala> getIdAutoTerm.prettyPrint
-res21: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
+res23: String = a ⇒ a match { b ⇒ (None() + 0); c ⇒ (0 + Some(c.value.id)) }
 
 scala> getId.prettyPrint
-res22: String = ou$7 ⇒ ou$7 match { n$8 ⇒ (None() + 0); su$9 ⇒ (0 + Some(su$9.value.id)) }
+res24: String = ou$7 ⇒ ou$7 match { n$8 ⇒ (None() + 0); su$9 ⇒ (0 + Some(su$9.value.id)) }
 ``` 
 
 The `prettyRename` method will rename all variables in a given term to names `a`, `b`, `c`, and so on.
@@ -803,7 +838,7 @@ The method `equiv` will do this automatically:
 
 ```scala
 scala> getIdAutoTerm equiv getId.prettyRename
-res23: Boolean = true
+res25: Boolean = true
 ```
 
 ## Summary of the lambda-term API

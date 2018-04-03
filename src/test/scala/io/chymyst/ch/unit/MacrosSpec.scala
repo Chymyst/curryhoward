@@ -143,4 +143,47 @@ class MacrosSpec extends FlatSpec with Matchers {
     val t1l = List(t1)
     t shouldEqual DisjunctT("Option", t1l, List(NamedConjunctT("None", List(), List(), Nil), NamedConjunctT("Some", t1l, List("value"), t1l)))
   }
+
+  behavior of "enclosing class detection"
+
+  it should "use previous values but not methods from enclosing class" in {
+
+    abstract class A(x: Int, p: String) {
+      def y: String
+
+      val l: List[Int] = List(1, 2, 3)
+      val n: TypeExpr = typeExpr[Int]
+      
+      val z: Boolean = true
+
+      def t: (Int, Boolean) = implement // Should not access `u`.
+      val u: (Int, String) = implement
+      val v: Long = 0L
+      val w: Long = implement // Should not access `q`.
+      val q: Long = 1L
+    }
+
+    val x = new A(123, "abc") {
+      override def y: String = "qqq"
+
+      override val z: Boolean = false
+    }
+    x.t shouldEqual ((123, true)) // The overridden value of `z` is not visible.
+    x.u shouldEqual ((123, "abc"))
+    x.w shouldEqual 0L
+  }
+
+  it should "generate code for tutorial" in {
+    final case class User2[A](name: String, id: A) {
+      def map[B](f: A ⇒ B): User2[B] = implement
+
+      val count: Int = name.length // whatever
+
+      val generated: (Int, String, A) = implement
+    }
+
+    val user = User2("abc", 123) // User[Int]
+    assert(user.generated == ((3, "abc", 123)))
+    assert(user.map(_ + 1).generated._3 == 124)
+  }
 }

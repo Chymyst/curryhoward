@@ -6,7 +6,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class LJTSpec extends FlatSpec with Matchers {
 
-  private val freshVar = new FreshIdents(prefix = "x")
+  private val freshVars = new FreshIdents(prefix = "x")
 
   /*
 
@@ -78,27 +78,27 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "correctly produce proofs from the Id axiom" in {
-    followsFromAxioms(Sequent(List(TP("3"), TP("2"), TP("1")), TP("0"), freshVar)) shouldEqual ((Seq(), Seq()))
+    followsFromAxioms(Sequent(List(TP("3"), TP("2"), TP("1")), TP("0"), freshVars)) shouldEqual ((Seq(), Seq()))
 
-    followsFromAxioms(Sequent(List(TP("3"), TP("2"), TP("1")), TP("1"), freshVar)) shouldEqual ((Seq(
+    followsFromAxioms(Sequent(List(TP("3"), TP("2"), TP("1")), TP("1"), freshVars)) shouldEqual ((Seq(
       CurriedE(List(VarE("x4", TP("3")), VarE("x5", TP("2")), VarE("x6", TP("1"))), VarE("x6", TP("1")))
     ), Seq()))
   }
 
   it should "produce several proofs from the Id axiom" in {
-    followsFromAxioms(Sequent(List(TP("1"), TP("2"), TP("1")), TP("1"), freshVar)) shouldEqual ((Seq(
+    followsFromAxioms(Sequent(List(TP("1"), TP("2"), TP("1")), TP("1"), freshVars)) shouldEqual ((Seq(
       CurriedE(List(VarE("x7", TP("1")), VarE("x8", TP("2")), VarE("x9", TP("1"))), VarE("x7", TP("1"))),
       CurriedE(List(VarE("x7", TP("1")), VarE("x8", TP("2")), VarE("x9", TP("1"))), VarE("x9", TP("1")))
     ), Seq()))
   }
 
   it should "find proof term for given sequent with premises" in {
-    val sequent = Sequent(List(TP("1")), TP("1"), freshVar)
+    val sequent = Sequent(List(TP("1")), TP("1"), freshVars)
     val terms = TheoremProver.findTermExprs(sequent)
     terms.length shouldEqual 1
     TermExpr.equiv(terms.head, CurriedE(List(VarE("x1", TP("1"))), VarE("x1", TP("1")))) shouldEqual true
 
-    val sequent2 = Sequent(List(TP("3"), TP("2"), TP("1")), TP("2"), freshVar)
+    val sequent2 = Sequent(List(TP("3"), TP("2"), TP("1")), TP("2"), freshVars)
     val terms2 = TheoremProver.findTermExprs(sequent2)
     terms2.length shouldEqual 1
     TermExpr.equiv(terms2.head,
@@ -107,7 +107,7 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "find proof term for the K combinator" in {
-    val sequent = Sequent(List(TP("1"), TP("2")), TP("1"), freshVar)
+    val sequent = Sequent(List(TP("1"), TP("2")), TP("1"), freshVars)
     val terms = TheoremProver.findTermExprs(sequent)
     terms.length shouldEqual 1
     TermExpr.equiv(terms.head, CurriedE(List(VarE("a", TP("1")), VarE("b", TP("2"))), VarE("a", TP("1")))) shouldEqual true
