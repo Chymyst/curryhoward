@@ -185,4 +185,14 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
     typeAInt.prettyPrintVerbose shouldEqual "A[<c>Int]{A1[<c>Int] + A2[<c>Int]}"
   }
 
+  it should "generate code containing case objects" in {
+    sealed trait A[X]
+    final case class A1[X]() extends A[X]
+    case object A0 extends A[Nothing]
+    final case class A2[X](q: X) extends A[X]
+
+    def f[X]: A[X] ⇒ A[X] = implement
+
+    def g[X, Y]: (X ⇒ Y) ⇒ A[X] ⇒ A[Y] = implement
+  }
 }

@@ -152,6 +152,7 @@ class MacrosSpec extends FlatSpec with Matchers {
     abstract class A(x: Int, p: String) {
       def y: String
 
+      val l: List[Int] = List(1, 2, 3)
       val z: Boolean = true
 
       def t: (Int, Boolean) = implement // Should not access `u`.
