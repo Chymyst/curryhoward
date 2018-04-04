@@ -803,36 +803,52 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
   }
 
   private[ch] override def simplifyOnceInternal(withEta: Boolean): TermExpr = {
-    lazy val casesSimplified = cases.map(_.simplifyOnce(withEta))
+    val ncases = cases.length
     term.simplifyOnce(withEta) match {
       // Match a fixed part of the disjunction; can be simplified to just one clause.
       // Example: Left(a) match { case Left(x) => f(x); case Right(y) => ... } can be simplified to just f(a).
       case DisjunctE(index, total, termInjected, _) ⇒
-        if (total === cases.length) {
+        if (total === ncases) {
           AppE(cases(index).simplifyOnce(withEta), termInjected).simplifyOnce(withEta)
-        } else throw new Exception(s"Internal error: MatchE with ${cases.length} cases applied to DisjunctE with $total parts, but must be of equal size")
+        } else throw new Exception(s"Internal error: MatchE with $ncases cases applied to DisjunctE with $total parts, but must be of equal size")
 
       // Match of an inner match, can be simplified to a single match.
-      // Example: (Left(a) match { case Left(x) ⇒ ...; case Right(y) ⇒ ... }) match { case ... ⇒ ... }
-      // can be simplified to Left(a) match { case Left(x) ⇒ ... match { case ... ⇒ ...}; case Right(y) ⇒ ... match { case ... ⇒ ... } }
+      // Example: (q match { case Left(x) ⇒ ...; case Right(y) ⇒ ... }) match { case ... ⇒ ... }
+      // can be simplified to q match { case Left(x) ⇒ ... match { case ... ⇒ ...}; case Right(y) ⇒ ... match { case ... ⇒ ... } }
       case MatchE(innerTerm, innerCases) ⇒
         MatchE(innerTerm, innerCases map { case CurriedE(List(head), body) ⇒ CurriedE(List(head), MatchE(body, cases)) })
+          .simplifyOnce(withEta)
 
       // Detect the identity patterns:
       // MatchE(_, List(a ⇒ DisjunctE(0, total, a, _), a ⇒ DisjunctE(1, total, a, _), ...))
       // MatchE(_, a: T1 ⇒ DisjunctE(i, total, NamedConjunctE(List(ProjectE(0, a), Project(1, a), ...), T1), ...), _)
       case termSimplified ⇒
-        if (cases.nonEmpty && {
+
+        // Replace redundant matches on the same term, can be simplified by eliminating one match subexpresssion.
+        // Example: q match { case x ⇒ q match { case y ⇒ b; case other ⇒ ... } ... }
+        // We already know that q was matched as Left(x). Therefore, we can replace y by x in b and remove the `case other` clause altogether.
+
+        val casesSimplified = cases.zipWithIndex.map { case (c@CurriedE(List(headVar), _), i) ⇒
+          TermExpr.substMap(c.simplifyOnce(withEta)) {
+            case MatchE(otherTerm, otherCases) if otherTerm === termSimplified ⇒
+              // We already matched `otherTerm`, and we are now in case `c`, which is `case x ⇒ ...`.
+              // Therefore we can discard any of the `otherCases` except the one corresponding to `c`.
+              // We can replace the `q match { case y ⇒ b; ...}` by `b` after replacing `x` by `y` in `b`.
+              val remainingCase = otherCases(i)
+              AppE(remainingCase, headVar).simplifyOnce(withEta)
+          }
+        }
+        if (casesSimplified.nonEmpty && {
           casesSimplified.zipWithIndex.forall {
             // Detect a ⇒ a pattern
             case (CurriedE(List(head@VarE(_, _)), body@VarE(_, _)), _)
               if head.name === body.name
             ⇒ true
             case (CurriedE(List(head@VarE(_, _)), DisjunctE(i, len, x, _)), ind)
-              if x === head && len === cases.length && ind === i
+              if x === head && len === ncases && ind === i
             ⇒ true
             case (CurriedE(List(head@VarE(_, headT)), DisjunctE(i, len, NamedConjunctE(projectionTerms, conjT), _)), ind) ⇒
-              len === cases.length && ind === i && headT === conjT &&
+              len === ncases && ind === i && headT === conjT &&
                 projectionTerms.zipWithIndex.forall {
                   case (ProjectE(k, head1), j) if k === j && head1 === head ⇒ true
                   case _ ⇒ false
