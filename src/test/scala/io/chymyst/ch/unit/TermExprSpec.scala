@@ -15,8 +15,29 @@ class TermExprSpec extends FlatSpec with Matchers {
 
   behavior of "TermExpr miscellaneous methods"
 
+  it should "generate variables for disjunction subtypes" in {
+    val p = freshVar[Either[Option[Option[(Int, Int)]], Option[(Option[Int], Option[Int])]]]
+
+    val subtypeVars = TermExpr.subtypeVars(p.t).map(_.prettyPrint)
+
+    val indices = "z([0-9]+)".r.findAllMatchIn(subtypeVars.mkString("")).map(_.group(1).toInt).toList
+    indices.map(_ - indices.min) shouldEqual Seq(0, 1, 3, 2, 2, 3)
+
+    subtypeVars.map(_.replaceAll("z[0-9]+", "z")) shouldEqual List(
+      "(Left((None() + 0)) + 0)",
+      "(Left((0 + Some((None() + 0)))) + 0)",
+      "(Left((0 + Some((0 + Some(Tuple2(z, z)))))) + 0)",
+      "(0 + Right((None() + 0)))", "(0 + Right((0 + Some(Tuple2((None() + 0), (None() + 0))))))",
+      "(0 + Right((0 + Some(Tuple2((None() + 0), (0 + Some(z)))))))",
+      "(0 + Right((0 + Some(Tuple2((0 + Some(z)), (None() + 0))))))",
+      "(0 + Right((0 + Some(Tuple2((0 + Some(z)), (0 + Some(z)))))))"
+    )
+
+  }
+
   it should "compute identity function" in {
     def idAB[A, B] = TermExpr.id(typeExpr[A ⇒ B])
+
     idAB.prettyPrint shouldEqual "x ⇒ x"
     idAB.toString shouldEqual "\\((x:A ⇒ B) ⇒ x)"
     idAB.t.prettyPrint shouldEqual "(A ⇒ B) ⇒ A ⇒ B"
@@ -274,9 +295,9 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
 
     //    println(flattens.size)
 
-    def f[A] = allOfType[Option[(A, A, A)] ⇒ Option[(A, A, A)]]()
+    def f[A] = anyOfType[Option[(A, A, A)] ⇒ Option[(A, A, A)]]()
 
-    println(f.size)
+    f.size shouldEqual 28
     //    f[Int].map(_.lambdaTerm.prettyPrint).sorted.foreach(println)
     //    f.size shouldEqual factorial(4)
   }
@@ -284,9 +305,7 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
   it should "generate match clauses" in {
     def f[A] = anyOfType[Option[Option[A]] ⇒ Option[Option[A]]]().map(_.lambdaTerm)
 
-    println(f.size)
-    f.map(_.prettyPrint).foreach(println)
-
+    f.size shouldEqual 13
+    //    f.map(_.prettyPrint).foreach(println)
   }
-
 }

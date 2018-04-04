@@ -342,6 +342,18 @@ object TermExpr {
   }
 
   private[ch] def roundFactor(x: Double): Int = math.round(x * 10000).toInt
+
+  /** Generate all necessary free variables for equality checking of functions that consume disjunction types.
+    *
+    * @param typeExpr The type of the argument expression.
+    * @return A sequence of [[TermExpr]] values containing the necessary free variables.
+    */
+  def subtypeVars(typeExpr: TypeExpr): Seq[TermExpr] = typeExpr match {
+    case dt@DisjunctT(constructor, typeParams, terms) ⇒ terms.zipWithIndex.flatMap { case (t, i) ⇒ subtypeVars(t).map(v ⇒ DisjunctE(i, terms.length, v, dt)) }
+    case nct@NamedConjunctT(constructor, typeParams, accessors, wrapped) ⇒
+      TheoremProver.explode(wrapped.map(subtypeVars)).map(NamedConjunctE(_, nct))
+    case _ ⇒ Seq(VarE(freshIdents(), typeExpr))
+  }
 }
 
 sealed trait TermExpr {
