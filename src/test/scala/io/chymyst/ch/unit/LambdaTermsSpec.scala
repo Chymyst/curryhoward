@@ -602,7 +602,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     // Compute flatten terms from flm terms
     val ftnTerms = flmTerms.map(flm ⇒ (flm :@ (px =>: px)).simplify)
-    if (debug) println(s"flatten terms: ${ftnTerms.map(_.prettyPrint)}")
+    if (debug) println(s"flatten terms (type ${ftnTerms.head.t.prettyPrint}):\n\t${ftnTerms.map(_.prettyPrint).mkString("\n\t")}")
 
     val pureTerms = TheoremProver.findProofs(pureVar.t)._2
     if (debug) println(s"pure terms: ${pureTerms.map(_.prettyPrint)}")
@@ -671,7 +671,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     def pure[A] = freshVar[A ⇒ P[A]]
 
-    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm, debug = true)
 
     println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
 
@@ -742,6 +742,26 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     goodMonads.size shouldEqual 2
   }
 
+  it should "check A x A + A x A x A monad" in {
+    type P[A] = Either[(A, A), (A, A, A)]
+
+    def fmapTerm[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    def flm[A, B] = freshVar[(A ⇒ P[B]) ⇒ P[A] ⇒ P[B]]
+
+    def pure[A] = freshVar[A ⇒ P[A]]
+
+    val (goodSemimonads, goodMonads) = semimonadsAndMonads(fmapTerm, pure, flm)
+
+    println(s"Good semimonads (flatten):\n${goodSemimonads.map(_.prettyPrint).mkString("\n")}")
+
+    println("Good monads:")
+    println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
+
+    goodSemimonads.size shouldEqual 12
+    goodMonads.size shouldEqual 2
+  }
+
   it should "check A + (1 ⇒ A) monad" in {
     type P[A] = Either[A, Unit ⇒ A]
 
@@ -761,4 +781,73 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     goodSemimonads.size shouldEqual 3
     goodMonads.size shouldEqual 1
   }
+
+  it should "check the 1 + A x A monad by hand" in {
+    type P[A] = Option[(A, A)]
+
+    def fmap[A, B] = ofType[(A ⇒ B) ⇒ P[A] ⇒ P[B]].lambdaTerm
+
+    fmap.prettyPrint shouldEqual "a ⇒ b ⇒ b match { c ⇒ (None() + 0); d ⇒ (0 + Some(Tuple2(a d.value._1, a d.value._2))) }"
+
+    def pure[A] = ofType[A ⇒ P[A]].lambdaTerm
+
+    pure.prettyPrint shouldEqual "a ⇒ (0 + Some(Tuple2(a, a)))"
+
+    // Construct flatten by hand.
+    def ppa[A] = freshVar[P[P[A]]]
+
+    def pa[A] = freshVar[P[A]]
+
+    val none = freshVar[None.type]
+    val ppaNone = ppa(none)
+    val paNone = pa(none)
+    ppaNone.t.prettyPrint shouldEqual "Option[Tuple2[Option[Tuple2[A,A]],Option[Tuple2[A,A]]]]"
+    ppa.t.prettyPrint shouldEqual ppaNone.t.prettyPrint
+
+    def tuplePa[A] = freshVar[Some[(P[A], P[A])]]
+
+    def tupleA0[A] = freshVar[Some[(A, A)]]
+
+    def tupleA1[A] = freshVar[Some[(A, A)]]
+
+    def tupleA2[A] = freshVar[Some[(A, A)]]
+
+    val ftn = (
+      ppa =>: ppa.cases(
+        none =>: paNone,
+        tuplePa =>: tuplePa("value")(0).cases(
+          none =>: paNone,
+          tupleA0 =>: tuplePa("value")(1).cases(
+            none =>: paNone,
+            tupleA1 =>:
+              pa(tupleA0(tupleA0("value").t(tupleA0("value")(0), tupleA1("value")(1))))
+          )
+        )
+      )
+      ).prettyRename
+    ftn.t.prettyPrint shouldEqual "Option[Tuple2[Option[Tuple2[A,A]],Option[Tuple2[A,A]]]] ⇒ Option[Tuple2[A,A]]"
+    ftn.prettyPrint shouldEqual "a ⇒ a match { b ⇒ (b + 0); c ⇒ c.value._1 match { d ⇒ (d + 0); e ⇒ c.value._2 match { f ⇒ (f + 0); g ⇒ (0 + Some(Tuple2(e.value._1, g.value._2))) } } }"
+    // Fails due to violating laws.
+    LC.checkPureFlattenLaws(fmap, pure, ftn) shouldEqual true
+    LC.checkFlattenAssociativity(fmap, ftn) shouldEqual false
+
+    val ftn2 = (
+      ppa =>: ppa.cases(
+        none =>: paNone,
+        tuplePa =>: tuplePa("value")(0).cases(
+          none =>: tuplePa("value")(1),
+          tupleA0 =>: tuplePa("value")(1).cases(
+            none =>: tuplePa("value")(0),
+            tupleA1 =>:
+              pa(tupleA0(tupleA0("value").t(tupleA0("value")(0), tupleA1("value")(1))))
+          )
+        )
+      )
+      ).simplify.prettyRename
+    ftn2.t.prettyPrint shouldEqual "Option[Tuple2[Option[Tuple2[A,A]],Option[Tuple2[A,A]]]] ⇒ Option[Tuple2[A,A]]"
+    ftn2.prettyPrint shouldEqual "a ⇒ a match { b ⇒ (b + 0); c ⇒ c.value._1 match { d ⇒ c.value._2; e ⇒ c.value._2 match { f ⇒ c.value._1; g ⇒ (0 + Some(Tuple2(e.value._1, g.value._2))) } } }"
+    LC.checkPureFlattenLaws(fmap, pure, ftn2) shouldEqual true
+    LC.checkFlattenAssociativity(fmap, ftn2) shouldEqual false
+  }
+
 }

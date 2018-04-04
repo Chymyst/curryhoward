@@ -35,7 +35,7 @@ class TermExprSpec extends FlatSpec with Matchers {
   }
 
   it should "compute extensional equality of functions" in {
-    TermExpr.extEquals(TermExpr.id(typeExpr[Int]), TermExpr.id(typeExpr[Int])) shouldEqual true
+    TermExpr.extEqual(TermExpr.id(typeExpr[Int]), TermExpr.id(typeExpr[Int])) shouldEqual true
   }
 
   it should "compute identity function" in {
@@ -65,7 +65,7 @@ class TermExprSpec extends FlatSpec with Matchers {
 
     the[Exception] thrownBy {
       TermExpr.subst(var23, termExpr1, var32 =>: var23.copy(t = TP("1"))) shouldEqual (var32 =>: termExpr1)
-    } should have message "In subst(x2, \\((x2:3) ⇒ (x3:2) ⇒ (x4:1) ⇒ x3), \\((x3:2) ⇒ x2)), found variable(s) (x2:1) with incorrect type(s), expected variable type 3"
+    } should have message "In subst(x2:3, \\((x2:3) ⇒ (x3:2) ⇒ (x4:1) ⇒ x3), \\((x3:2) ⇒ x2)), found variable(s) (x2:1) with incorrect type(s), expected variable type 3"
   }
 
   it should "recover from incorrect substitution" in {
