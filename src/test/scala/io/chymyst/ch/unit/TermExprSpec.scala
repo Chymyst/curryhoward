@@ -32,7 +32,10 @@ class TermExprSpec extends FlatSpec with Matchers {
       "(0 + Right((0 + Some(Tuple2((0 + Some(z)), (None() + 0))))))",
       "(0 + Right((0 + Some(Tuple2((0 + Some(z)), (0 + Some(z)))))))"
     )
+  }
 
+  it should "compute extensional equality of functions" in {
+    TermExpr.extEquals(TermExpr.id(typeExpr[Int]), TermExpr.id(typeExpr[Int])) shouldEqual true
   }
 
   it should "compute identity function" in {

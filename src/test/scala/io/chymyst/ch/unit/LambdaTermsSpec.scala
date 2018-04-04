@@ -1,7 +1,7 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
-import io.chymyst.ch.data.{LawChecking => LC}
+import io.chymyst.ch.data.{SymbolicLawChecking => LC}
 import org.scalatest.{Assertion, FlatSpec, Matchers}
 
 class LambdaTermsSpec extends FlatSpec with Matchers {
@@ -658,7 +658,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
-    goodSemimonads.size shouldEqual 2
+    goodSemimonads.size shouldEqual 3
     goodMonads.size shouldEqual 1
   }
 
@@ -718,7 +718,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
-    goodSemimonads.size shouldEqual 13
+    goodSemimonads.size shouldEqual 19
     goodMonads.size shouldEqual 6
   }
 
@@ -758,7 +758,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     println("Good monads:")
     println(goodMonads.map { case (pure, ftn) ⇒ s"pure = ${pure.prettyPrint}, flatten = ${ftn.prettyPrint}" }.mkString("\n"))
 
-    goodSemimonads.size shouldEqual 2
+    goodSemimonads.size shouldEqual 3
     goodMonads.size shouldEqual 1
   }
 }

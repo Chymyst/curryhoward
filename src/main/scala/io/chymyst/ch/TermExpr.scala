@@ -343,16 +343,32 @@ object TermExpr {
 
   private[ch] def roundFactor(x: Double): Int = math.round(x * 10000).toInt
 
-  /** Generate all necessary free variables for equality checking of functions that consume disjunction types.
+  /** Generate all necessary fresh variables for equality checking of functions that consume disjunction types.
     *
     * @param typeExpr The type of the argument expression.
-    * @return A sequence of [[TermExpr]] values containing the necessary free variables.
+    * @return A sequence of [[TermExpr]] values containing the necessary fresh variables.
     */
   def subtypeVars(typeExpr: TypeExpr): Seq[TermExpr] = typeExpr match {
     case dt@DisjunctT(constructor, typeParams, terms) ⇒ terms.zipWithIndex.flatMap { case (t, i) ⇒ subtypeVars(t).map(v ⇒ DisjunctE(i, terms.length, v, dt)) }
     case nct@NamedConjunctT(constructor, typeParams, accessors, wrapped) ⇒
       TheoremProver.explode(wrapped.map(subtypeVars)).map(NamedConjunctE(_, nct))
     case _ ⇒ Seq(VarE(freshIdents(), typeExpr))
+  }
+
+  /** Extensional equality check. If the term expressions are functions, fresh variables are substituted as arguments and the results are compared with `equiv`.
+    *
+    * @param termExpr1 The first term.
+    * @param termExpr2 The second term.
+    * @return `true` if the terms are extensionally equal.
+    */
+  def extEquals(termExpr1: TermExpr, termExpr2: TermExpr): Boolean = {
+    val t1 = termExpr1.simplify
+    val t2 = termExpr2.simplify
+    (t1.t === t2.t) && ((t1 equiv t2) || ((t1, t2) match {
+      case (CurriedE(h1 :: _, _), CurriedE(_ :: _, _)) ⇒
+        subtypeVars(h1.t).forall(term ⇒ extEquals(t1(term), t2(term)))
+      case _ ⇒ false
+    }))
   }
 }
 
