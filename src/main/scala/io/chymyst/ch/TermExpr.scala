@@ -835,7 +835,9 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
               // Therefore we can discard any of the `otherCases` except the one corresponding to `c`.
               // We can replace the `q match { case y ⇒ b; ...}` by `b` after replacing `x` by `y` in `b`.
               val remainingCase = otherCases(i)
-              AppE(remainingCase, headVar).simplifyOnce(withEta)
+              val result = AppE(remainingCase, headVar).simplifyOnce(withEta)
+              println(s"DEBUG: replacing ${MatchE(otherTerm, otherCases)} by $result in ${c.simplifyOnce(withEta)}")
+              result
           }
         }
         if (casesSimplified.nonEmpty && {
