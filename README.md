@@ -146,6 +146,8 @@ See the [youtube presentation](https://youtu.be/cESdgot_ZxY) for more details ab
 
 [This lecture](https://youtu.be/v=KcfD3Iv--UM) is a pedagogical explanation of the Curry-Howard correspondence in the context of functional programming.
 
+See also a [recent presentation at the Haskell User's Group meetup](https://youtu.be/OFBwrMo1ESk).
+
 # Unit tests
 
 `sbt test`

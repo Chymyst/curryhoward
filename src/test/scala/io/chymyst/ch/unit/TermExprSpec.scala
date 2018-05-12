@@ -32,8 +32,19 @@ class TermExprSpec extends FlatSpec with Matchers {
       "(0 + Right((0 + Some(Tuple2((0 + Some(z)), (None() + 0))))))",
       "(0 + Right((0 + Some(Tuple2((0 + Some(z)), (0 + Some(z)))))))"
     )
+
+    val subtypeVarsScala = TermExpr.subtypeVars(p.t).map(_.printScala).map(_.replaceAll("z[0-9]+", "z")) shouldEqual
+      List("Left(None)", "Left(Some(None))", "Left(Some(Some(Tuple2(z, z))))", "Right(None)", "Right(Some(Tuple2(None, None)))", "Right(Some(Tuple2(None, Some(z))))", "Right(Some(Tuple2(Some(z), None)))", "Right(Some(Tuple2(Some(z), Some(z))))")
   }
 
+  it should "compute Scala code of flatten for Option" in {
+    def flattenOpt[A]: Option[Option[A]] ⇒ Option[A] = implement
+    
+    val flattenScala = flattenOpt.lambdaTerm.printScala
+    
+    flattenScala shouldEqual "a: Option[Option[A]] ⇒ a match { case b: None.type ⇒ None; case c: Some[Option[A]] ⇒ c.value }"
+  }
+  
   it should "compute extensional equality of functions" in {
     TermExpr.extEqual(TermExpr.id(typeExpr[Int]), TermExpr.id(typeExpr[Int])) shouldEqual true
   }
@@ -80,6 +91,15 @@ class TermExprSpec extends FlatSpec with Matchers {
       case VarE(_, _) ⇒ pair
     } should // The `subst` tries to replace `var23` in `var23 =>: var12` with `pair`, which is a NamedConjunctE.
       have message "Incorrect substitution of bound variable x2 by non-variable Tuple2(x, x) in substMap(x2 ⇒ x1){...}"
+  }
+
+  behavior of "printScala"
+
+  it should "print functions in Scala syntax" in {
+    termExpr1.printScala shouldEqual "x2 ⇒ x3 ⇒ x4 ⇒ x3"
+    termExpr2.printScala shouldEqual "x2 ⇒ x3 ⇒ x4 ⇒ x1"
+    termExpr3.printScala shouldEqual "x1 ⇒ x2 ⇒ x3 ⇒ x4 ⇒ x1"
+
   }
 
   behavior of "TermExpr#renameVar"

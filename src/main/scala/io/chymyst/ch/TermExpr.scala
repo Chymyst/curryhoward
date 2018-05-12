@@ -349,8 +349,8 @@ object TermExpr {
     * @return A sequence of [[TermExpr]] values containing the necessary fresh variables.
     */
   def subtypeVars(typeExpr: TypeExpr): Seq[TermExpr] = typeExpr match {
-    case dt@DisjunctT(constructor, typeParams, terms) ⇒ terms.zipWithIndex.flatMap { case (t, i) ⇒ subtypeVars(t).map(v ⇒ DisjunctE(i, terms.length, v, dt)) }
-    case nct@NamedConjunctT(constructor, typeParams, accessors, wrapped) ⇒
+    case dt@DisjunctT(_, _, terms) ⇒ terms.zipWithIndex.flatMap { case (t, i) ⇒ subtypeVars(t).map(v ⇒ DisjunctE(i, terms.length, v, dt)) }
+    case nct@NamedConjunctT(_, _, _, wrapped) ⇒
       TheoremProver.explode(wrapped.map(subtypeVars)).map(NamedConjunctE(_, nct))
     case _ ⇒ Seq(VarE(freshIdents(), typeExpr))
   }
@@ -542,6 +542,27 @@ sealed trait TermExpr {
       val rightZeros = Seq.fill(total - index - 1)("0")
       val rightZerosString = if (rightZeros.isEmpty) "" else " + "
       "(" + leftZeros.mkString(" + ") + leftZerosString + term.prettyPrintWithParentheses(0) + rightZerosString + rightZeros.mkString(" + ") + ")"
+  }
+
+  lazy val printScala: String = printScalaWithTypes()
+
+  private[ch] def printScalaWithTypes(withTypes: Boolean = false): String = this match {
+    case VarE(name, _) ⇒ name + (if (withTypes) ": " + t.prettyPrint else "")
+    case AppE(head, arg) ⇒
+      val h = head.printScalaWithTypes(true)
+      val b = arg.printScalaWithTypes()
+      s"$h($b)"
+    case CurriedE(heads, body) ⇒
+      s"${heads.map(_.printScalaWithTypes(true)).mkString(" ⇒ ")} ⇒ ${body.printScalaWithTypes()}"
+    case UnitE(_) ⇒ "()"
+    case ConjunctE(terms) ⇒ "(" + terms.map(_.printScalaWithTypes()).mkString(", ") + ")"
+    case NamedConjunctE(terms, tExpr) ⇒ if (tExpr.wrapped.isEmpty) tExpr.constructor.toString
+    else s"${tExpr.constructor.toString}(${terms.map(_.printScalaWithTypes()).mkString(", ")})"
+    case ProjectE(index, term) ⇒ term.printScalaWithTypes() + "." + term.accessor(index)
+    case MatchE(term, cases) ⇒
+      term.printScalaWithTypes() + " match { case " + cases.map(_.printScalaWithTypes(true)).mkString("; case ") + " }"
+    case DisjunctE(index, total, term, _) ⇒
+      term.printScalaWithTypes()
   }
 
   private def prettyVars: Iterator[String] = for {
@@ -866,20 +887,20 @@ final case class MatchE(term: TermExpr, cases: List[TermExpr]) extends TermExpr 
         // We already know that q was matched as Left(x). Therefore, we can replace y by x in b and remove the `case other` clause altogether.
         // Doing a .renameBoundVars on the cases leads to infinite loops somewhere due to incorrect alpha-conversion.
         val casesSimplified = cases.map(_.simplifyOnce(withEta))
-          /*
-          .zipWithIndex.map { case (c@CurriedE(List(headVar), _), i) ⇒
-          TermExpr.substMap(c) {
-            case MatchE(otherTerm, otherCases) if otherTerm === termSimplified ⇒
-              // We already matched `otherTerm`, and we are now in case `c`, which is `case x ⇒ ...`.
-              // Therefore we can discard any of the `otherCases` except the one corresponding to `c`.
-              // We can replace the `q match { case y ⇒ b; ...}` by `b` after replacing `x` by `y` in `b`.
-              val remainingCase = otherCases(i)
-              val result = AppE(remainingCase, headVar).simplifyOnce(withEta)
-              //            println(s"DEBUG: replacing ${MatchE(otherTerm, otherCases)} by $result in ${c.simplifyOnce(withEta)}")
-              result
-          }
+        /*
+        .zipWithIndex.map { case (c@CurriedE(List(headVar), _), i) ⇒
+        TermExpr.substMap(c) {
+          case MatchE(otherTerm, otherCases) if otherTerm === termSimplified ⇒
+            // We already matched `otherTerm`, and we are now in case `c`, which is `case x ⇒ ...`.
+            // Therefore we can discard any of the `otherCases` except the one corresponding to `c`.
+            // We can replace the `q match { case y ⇒ b; ...}` by `b` after replacing `x` by `y` in `b`.
+            val remainingCase = otherCases(i)
+            val result = AppE(remainingCase, headVar).simplifyOnce(withEta)
+            //            println(s"DEBUG: replacing ${MatchE(otherTerm, otherCases)} by $result in ${c.simplifyOnce(withEta)}")
+            result
         }
-        */
+      }
+      */
         if (casesSimplified.nonEmpty && {
           casesSimplified.zipWithIndex.forall {
             // Detect a ⇒ a pattern
