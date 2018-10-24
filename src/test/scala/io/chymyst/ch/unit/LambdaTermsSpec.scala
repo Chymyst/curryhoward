@@ -206,6 +206,8 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
     fmapAA(a =>: a)(optA) equiv optA shouldEqual true
   }
 
+  private def cleanMessage(s: String): String = s.replaceAll("""\$\d+""", """\$""")
+
   it should "verify identity law for Option[T]" in {
     def fmap[A, B] = ofType[(A ⇒ B) ⇒ Option[A] ⇒ Option[B]]
 
@@ -216,13 +218,13 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     def b[B] = freshVar[B]
 
-    the[Exception] thrownBy idA(b) should have message "Internal error: Invalid head type in application (\\((a$12:A) ⇒ a$12) b$13): A ⇒ A must be a function with argument type B"
+    cleanMessage((the[Exception] thrownBy idA(b)).getMessage) shouldEqual "Internal error: Invalid head type in application (\\((a$:A) ⇒ a$) b$): A ⇒ A must be a function with argument type B"
 
     val fmapAA = fmapT.substTypeVar(b, a)
 
     val f2 = fmapAA(idA)
 
-    the[Exception] thrownBy fmapT.substTypeVar(idA, a) should have message "substTypeVar requires a type variable as type of expression \\((a$12:A) ⇒ a$12), but found type A ⇒ A"
+    cleanMessage((the[Exception] thrownBy fmapT.substTypeVar(idA, a)).getMessage) shouldEqual "substTypeVar requires a type variable as type of expression \\((a$:A) ⇒ a$), but found type A ⇒ A"
 
     def optA[A] = freshVar[Option[A]]
 
@@ -300,13 +302,13 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     e1.t.typeParams shouldEqual Seq(BasicT("String"), BasicT("Int"))
 
-    the[Exception] thrownBy e1.accessor(1) should have message "Internal error: Cannot perform projection for term e1$25 : Either[<c>String,<c>Int] because its type is not a conjunction"
+    cleanMessage((the[Exception] thrownBy e1.accessor(1)).getMessage) shouldEqual "Internal error: Cannot perform projection for term e1$ : Either[<c>String,<c>Int] because its type is not a conjunction"
 
     the[Exception] thrownBy e1() should have message "Calling .apply() on type Either[<c>String,<c>Int] requires one argument (disjunction injection value)"
 
     the[Exception] thrownBy e1.t() should have message "Calling .apply() on type Either[<c>String,<c>Int] requires one argument (disjunction injection value)"
 
-    the[Exception] thrownBy e1(x) should have message "Cannot inject into disjunction since the given disjunction type Either[<c>String,<c>Int] does not contain the type None.type of the given term x$23"
+    cleanMessage((the[Exception] thrownBy e1(x)).getMessage) shouldEqual "Cannot inject into disjunction since the given disjunction type Either[<c>String,<c>Int] does not contain the type None.type of the given term x$"
 
     the[Exception] thrownBy e1.cases() should have message "Case match on Either[<c>String,<c>Int] must use a sequence of 2 functions with matching types of arguments (Left[<c>String,<c>Int]; Right[<c>String,<c>Int]) and bodies, but have "
 
@@ -329,7 +331,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val i = freshVar[Int]
 
-    the[Exception] thrownBy i() should have message "t.apply(...) is not defined for the term i$28 of type <c>Int"
+    cleanMessage((the[Exception] thrownBy i()).getMessage) shouldEqual "t.apply(...) is not defined for the term i$ of type <c>Int"
 
     (f0 andThen f0).t shouldEqual f0.t
 
@@ -355,7 +357,7 @@ class LambdaTermsSpec extends FlatSpec with Matchers {
 
     val mapApplied = mapReaderTerm :@ readerTerm
 
-    mapApplied.toString shouldEqual "(\\((a:X ⇒ A) ⇒ (b:A ⇒ B) ⇒ (c:X) ⇒ (b (a c))) readerTerm$29)"
+    cleanMessage(mapApplied.toString) shouldEqual "(\\((a:X ⇒ A) ⇒ (b:A ⇒ B) ⇒ (c:X) ⇒ (b (a c))) readerTerm$)"
     (mapApplied.t.prettyPrint, idTermA.t.prettyPrint) shouldEqual (("(A ⇒ B) ⇒ X ⇒ B", "A ⇒ A"))
 
     // map(rxa)(id) = rxa
