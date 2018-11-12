@@ -28,7 +28,7 @@ def f[X, Y]: (X ⇒ Y) ⇒ (Int ⇒ X) ⇒ (Int ⇒ Y) = implement
 
 // The macro `implement` will automatically generate this code for the function body:
 // {
-//  (g: X ⇒ Y) ⇒ (r: Int ⇒ X) ⇒ (e: Int) ⇒ g(r(e))
+//  (g: X ⇒ Y) ⇒ (r: Int ⇒ X) ⇒ (e: Int) = g(r(e))
 // }
 
 ```
