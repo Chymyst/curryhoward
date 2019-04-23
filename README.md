@@ -96,7 +96,7 @@ See the [tutorial](docs/Tutorial.md) for more details.
 ## How it works
 
 The macros `implement` and `ofType`  examine the given type expression via reflection (at compile time).
-The type expression is rewritten as a formula the intuitionistic propositional logic (IPL) with universally quantified propositions.
+The type expression is rewritten as a formula in the intuitionistic propositional logic (IPL) with universally quantified propositions.
 
 This is possible due to the Curry-Howard isomorphism, which maps functions with fully parametric types to theorems in the (IPL) with universally quantified propositions.
 
