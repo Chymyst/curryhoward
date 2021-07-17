@@ -18,7 +18,7 @@ package object ch {
     * Example usage:
     *
     * {{{
-    *   def f[A,B](x: A ⇒ B, y: B ⇒ A): A ⇒ A = implement
+    *   def f[A,B](x: A => B, y: B => A): A => A = implement
     * }}}
     *
     * @tparam U Type of the expression to be implemented. Specifying this type parameter is optional.
@@ -62,9 +62,9 @@ package object ch {
     * Example usage:
     *
     * {{{
-    *   val x: A ⇒ B = ...
-    *   val y: B ⇒ C = ...
-    *   val z = ofType[A ⇒ C](x, y)
+    *   val x: A => B = ...
+    *   val y: B => C = ...
+    *   val z = ofType[A => C](x, y)
     * }}}
     *
     * @param values Available values that can be used while constructing the expression.
@@ -80,11 +80,11 @@ package object ch {
     */
   implicit class WithLambdaTerm(val functionValue: Any) extends AnyVal {
     def lambdaTerm: TermExpr = functionValue match {
-      case g: Function0Lambda[_] ⇒ g.lambdaTerm
-      case g: Function1Lambda[_, _] ⇒ g.lambdaTerm
-      case g: Function2Lambda[_, _, _] ⇒ g.lambdaTerm
-      case g: Function3Lambda[_, _, _, _] ⇒ g.lambdaTerm
-      case _ ⇒ throw new Exception(s"Called `.lambdaTerm` on an expression $functionValue that has no attached lambda-term")
+      case g: Function0Lambda[_] => g.lambdaTerm
+      case g: Function1Lambda[_, _] => g.lambdaTerm
+      case g: Function2Lambda[_, _, _] => g.lambdaTerm
+      case g: Function3Lambda[_, _, _, _] => g.lambdaTerm
+      case _ => throw new Exception(s"Called `.lambdaTerm` on an expression $functionValue that has no attached lambda-term")
     }
   }
 
@@ -101,7 +101,7 @@ package object ch {
     *
     * {{{
     *   val tInt = typeExpr[Int]
-    *   def idAType[A] = typeExpr[A ⇒ A]
+    *   def idAType[A] = typeExpr[A => A]
     * }}}
     *
     * @tparam U The Scala type for which the type expression is requested. Can use type parameters.

@@ -1,49 +1,49 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
-import io.chymyst.ch.Macros._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class MoreMatchTypeSpec extends FlatSpec with Matchers {
+class MoreMatchTypeSpec extends AnyFlatSpec with Matchers {
 
   behavior of "tuples"
 
   it should "get type with argument tuples" in {
-    def result[A, B] = typeExpr[A ⇒ ((A, B)) ⇒ A]
+    def result[A, B] = typeExpr[A => ((A, B)) => A]
 
-    result.prettyPrint shouldEqual "A ⇒ Tuple2[A,B] ⇒ A"
+    result.prettyPrint shouldEqual "A => Tuple2[A,B] => A"
   }
 
   it should "get type with nested argument tuples" in {
-    def result[A, B] = typeExpr[(((A, B)) ⇒ A) ⇒ A]
+    def result[A, B] = typeExpr[(((A, B)) => A) => A]
 
     result.prettyPrint
-    "(Tuple2[A,B] ⇒ A) ⇒ A"
+    "(Tuple2[A,B] => A) => A"
   }
 
   it should "get a complicated type with argument tuples" in {
-    def result[S, A, B] = typeExpr[(S ⇒ (A, S)) ⇒ (((A, S)) ⇒ (B, S)) ⇒ (S ⇒ (B, S))]
+    def result[S, A, B] = typeExpr[(S => (A, S)) => (((A, S)) => (B, S)) => (S => (B, S))]
 
     result.prettyPrint
-    "(S ⇒ Tuple2[A,S]) ⇒ (Tuple2[A,S] ⇒ Tuple2[B,S]) ⇒ S ⇒ Tuple2[B,S]"
+    "(S => Tuple2[A,S]) => (Tuple2[A,S] => Tuple2[B,S]) => S => Tuple2[B,S]"
   }
 
   behavior of "Java-style function argument groups"
 
   it should "get type with argument group" in {
-    def result[A, B] = typeExpr[A ⇒ (A, B) ⇒ A]
+    def result[A, B] = typeExpr[A => (A, B) => A]
 
-    result.prettyPrint shouldEqual "A ⇒ (A, B) ⇒ A"
+    result.prettyPrint shouldEqual "A => (A, B) => A"
   }
 
   it should "get type with argument group in higher-order function" in {
-    def result[A, B, C] = typeExpr[A ⇒ ((A, B, C) ⇒ A) ⇒ B]
+    def result[A, B, C] = typeExpr[A => ((A, B, C) => A) => B]
 
-    result.prettyPrint shouldEqual "A ⇒ ((A, B, C) ⇒ A) ⇒ B"
+    result.prettyPrint shouldEqual "A => ((A, B, C) => A) => B"
   }
 
   it should "use ConjunctT to emit code for Java-style argument group" in {
-    freshVar[(Int, (Int, Boolean), (Int, String) ⇒ Double) ⇒ Boolean].t shouldEqual #->(ConjunctT(List(BasicT("Int"), NamedConjunctT("Tuple2", List(BasicT("Int"), BasicT("Boolean")), List("_1", "_2"), List(BasicT("Int"), BasicT("Boolean"))), #->(ConjunctT(List(BasicT("Int"), BasicT("String"))), BasicT("Double")))), BasicT("Boolean"))
+    freshVar[(Int, (Int, Boolean), (Int, String) => Double) => Boolean].t shouldEqual #->(ConjunctT(List(BasicT("Int"), NamedConjunctT("Tuple2", List(BasicT("Int"), BasicT("Boolean")), List("_1", "_2"), List(BasicT("Int"), BasicT("Boolean"))), #->(ConjunctT(List(BasicT("Int"), BasicT("String"))), BasicT("Double")))), BasicT("Boolean"))
   }
 
   behavior of "type parameters"
@@ -66,9 +66,9 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
   }
 
   it should "match type with nested type parameters" in {
-    def r[U, V] = freshVar[Option[U] ⇒ Option[Option[V]]].t
+    def r[U, V] = freshVar[Option[U] => Option[Option[V]]].t
 
-    r.prettyPrintVerbose shouldEqual "Option[U]{None.type + Some[U]} ⇒ Option[Option[V]{None.type + Some[V]}]{None.type + Some[Option[V]{None.type + Some[V]}]}"
+    r.prettyPrintVerbose shouldEqual "Option[U]{None.type + Some[U]} => Option[Option[V]{None.type + Some[V]}]{None.type + Some[Option[V]{None.type + Some[V]}]}"
 
     val A = "A"
     val B = "B"
@@ -85,30 +85,30 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
   behavior of "other syntax"
 
   it should "get type of conventional syntax for function" in {
-    def result[A, B, C] = typeExpr[A ⇒ C]
+    def result[A, B, C] = typeExpr[A => C]
 
-    result.prettyPrint shouldEqual "A ⇒ C"
+    result.prettyPrint shouldEqual "A => C"
   }
 
   behavior of "recursive types"
 
   it should "not hang on List type" in {
-    def result[A](x: List[A]) = typeExpr[A ⇒ List[A]]
+    def result[A](x: List[A]) = typeExpr[A => List[A]]
 
     val r = result(List(10))
-    r.prettyPrint shouldEqual "A ⇒ List[A]"
+    r.prettyPrint shouldEqual "A => List[A]"
 
-    def f[A]: A ⇒ List[A] = implement
+    def f[A]: A => List[A] = implement
 
     f(10) shouldEqual List()
-    f.lambdaTerm.prettyPrint shouldEqual "a ⇒ (0 + Nil())"
+    f.lambdaTerm.prettyPrint shouldEqual "a => (0 + Nil())"
   }
 
-  it should "process List[A] ⇒ List[A]" in {
-    freshVar[List[Int] ⇒ List[Int]].t shouldEqual #->(DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(BasicT("Int")), List("head", "tl$access$1"), List(BasicT("Int"), RecurseT("List", List(BasicT("Int"))))), NamedConjunctT("Nil", List(), List(), List()))), DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(BasicT("Int")), List("head", "tl$access$1"), List(BasicT("Int"), RecurseT("List", List(BasicT("Int"))))), NamedConjunctT("Nil", List(), List(), List()))))
+  it should "process List[A] => List[A]" in {
+    freshVar[List[Int] => List[Int]].t shouldEqual #->(DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(BasicT("Int")), List("head", "tl$access$1"), List(BasicT("Int"), RecurseT("List", List(BasicT("Int"))))), NamedConjunctT("Nil", List(), List(), List()))), DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(BasicT("Int")), List("head", "tl$access$1"), List(BasicT("Int"), RecurseT("List", List(BasicT("Int"))))), NamedConjunctT("Nil", List(), List(), List()))))
 
 
-    def f[P] = freshVar[List[P] ⇒ List[P]].t
+    def f[P] = freshVar[List[P] => List[P]].t
 
     f[Int] shouldEqual #->(DisjunctT("List", List(TP("P")), List(NamedConjunctT("::", List(TP("P")), List("head", "tl$access$1"), List(TP("P"), RecurseT("List", List(TP("P"))))), NamedConjunctT("Nil", List(), List(), List()))), DisjunctT("List", List(TP("P")), List(NamedConjunctT("::", List(TP("P")), List("head", "tl$access$1"), List(TP("P"), RecurseT("List", List(TP("P"))))), NamedConjunctT("Nil", List(), List(), List()))))
 
@@ -118,15 +118,15 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
 
     final case class Data[Q](f: List[(Q, Q, Int)], g: Int)
 
-    def result[A] = typeExpr[A ⇒ Data[A]]
+    def result[A] = typeExpr[A => Data[A]]
 
-    result.prettyPrint shouldEqual "A ⇒ Data[A]"
+    result.prettyPrint shouldEqual "A => Data[A]"
   }
 
   it should "process Either containing List" in {
-    def result[P] = typeExpr[P ⇒ Either[List[P], Option[P]]]
+    def result[P] = typeExpr[P => Either[List[P], Option[P]]]
 
-    result.prettyPrint shouldEqual "P ⇒ Either[List[P],Option[P]]"
+    result.prettyPrint shouldEqual "P => Either[List[P],Option[P]]"
   }
 
   it should "process a recursive case class (infinite product)" in {
@@ -159,7 +159,7 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
   }
 
   it should "process a recursive type (infinite implication)" in {
-    final case class InfImplication[T](i: T ⇒ InfImplication[T])
+    final case class InfImplication[T](i: T => InfImplication[T])
 
     val r = freshVar[InfImplication[Int]].t
 
@@ -179,10 +179,10 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
     final case class B1[S1](a1: A[S1]) extends B[S1]
     final case class B2[S2](b2: B[S2]) extends B[S2]
 
-    def result[Z] = freshVar[Z ⇒ Either[A[Z], Option[B[Z]]]].t
+    def result[Z] = freshVar[Z => Either[A[Z], Option[B[Z]]]].t
 
     val r = result[Int]
-    r.prettyPrintVerbose shouldEqual "Z ⇒ Either[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]{Left[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}] + Right[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]}"
+    r.prettyPrintVerbose shouldEqual "Z => Either[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]{Left[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}] + Right[A[Z]{A1[Z] + A2[Z]},Option[B[Z]{B1[Z] + B2[Z]}]{None.type + Some[B[Z]{B1[Z] + B2[Z]}]}]}"
 
     val typeAInt = freshVar[A[Int]].t
     typeAInt shouldEqual DisjunctT("A", List(BasicT("Int")), List(NamedConjunctT("A1", List(BasicT("Int")), List("b1"), List(DisjunctT("B", List(BasicT("Int")), List(NamedConjunctT("B1", List(BasicT("Int")), List("a1"), List(RecurseT("A", List(BasicT("Int"))))), NamedConjunctT("B2", List(BasicT("Int")), List("b2"), List(RecurseT("B", List(BasicT("Int"))))))))), NamedConjunctT("A2", List(BasicT("Int")), List("a2"), List(RecurseT("A", List(BasicT("Int")))))))
@@ -195,8 +195,8 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
     case object A0 extends A[Nothing]
     final case class A2[X](q: X) extends A[X]
 
-    def f[X]: A[X] ⇒ A[X] = implement
+    def f[X]: A[X] => A[X] = implement
 
-    def g[X, Y]: (X ⇒ Y) ⇒ A[X] ⇒ A[Y] = implement
+    def g[X, Y]: (X => Y) => A[X] => A[Y] = implement
   }
 }

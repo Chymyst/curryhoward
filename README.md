@@ -24,11 +24,11 @@ libraryDependencies += "io.chymyst" %% "curryhoward" % "latest.integration"
 import io.chymyst.ch.implement
 
 // Automatically derive code for this function, based on its type signature:
-def f[X, Y]: (X ⇒ Y) ⇒ (Int ⇒ X) ⇒ (Int ⇒ Y) = implement
+def f[X, Y]: (X => Y) => (Int => X) => (Int => Y) = implement
 
 // The macro `implement` will automatically generate this code for the function body:
 // {
-//  (g: X ⇒ Y) ⇒ (r: Int ⇒ X) ⇒ (e: Int) ⇒ g(r(e))
+//  (g: X => Y) => (r: Int => X) => (e: Int) => g(r(e))
 // }
 
 ```
@@ -39,8 +39,8 @@ def f[X, Y]: (X ⇒ Y) ⇒ (Int ⇒ X) ⇒ (Int ⇒ Y) = implement
 - Automatically generate an expression of a specified type from given arguments (`ofType`)
 - Works as a macro at compile time; when a type cannot be implemented, emit a compile-time error
 - Supports function types, tuples, sealed traits / case classes / case objects
-- Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T` can be used equivalently
-- Java-style argument groups can be used, e.g. `A ⇒ (B, C) ⇒ D`, in addition to using a tuple type, e.g. `A ⇒ ((B, C)) ⇒ D`
+- Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T => T` can be used equivalently
+- Java-style argument groups can be used, e.g. `A => (B, C) => D`, in addition to using a tuple type, e.g. `A => ((B, C)) => D`
 - When a type can be implemented in more than one way, heuristics ("least information loss") are used to prefer implementations that are more likely to satisfy algebraic laws
 - Emit a compile-time error when a type can be implemented in more than one way despite using heuristics
 - Debugging and logging options are available
@@ -56,15 +56,15 @@ The function `implement` works when defining methods, and is used syntactically 
 ```scala
 import io.chymyst.ch.implement
 
-def f[X, Y]: X ⇒ Y ⇒ X = implement
+def f[X, Y]: X => Y => X = implement
 
-// The code `(x: X) ⇒ (y: Y) ⇒ x` is generated for the body of the function `f`.
+// The code `(x: X) => (y: Y) => x` is generated for the body of the function `f`.
   
 f(123)("abc") // returns 123
 
 // The applicative `map2` function for the Reader monad.
-def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
-// Generates the code (e: E) ⇒ f(readerA(e), readerB(e)) 
+def map2[E, A, B, C](readerA: E => A, readerB: E => B, f: A => B => C): E => C = implement
+// Generates the code (e: E) => f(readerA(e), readerB(e)) 
 
 ```
 
@@ -77,7 +77,7 @@ case class User(name: String, id: Long)
 
 val x: Int = 123
 val s: String = "abc"
-val f: Int ⇒ Long = _.toLong // whatever
+val f: Int => Long = _.toLong // whatever
 
 val userId = ofType[User](f, s, x).id
 // Generates the expression User(s, f(x)) from previously computed values f, s, x, and returns the `id`
@@ -103,11 +103,11 @@ This is possible due to the Curry-Howard isomorphism, which maps functions with 
 For example, the type signature of the function
 
 ```scala
-def f[X, Y]: X ⇒ Y ⇒ X = (x: X) ⇒ (y: Y) ⇒ x
+def f[X, Y]: X => Y => X = (x: X) => (y: Y) => x
 
 ```
 
-is mapped to the propositional theorem `∀ X : ∀ Y : X ⇒ (Y ⇒ X)` in the IPL.
+is mapped to the propositional theorem `∀ X : ∀ Y : X => (Y => X)` in the IPL.
 
 The resulting IPL formula is passed on to an IPL theorem prover.
 The theorem prover performs an exhaustive proof search to look for possible lambda-terms (terms in the simply-typed lambda-calculus, STLC) that implement the given type.
@@ -121,7 +121,7 @@ All this happens at compile time, so compilation may take longer if a lot of ter
 
 If there are additional values available for constructing the expression, the types of those additional values are added as extra function arguments.
 
-For example, if required to implement a type `Option[B]` given value `x` of type `Option[A]` and value `f` of type `A ⇒ Option[B]`, the library will first rewrite the problem as that of implementing a function type `Option[A] ⇒ (A ⇒ Option[B]) ⇒ Option[B]` with type parameters `A` and `B`.
+For example, if required to implement a type `Option[B]` given value `x` of type `Option[A]` and value `f` of type `A => Option[B]`, the library will first rewrite the problem as that of implementing a function type `Option[A] => (A => Option[B]) => Option[B]` with type parameters `A` and `B`.
 Having obtained a solution, i.e. a term of that type, the library will then apply this term to arguments `x` and `f`.
 The resulting term will be returned as Scala code that uses the given values `x` and `f`.
 
@@ -188,8 +188,8 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 # Known limitations
 
 - No support for non-case classes, classes with non-standard constructors, or class hierarchies other than a flat `sealed trait` / `final case class` hierarchies.
-- Very limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. A non-recursive example that fails to generate sensible code: `T ⇒ List[T]` (the generated code always returns empty list).
-- Functions with zero arguments are currently not supported, e.g. `ofType[Int ⇒ () ⇒ Int]` will not compile.
+- Very limited support for recursive case classes (including `List`): generated code may fail and, in particular, cannot contain recursive functions. A non-recursive example that fails to generate sensible code: `T => List[T]` (the generated code always returns empty list).
+- Functions with zero arguments are currently not supported, e.g. `ofType[Int => () => Int]` will not compile.
 - If the type contains lots of repeated copies of the same type parameter, or lots of `Option[T]`, heuristics will sometimes fail to produce the desired implementation.
 
 # Examples of functionality
@@ -199,23 +199,23 @@ The following code examples show how various functions are implemented automatic
 "Weak" Peirce's law:
 
 ```scala
-def f[A, B]: ((((A ⇒ B) ⇒ A) ⇒ A) ⇒ B) ⇒ B = implement
+def f[A, B]: ((((A => B) => A) => A) => B) => B = implement
 
 ```
 
 "Weak" law of _tertium non datur_:
 
 ```scala
-def f[A, B]: (Either[A, A ⇒ B] ⇒ B) ⇒ B = implement
+def f[A, B]: (Either[A, A => B] => B) => B = implement
 
 ```
 
 Automatic implementations of `pure`, `map`, and `flatMap` for the `Reader` monad:
 
 ```scala
-def pure[E, A]: A ⇒ (E ⇒ A) = implement
-def map[E, A, B]: (E ⇒ A) ⇒ (A ⇒ B) ⇒ (E ⇒ B) = implement
-def flatMap[E, A, B]: (E ⇒ A) ⇒ (A ⇒ E ⇒ B) ⇒ (E ⇒ B) = implement
+def pure[E, A]: A => (E => A) = implement
+def map[E, A, B]: (E => A) => (A => B) => (E => B) = implement
+def flatMap[E, A, B]: (E => A) => (A => E => B) => (E => B) = implement
 
 ```
 
@@ -223,7 +223,7 @@ Constant (non-parametric) types are treated as type parameters:
 
 ```scala
 
-def f[A, B]: A ⇒ Int ⇒ (A, Int) = implement
+def f[A, B]: A => Int => (A, Int) = implement
 
 f("abc")(123) // returns the tuple ("abc", 123)
 
@@ -232,9 +232,9 @@ f("abc")(123) // returns the tuple ("abc", 123)
 Tuples, sealed traits, and case classes/case objects are supported, including `Option` and `Either`:
 
 ```scala
-def eitherCommut[A, B]: Either[A, B] ⇒ Either[B, A] = implement
+def eitherCommut[A, B]: Either[A, B] => Either[B, A] = implement
 
-def eitherAssoc[A, B, C]: Either[A, Either[B, C]] ⇒ Either[Either[A, B], C] = implement
+def eitherAssoc[A, B, C]: Either[A, Either[B, C]] => Either[Either[A, B], C] = implement
 
 ```
 
@@ -247,13 +247,13 @@ Type aliases (`type P[T] = ...`) are supported as well.
 Lambda-terms can be obtained and manipulated symbolically.
 
 ```scala
-type R[X, A] = X ⇒ A
+type R[X, A] = X => A
 
-def mapReader[X, A, B]: R[X, A] ⇒ (A ⇒ B) ⇒ R[X, B] = implement
+def mapReader[X, A, B]: R[X, A] => (A => B) => R[X, B] = implement
 // mapReader is now a compiled function of the required type
 val mapReaderTerm = mapReader.lambdaTerm
 // mapReaderTerm is a lambda-term representing the code of mapReader
-mapReaderTerm.prettyPrint // returns the string "a ⇒ b ⇒ c ⇒ b (a c)"
+mapReaderTerm.prettyPrint // returns the string "a => b => c => b (a c)"
 
 ```
 
@@ -273,17 +273,17 @@ Code can be generated based on a given type and possibly on given values:
 import io.chymyst.ch._
 
 // Conventional Scala syntax for functions.
-def f1[T, U](x: T, y: T ⇒ U) : (T, U) = implement
+def f1[T, U](x: T, y: T => U) : (T, U) = implement
 
 // Fully or partially curried functions are supported.
-def f2[T, U](x: T): (T ⇒ U) ⇒ (T, U) = implement
+def f2[T, U](x: T): (T => U) => (T, U) = implement
 
-def f3[T, U]: T ⇒ (T ⇒ U) ⇒ (T, U) = implement
+def f3[T, U]: T => (T => U) => (T, U) = implement
 
 // Generating code within expressions.
 final case class User(name: String, id: Long)
 
-val f: Int ⇒ Long = _.toLong
+val f: Int => Long = _.toLong
 
 ofType[User](123, "abc", f).id // This expression evaluates to `123L`.
 
@@ -295,7 +295,7 @@ If the `implement` macro is used as the body of a class method, values from the 
 import io.chymyst.ch._
 
 final case class User[A](name: String, id: A) {
-  def map[B](f: A ⇒ B): User[B] = implement
+  def map[B](f: A => B): User[B] = implement
 }
 
 ```
@@ -334,9 +334,9 @@ Choosing the smallest "information loss" is a heuristic that enables automatic c
 For example, here are correct implementations of `pure`, `map`, and `flatMap` for the `State` monad:
 
 ```scala
-def pure[S, A]: A ⇒ (S ⇒ (A, S)) = implement
-def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
-def flatMap[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ S ⇒ (B, S)) ⇒ (S ⇒ (B, S)) = implement
+def pure[S, A]: A => (S => (A, S)) = implement
+def map[S, A, B]: (S => (A, S)) => (A => B) => (S => (B, S)) = implement
+def flatMap[S, A, B]: (S => (A, S)) => (A => S => (B, S)) => (S => (B, S)) = implement
 
 ```
 
@@ -353,7 +353,7 @@ If there are several possible implementations but only one implementation with t
 the theorem prover will choose that implementation but print a warning message such as
 
 ```
-Warning:scalac: type (S → (A, S)) → (A → B) → S → (B, S) has 2 implementations (laws need checking?)
+Warning:scalac: type (S -> (A, S)) -> (A -> B) -> S -> (B, S) has 2 implementations (laws need checking?)
 
 ```
 
@@ -373,14 +373,14 @@ The lambda-term API is experimental because, in particular, it exposes the inter
 The "smallest information loss" heuristic allows us to select the "better" implementation in the following example:
 
 ```scala
-def optionId[X]: Option[X] ⇒ Option[X] = implement
+def optionId[X]: Option[X] => Option[X] = implement
 
 optionId(Some(123)) == 123
 optionId(None) == None
 
 ```
 
-There are two possible implementations of the type `Option[X] ⇒ Option[X]`: the "trivial" implementation (always returns `None`), and the "interesting" implementation (returns the same value as given).
+There are two possible implementations of the type `Option[X] => Option[X]`: the "trivial" implementation (always returns `None`), and the "interesting" implementation (returns the same value as given).
 The "trivial" implementation is rejected by the algorithm because it ignores the information given in the original data, so it has higher "information loss".
 
 Another heuristic is to prefer implementations that use more parts of a disjunction.
@@ -391,17 +391,17 @@ Another heuristic is to prefer implementations that preserve the order of parts 
 For example,
 
 ```scala
-def f[X]: ((X, X, X)) ⇒ (X, X, X) = implement
+def f[X]: ((X, X, X)) => (X, X, X) = implement
 
 ```
 
-will generate the code for the identity function on triples, that is, `((a, b, c)) ⇒  (a, b, c)`.
-There are many other implementations of this type, for example `((a, b, c)) ⇒  (b, c, a)`.
+will generate the code for the identity function on triples, that is, `((a, b, c)) =>  (a, b, c)`.
+There are many other implementations of this type, for example `((a, b, c)) =>  (b, c, a)`.
 However, these implementations do not preserve the order of the elements in the input data, which is considered as a "loss of information".
 
 The analogous parts-ordering heuristic is used for disjunctions, which selects the most reasonable implementation of
 
 ```scala
-def f[X]: Either[X, X] ⇒ Either[X, X] = implement
+def f[X]: Either[X, X] => Either[X, X] = implement
 
 ```

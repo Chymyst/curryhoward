@@ -18,26 +18,26 @@ object TheoremProver {
   private[ch] def inhabitInternal(typeStructure: TypeExpr): Either[String, (Option[String], TermExpr)] = {
     // TODO Check that there aren't repeated types among the curried arguments, print warning.
     TheoremProver.findProofs(typeStructure) match {
-      case (Nil, _) ⇒
+      case (Nil, _) =>
         Left(s"type ${typeStructure.prettyPrint} cannot be implemented")
-      case (List(termFound), allTerms) ⇒
+      case (List(termFound), allTerms) =>
         allTerms.length match {
-          case count if count > 1 ⇒
-            val message = s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(t ⇒ s"${t.prettyRenamePrint} [score: ${t.informationLossScore}]").mkString(";\n ")}."
+          case count if count > 1 =>
+            val message = s"type ${typeStructure.prettyPrint} has $count implementations (laws need checking?):\n ${allTerms.map(t => s"${t.prettyRenamePrint} [score: ${t.informationLossScore}]").mkString(";\n ")}."
             Right((Some(message), termFound))
-          case _ ⇒
+          case _ =>
             Right((None, termFound))
         }
-      case (list, _) ⇒
-        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} inequivalent ways:\n ${list.map(t ⇒ s"${t.prettyRenamePrint} [score: ${t.informationLossScore}]").mkString(";\n ")}.")
+      case (list, _) =>
+        Left(s"type ${typeStructure.prettyPrint} can be implemented in ${list.length} inequivalent ways:\n ${list.map(t => s"${t.prettyRenamePrint} [score: ${t.informationLossScore}]").mkString(";\n ")}.")
     }
   }
 
   private[ch] def explode[A](src: Seq[Seq[A]]): Seq[Seq[A]] = {
-    src.foldLeft[Seq[Seq[A]]](Vector(Vector())) { case (prevSeqSeq, newSeq) ⇒
+    src.foldLeft[Seq[Seq[A]]](Vector(Vector())) { case (prevSeqSeq, newSeq) =>
       for {
-        prev ← prevSeqSeq
-        next ← newSeq
+        prev <- prevSeqSeq
+        next <- newSeq
       } yield prev :+ next
     }
   }
@@ -56,14 +56,14 @@ object TheoremProver {
     sequentsAlreadyRequested.clear()
     val mainSequent = Sequent(List(), typeStructure, freshVar)
     // We can do simplifyWithEta only at this last stage. Otherwise rule transformers will not be able to find the correct number of arguments in premises.
-    val allTermExprs = findTermExprs(mainSequent).map(t ⇒ TermExpr.simplifyWithEtaUntilStable(t.prettyRename).prettyRename).distinct
+    val allTermExprs = findTermExprs(mainSequent).map(t => TermExpr.simplifyWithEtaUntilStable(t.prettyRename).prettyRename).distinct
     if (debugTrace) {
-      val prettyPT = allTermExprs.map(p ⇒ (p.informationLossScore, s"${p.prettyRenamePrint}; score = ${p.informationLossScore}: ${TermExpr.unusedArgs(p).size} unused args: ${TermExpr.unusedArgs(p)}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) ⇒ (te.prettyRenamePrint, i) }}"))
+      val prettyPT = allTermExprs.map(p => (p.informationLossScore, s"${p.prettyRenamePrint}; score = ${p.informationLossScore}: ${TermExpr.unusedArgs(p).size} unused args: ${TermExpr.unusedArgs(p)}; unusedMatchClauseVars=${p.unusedMatchClauseVars}; unusedTupleParts=${p.unusedTupleParts}; used tuple parts: ${p.usedTuplePartsSeq.distinct.map { case (te, i) => (te.prettyRenamePrint, i) }}"))
         .sortBy(_._1).map(_._2)
       val TermExprsMessage = if (prettyPT.isEmpty) "no final proof terms." else s"${prettyPT.length} final proof terms:\n ${prettyPT.take(maxTermsPrinted).mkString(" ;\n ")} ."
       println(s"DEBUG: for main sequent $mainSequent, obtained $TermExprsMessage This took ${System.currentTimeMillis() - t0} ms")
       // Very verbose
-      //      val sequentsSeenMoreThanOnce = sequentsSeen.filter { case (_, v) ⇒ v.length > 1 }.mapValues(_.length)
+      //      val sequentsSeenMoreThanOnce = sequentsSeen.filter { case (_, v) => v.length > 1 }.mapValues(_.length)
       //      if (debug && sequentsSeenMoreThanOnce.nonEmpty) println(s"DEBUG: sequents seen more than once are $sequentsSeenMoreThanOnce")
     }
     // Return the group of proofs with the smallest information loss score, and also return all terms found.
@@ -128,8 +128,8 @@ object TheoremProver {
 
     // Check whether we already saw this sequent. We may already have proved it, or we may not yet proved it but already saw it.
     sequentsAlreadyProved.get(sequent) match {
-      case Some(terms) ⇒ terms
-      case None ⇒
+      case Some(terms) => terms
+      case None =>
 
         if (sequentsAlreadyRequested contains sequent) {
           if (debug) println(s"DEBUG: sequent $sequent is looping; returning an empty sequence of proof terms")
@@ -152,14 +152,14 @@ object TheoremProver {
             // If some non-ambiguous invertible rule applies, there is no need to try any other rules.
             // We should apply that invertible rule and proceed from there.
             val fromRules: Seq[TermExpr] = fromInvertibleRules.headOption match {
-              case Some(ruleResult) ⇒ fromAxioms ++ obtainAndConcatProofs(ruleResult)
-              case None ⇒ fromAxioms ++ fromInvertibleAmbiguousRules ++ fromNoninvertibleRules
+              case Some(ruleResult) => fromAxioms ++ obtainAndConcatProofs(ruleResult)
+              case None => fromAxioms ++ fromInvertibleAmbiguousRules ++ fromNoninvertibleRules
             }
             val termsFound = fromRules.map(_.simplifyOnce()).distinct
             if (debugTrace) {
               val termsMessage = termsFound.length match {
-                case 0 ⇒ "no terms"
-                case x ⇒
+                case 0 => "no terms"
+                case x =>
                   val messagePrefix = if (x > maxTermsPrinted) s"first $maxTermsPrinted out of " else ""
                   s"$messagePrefix$x terms:\n " + termsFound.take(maxTermsPrinted).map(_.prettyRenamePrint).mkString(" ;\n ") + " ,\n"
               }

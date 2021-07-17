@@ -37,7 +37,7 @@ Consider this code:
 ```scala
 case class User(name: String, id: Long)
 
-def makeUser(userName: String, userIdGenerator: String ⇒ Long): User = {
+def makeUser(userName: String, userIdGenerator: String => Long): User = {
   User(userName, userIdGenerator(userName))
 }
 
@@ -49,7 +49,7 @@ So, this code can be generalized to arbitrary types:
 ```scala
 case class User[N, I](name: N, id: I)
 
-def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = {
+def makeUser[N, I](userName: N, userIdGenerator: N => I): User[N, I] = {
   User(userName, userIdGenerator(userName))
 }
 
@@ -64,8 +64,8 @@ The `curryhoward` library can generate the code of functions of this sort using 
 
 ```tut
 case class User[N, I](name: N, id: I)
-def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
-makeUser(123, (n: Int) ⇒ "id:" + (n * 100).toString)
+def makeUser[N, I](userName: N, userIdGenerator: N => I): User[N, I] = implement
+makeUser(123, (n: Int) => "id:" + (n * 100).toString)
 ```
 
 With the `verbose` option set, the library will print the lambda-calculus term corresponding to the generated code.
@@ -79,32 +79,32 @@ Below we will see more examples of the generated terms printed using the lambda-
 The `curryhoward` library, of course, works with _curried_ functions as well:
 
 ```tut
-def const[A, B]: A ⇒ B ⇒ A = implement
-val f: String ⇒ Int = const(10)
+def const[A, B]: A => B => A = implement
+val f: String => Int = const(10)
 
 f("abc")
 ```
 
-The returned lambda-calculus term is `(a ⇒ b ⇒ a)`.
+The returned lambda-calculus term is `(a => b => a)`.
 
 Here is a more complicated example that automatically implements the `fmap` function for the Reader monad:
 
 ```tut
-def fmap[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
-val f: Int ⇒ Int = _ + 10
-def eaeb[E]: (E ⇒ Int) ⇒ (E ⇒ Int) = fmap(f)
-val ea: Double ⇒ Int = x ⇒ (x + 0.5).toInt
+def fmap[E, A, B]: (A => B) => (E => A) => (E => B) = implement
+val f: Int => Int = _ + 10
+def eaeb[E]: (E => Int) => (E => Int) = fmap(f)
+val ea: Double => Int = x => (x + 0.5).toInt
 
 eaeb(ea)(1.9)
 ```
 
-In this example, the returned lambda-calculus term is `(a ⇒ b ⇒ c ⇒ a (b c))`.
+In this example, the returned lambda-calculus term is `(a => b => c => a (b c))`.
 
 One can freely mix the curried and the conventional Scala function syntax.
 Here is the applicative `map2` function for the Reader monad:
 
 ```tut
-def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
+def map2[E, A, B, C](readerA: E => A, readerB: E => B, f: A => B => C): E => C = implement
 ```
 
 ## Using class values
@@ -115,7 +115,7 @@ If the `implement` macro is used to generate a class method or `val` class membe
 import io.chymyst.ch._
 
 final case class User2[A](name: String, id: A) {
-  def map[B](f: A ⇒ B): User2[B] = implement
+  def map[B](f: A => B): User2[B] = implement
   val count: Int = name.length // whatever
   val generated: (Int, String, A) = implement
 }
@@ -145,16 +145,16 @@ This functionality is provided through the macro `ofType`.
 Instead of the code
 
 ```scala
-def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
+def makeUser[N, I](userName: N, userIdGenerator: N => I): User[N, I] = implement
 
-makeUser(123, (n: Int) ⇒ "id:" + (n * 100).toString)
+makeUser(123, (n: Int) => "id:" + (n * 100).toString)
 
 ```
 
 we now write
 
 ```tut
-ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
+ofType[User[Int, String]](123, (n: Int) => "id:" + (n * 100).toString)
 ```
 
 The macro `ofType[T](x, y, ..., z)` generates an expression of type `T` built up from the given values `x`, `y`, ..., `z`.
@@ -173,40 +173,40 @@ Some types have more than one implementation.
 
 There are many ways in which this can happen:
 
-1. The type involves a function with several arguments of the same type, for example `X ⇒ X ⇒ ...`.
+1. The type involves a function with several arguments of the same type, for example `X => X => ...`.
 If this type can be implemented, there will be at least two implementations that differ only by the choice of the argument of type `X`.
 This ambiguity cannot be resolved in any reasonable way, except by making types different.
 2. One implementation ignores some function argument(s), while another does not.
-For example, the "Church numeral" type `(X ⇒ X) ⇒ X ⇒ X` can be implemented in infinitely many ways: `_ ⇒ x ⇒ x`, `f ⇒ x ⇒ f x`, `f ⇒ x ⇒ f (f x)`, etc. Of these ways, the most likely candidate is `f ⇒ x ⇒ f x` because it is the identity on the type `X ⇒ X`, which was most likely what is intended here. The implementation `_ ⇒ x ⇒ x` should be probably rejected because it ignores some part of the given input.
+For example, the "Church numeral" type `(X => X) => X => X` can be implemented in infinitely many ways: `_ => x => x`, `f => x => f x`, `f => x => f (f x)`, etc. Of these ways, the most likely candidate is `f => x => f x` because it is the identity on the type `X => X`, which was most likely what is intended here. The implementation `_ => x => x` should be probably rejected because it ignores some part of the given input.
 3. Some arguments can be used more than once, and different implementations use them differently. Again, the "Church numerals" are an example.
-The type `(X ⇒ X) ⇒ X ⇒ X` can be implemented as `f ⇒ x ⇒ f x` or as `f ⇒ x ⇒ f (f x)` or as `f ⇒ x ⇒ f (f (f x))`, etc.
+The type `(X => X) => X => X` can be implemented as `f => x => f x` or as `f => x => f (f x)` or as `f => x => f (f (f x))`, etc.
 There are infinitely many possible implementations that differ in how many times the argument `f` was used.
 In this example, probably the desired implementation is that which uses `f` only once.
 4. The type involves a tuple or a case class with several parts of the same type.
 Implementing such a type will always have an ordering ambiguity.
-For example, the type `(X, X, X) ⇒ (X, X, X)` can be implemented as `a ⇒ (a._1, a._2, a._3)` or as `a ⇒ (a._2, a._1, a._3)` or as `a ⇒ (a._1, a._1, a._1)`, etc.
+For example, the type `(X, X, X) => (X, X, X)` can be implemented as `a => (a._1, a._2, a._3)` or as `a => (a._2, a._1, a._3)` or as `a => (a._1, a._1, a._1)`, etc.
 In this example, the first implementation (preserving the ordering) is probably the desired one.
-It is, however, not clear what implementation is desired for a type such as `(X, X, X, X) ⇒ (X, X)`.
+It is, however, not clear what implementation is desired for a type such as `(X, X, X, X) => (X, X)`.
 5. The type involves a disjunction with several parts of the same type.
 Implementing such a type will always have an ordering ambiguity.
-For example, the type `Either[X, X] ⇒ Either[X, X]` can be implemented in four ways that differ by the ordering of the parts of the disjunctions: 
+For example, the type `Either[X, X] => Either[X, X]` can be implemented in four ways that differ by the ordering of the parts of the disjunctions: 
 
 ```scala
-def f1[X]: Either[X, X] ⇒ Either[X, X] = { // identity[Either[X, X]]
-  case Left(x) ⇒ Left(x)
-  case Right(x) ⇒ Right(x)
+def f1[X]: Either[X, X] => Either[X, X] = { // identity[Either[X, X]]
+  case Left(x) => Left(x)
+  case Right(x) => Right(x)
 }
-def f2[X]: Either[X, X] ⇒ Either[X, X] = { // switch left and right
-  case Left(x) ⇒ Right(x)
-  case Right(x) ⇒ Left(x)
+def f2[X]: Either[X, X] => Either[X, X] = { // switch left and right
+  case Left(x) => Right(x)
+  case Right(x) => Left(x)
 }
-def f3[X]: Either[X, X] ⇒ Either[X, X] = { // always return left
-  case Left(x) ⇒ Left(x)
-  case Right(x) ⇒ Left(x)
+def f3[X]: Either[X, X] => Either[X, X] = { // always return left
+  case Left(x) => Left(x)
+  case Right(x) => Left(x)
 }
-def f4[X]: Either[X, X] ⇒ Either[X, X] = { // always return right
-  case Left(x) ⇒ Right(x)
-  case Right(x) ⇒ Right(x)
+def f4[X]: Either[X, X] => Either[X, X] = { // always return right
+  case Left(x) => Right(x)
+  case Right(x) => Right(x)
 }
 
 ```
@@ -218,13 +218,13 @@ The `curryhoward` library implements the "information loss" heuristic for choosi
 As an example, consider the `map` function for the State monad:
 
 ```tut
-def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
+def map[S, A, B]: (S => (A, S)) => (A => B) => (S => (B, S)) = implement
 ```
 
 The warning shows that there exist two inequivalent implementations of the `map` function.
 The first implementation was automatically chosen and returned as code.
 
-The difference between the two implementations is that the initial state `s: S` can be either transformed using the given function `S ⇒ (A, S)`, or it can be left unchanged and returned in the pair `(B, S)`.
+The difference between the two implementations is that the initial state `s: S` can be either transformed using the given function `S => (A, S)`, or it can be left unchanged and returned in the pair `(B, S)`.
 The first implementation is the correct functor instance for the State monad.
 The second implementation "loses information" because the transformed value of type `S` has been computed but then ignored.
 
@@ -237,7 +237,7 @@ In the hopes of producing a sensible and useful answer, `curryhoward` will choos
 If there are several such implementations then no automatic choice is possible, and the macro will generate a compile-time error:
 
 ```tut:fail
-def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
+def ff[A, B]: A => A => (A => B) => B = implement
 ```
 
 In this case, `allOfType[]()` might be useful.
@@ -247,11 +247,11 @@ In this case, `allOfType[]()` might be useful.
 The macro `allOfType` will find the implementations that have the lowest information loss, and return a sequence of these implementations if there are more than one.
 User's code can then examine each of them and check laws or other properties, selecting the implementation with the desired properties.
 
-As a simple example, consider a function of type `Int ⇒ Int ⇒ Int`: 
+As a simple example, consider a function of type `Int => Int => Int`: 
 
 ```tut
-val fs = allOfType[Int ⇒ Int ⇒ Int]
-fs.map(f ⇒ f(1)(2))
+val fs = allOfType[Int => Int => Int]
+fs.map(f => f(1)(2))
 ```
 
 The list `fs` contains the two chosen implementations, both of them having equal levels of "information loss".
@@ -266,12 +266,12 @@ User code can be written to examine all available implementations and to select 
 
 | Function  | Type  | Comment  |
 |---|---|---|
-| `implement`  | `[T] ⇒ T` | implement an expression of type specified at the left-hand side only works when there is a single good implementation |
-| `ofType[T]`  | `[T] ⇒ T`  | implement an expression of type specified as the type parameter; if the given type is a function type, attach the lambda-term to the function |
-| `ofType[T](x...)`  | `[T] ⇒ Any* ⇒ T`  | implement an expression of type specified as the type parameter, using given values `x...` if necessary |
-| `allOfType[T]`  | `[T] ⇒ Seq[T]`  | return all least-lossy implementations for an expression of type specified as the type parameter; if the given type is a function type, attach the lambda-terms to the resulting functions |
-| `allOfType[T](x...)`  | `[T] ⇒ Any* ⇒ Seq[T]`  | return all least-lossy implementations for an expression of type specified as the type parameter; the given values `x...` can be used if necessary |
-| `anyOfType[T](x...)`  | `[T] ⇒ Any* ⇒ Seq[T]`  | return all implementations (including arbitrarily lossy ones) for an expression of type specified as the type parameter; the given values `x...` can be used if necessary |
+| `implement`  | `[T] => T` | implement an expression of type specified at the left-hand side only works when there is a single good implementation |
+| `ofType[T]`  | `[T] => T`  | implement an expression of type specified as the type parameter; if the given type is a function type, attach the lambda-term to the function |
+| `ofType[T](x...)`  | `[T] => Any* => T`  | implement an expression of type specified as the type parameter, using given values `x...` if necessary |
+| `allOfType[T]`  | `[T] => Seq[T]`  | return all least-lossy implementations for an expression of type specified as the type parameter; if the given type is a function type, attach the lambda-terms to the resulting functions |
+| `allOfType[T](x...)`  | `[T] => Any* => Seq[T]`  | return all least-lossy implementations for an expression of type specified as the type parameter; the given values `x...` can be used if necessary |
+| `anyOfType[T](x...)`  | `[T] => Any* => Seq[T]`  | return all implementations (including arbitrarily lossy ones) for an expression of type specified as the type parameter; the given values `x...` can be used if necessary |
 
 
 # Working with lambda-terms
@@ -294,28 +294,28 @@ The version of STLC used in `curryhoward` includes the following features:
 - variables, curried anonymous functions, function applications (this is standard in lambda-calculus)
 - type expressions distinguish between type variables and ground types
 - named conjunctions and named disjunctions; Scala tuples are named as in the standard library (e.g. `Tuple2` with accessors `_1`, `_2`)
-- Java-style argument groups (e.g. `def f(x: A, y: B, z: C): D`) are supported as unnamed conjunctions, as opposed to tupled arguments `def f(t: (A, B, C)): D` or curried functions `def f: A ⇒ B ⇒ C ⇒ D` 
+- Java-style argument groups (e.g. `def f(x: A, y: B, z: C): D`) are supported as unnamed conjunctions, as opposed to tupled arguments `def f(t: (A, B, C)): D` or curried functions `def f: A => B => C => D` 
 
 The syntax of STLC uses non-standard conventions for disjunctions:
 
 - Disjunction types must be named, and each part of a disjunction must be a named conjunction (or a recursive type).
 - Disjunction types can be printed in the short form or in the verbose form with all top-level names, for example the type `Either[Int, A]` is printed as `Either[<c>Int,A]` in the short form (`.prettyPrint`) and as `Either[<c>Int,A]{Left[<c>Int,A] + Right[<c>Int,A]}` in the verbose form (`.prettyPrintVerbose`).
 - Disjunction values are printed in the notation `x + 0` or `0 + x + 0`, etc., where `0` signifies the missing parts of the disjunction. For example, the concrete value `Left(x)` is printed as `Left(x) + 0`.
-- The `match / case` expression is printed as `x match {a ⇒ ...; b ⇒ ...}` where each function after `match` represents a different `case` clause.   
+- The `match / case` expression is printed as `x match {a => ...; b => ...}` where each function after `match` represents a different `case` clause.   
 
 ## When are lambda-terms available?
 
-When the macros `implement`, `anyOfType`, `allOfType`, or `ofType` are used to create a function type such as `A ⇒ B ⇒ C`, the returned value is actually of a special subclass of `Function1`, `Function2`, or `Function3`.
+When the macros `implement`, `anyOfType`, `allOfType`, or `ofType` are used to create a function type such as `A => B => C`, the returned value is actually of a special subclass of `Function1`, `Function2`, or `Function3`.
 These subclasses are called `Function1Lambda`, `Function2Lambda`, `Function3Lambda` and carry not only the function's compiled code but also the STLC term corresponding to the function's code.
 
 An STLC term is generated only if an expression is generated of a pure function type (not function applied to arguments) using `implement`, `ofType[...]`, `allOfType[...]`, or `anyOfType[...]()` without value arguments.
 
 The STLC term can be extracted using one of these two methods:
 
-- `TermExpr.lambdaTerm : Any ⇒ Option[TermExpr]`. This is a safe way of finding out whether an expression has an associated STLC term.
+- `TermExpr.lambdaTerm : Any => Option[TermExpr]`. This is a safe way of finding out whether an expression has an associated STLC term.
 - A syntax extension `.lambdaTerm` on `Any`. This is unsafe, since it will throw an exception if an expression does not have an associated STLC term.
 
-Consider the function of type `Int ⇒ Int ⇒ Int` whose implementations we have just computed as `fs`.
+Consider the function of type `Int => Int => Int` whose implementations we have just computed as `fs`.
 Let us now look at the STLC terms corresponding to these implementations:
 
 ```tut
@@ -355,7 +355,7 @@ val y = freshVar[Int]
 Now we can apply `fs(0)` and `fs(1)` to these variables and obtain the resulting symbolic terms:
 
 ```tut
-val results = fs.map ( f ⇒ f.lambdaTerm(x)(y) )    
+val results = fs.map ( f => f.lambdaTerm(x)(y) )    
 ```
 
 Note that the results are unevaluated STLC terms representing function applications:
@@ -373,7 +373,7 @@ results.map(_.simplify)
 To determine whether the required law holds, we can use the `.equiv` method that automatically performs simplification:
 
 ```tut
-results.filter(r ⇒ r equiv x)
+results.filter(r => r equiv x)
 ```
 
 This leaves only one implementation that satisfies the law.
@@ -381,7 +381,7 @@ This leaves only one implementation that satisfies the law.
 We can now rewrite this computation working directly on the functions `fs(0)` and `fs(1)` and selecting the one that satisfies the law:
 
 ```tut
-val goodF = fs.find { f ⇒ x equiv f.lambdaTerm(x)(y) }.get
+val goodF = fs.find { f => x equiv f.lambdaTerm(x)(y) }.get
 ```
 
 Now we can use the good implementation:
@@ -402,7 +402,7 @@ To consider an easy example, let us generate the functor method `fmap` for the p
 We begin by auto-generating `fmap` using the `implement` macro:
 
 ```tut
-def fmap[A, B]: (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] = implement 
+def fmap[A, B]: (A => B) => Either[Int, A] => Either[Int, B] = implement 
 
 val fmapT = fmap.lambdaTerm // No need to specify type parameters here.
 fmapT.prettyPrint
@@ -417,7 +417,7 @@ While the Scala method `fmap` has type parameters and can be called `fmap[Int, S
 the STLC term `fmapT` has fixed STLC type names `A` and `B`, which we cannot change by specifying Scala type parameters at run time.
 For this reason, we will have to manipulate these names explicitly in our symbolic computations.
 
-The identity law is `fmap id = id`. To verify this law, we need to apply `fmap` to an identity function of type `A ⇒ A`, and to check that the result is an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
+The identity law is `fmap id = id`. To verify this law, we need to apply `fmap` to an identity function of type `A => A`, and to check that the result is an identity function of type `Either[Int, A] => Either[Int, A]`.
 
 We can create an identity function by first creating an STLC variable of type `A`, and then creating a function expression using the operator `=>:`:
 
@@ -452,7 +452,7 @@ Let us now apply the lambda-term `fmapT` to `idA`. Our first try fails:
 val result = fmapT(idA)
 ```
 
-We got an error because `fmapT` expects an argument of type `A ⇒ B`, while we gave it the argument `idA` of type `A ⇒ A`.
+We got an error because `fmapT` expects an argument of type `A => B`, while we gave it the argument `idA` of type `A => A`.
 In Scala, the compiler would have automatically set `B = A` and resolved the types.
 But the STLC evaluator does not support type variables directly in this way.
 
@@ -467,9 +467,9 @@ f2.t.prettyPrint
 ```
 
 You can see from the type of `f2` that the type variables in `fmapT` have been automatically adjusted to match the given argument `idA`.
-The type of `f2` is `Either[Int, A] ⇒ Either[Int, A]`
+The type of `f2` is `Either[Int, A] => Either[Int, A]`
 
-It remains to show that the STLC term `f2` is actually equal to an identity function of type `Either[Int, A] ⇒ Either[Int, A]`.
+It remains to show that the STLC term `f2` is actually equal to an identity function of type `Either[Int, A] => Either[Int, A]`.
 
 The most straightforward way of verifying that `f2` is an identity function is to apply it to an arbitrary term of type `Either[Int, A]` and to verify that the result is the same as the initial term.
 
@@ -491,7 +491,7 @@ This concludes the verification of the identity law.
 Here is the entire code once again, slightly shorter:
 
 ```scala
-def fmap[A, B]: (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] = implement
+def fmap[A, B]: (A => B) => Either[Int, A] => Either[Int, B] = implement
 val fmapT = fmap.lambdaTerm
 def a[A] = freshVar[A]
 def optA[A] = freshVar[Either[Int, A]]
@@ -508,7 +508,7 @@ In the operators `:@`, `:@@`, and `@@:`, the colon `:` mnemonically shows the si
 To illustrate the use of these operators, consider the function `pure`, which is standard for the `Either` monad and can be implemented automatically:
 
 ```tut
-def pure[A]: A ⇒ Either[Int, A] = implement
+def pure[A]: A => Either[Int, A] = implement
 val pureT = pure.lambdaTerm
 ```
 
@@ -518,7 +518,7 @@ For this to work, we need to put `implement` by itself at the right-hand side of
 Alternatively, we could use `ofType` like this:
 
 ```scala
-def pureT[A] = ofType[A ⇒ Either[Int, A]].lambdaTerm
+def pureT[A] = ofType[A => Either[Int, A]].lambdaTerm
 
 ```
 
@@ -526,10 +526,10 @@ Let us verify the naturality law for the function `pure`:
 
 `f . pure = pure . fmap f`
 
-In this law, `f` is an arbitrary function of type `A ⇒ B`. Let us therefore create a STLC variable of this type:
+In this law, `f` is an arbitrary function of type `A => B`. Let us therefore create a STLC variable of this type:
 
 ```tut
-def f[A,B] = freshVar[A ⇒ B]
+def f[A,B] = freshVar[A => B]
 ```
 
 We will now compute both sides of the naturality equation, reassigning type variables automatically:
@@ -577,7 +577,7 @@ For manipulating conjunction and disjunction types, the current API of the `curr
 
 ## More examples of working with lambda-terms
 
-To illustrate these facilities, let us construct a lambda-term representing a function `getId` of type `Option[User] ⇒ Option[Long]` and apply that function to some test data.
+To illustrate these facilities, let us construct a lambda-term representing a function `getId` of type `Option[User] => Option[Long]` and apply that function to some test data.
 We will then implement this function automatically using the `curryhoward` library, and compare the resulting lambda-terms.
 
 We begin by creating a fresh variable of type `Option[User]`.
@@ -596,9 +596,9 @@ To create the function body, we need to create a lambda-term that matches the va
 In Scala, we would have written
 
 ```scala
-(ou: Option[User]) ⇒ ou match {
-  case None ⇒ None
-  case Some(User(fullName, id)) ⇒ Some(id)
+(ou: Option[User]) => ou match {
+  case None => None
+  case Some(User(fullName, id)) => Some(id)
 }
 ```
 
@@ -685,7 +685,7 @@ We have obtained the resulting term, and we can see that it is what we expected 
 We will now check that the same lambda-term is obtained when implementing the function `getId` automatically using `curryhoward`.
 
 ```tut
-val getIdAuto: Option[User] ⇒ Option[Long] = implement
+val getIdAuto: Option[User] => Option[Long] = implement
 val getIdAutoTerm = getIdAuto.lambdaTerm
 getIdAutoTerm.prettyPrint
 getId.prettyPrint
@@ -705,28 +705,28 @@ getIdAutoTerm equiv getId.prettyRename
 
 | Function  | Type  | Comment  |
 |---|---|---|
-| `TermExpr.lambdaTerm`  | `Any ⇒ Option[TermExpr]` | extract a lambda-term if present  |
-| `a.lambdaTerm`  | `Any ⇒ TermExpr`  | extract a lambda-term, throw exception if not present  |
-| `t.prettyPrint` | `TermExpr ⇒ String` and `TypeExpr ⇒ String` | produce a more readable string representation than `.toString` |
-| `t.prettyPrintVerbose` | `TypeExpr ⇒ String` | produce a more verbose string representation for disjunction types |
-| `t.prettyRename` | `TermExpr ⇒ TermExpr` | rename all variables in a term to `a`, `b`, `c`, etc., so that the term becomes more readable |
-| `t.prettyRenamePrint` | `TermExpr ⇒ String` | shorthand for `.prettyRename.prettyPrint` |
-| `a.t` | `TermExpr ⇒ TypeExpr` | get the type expression for a given term |
-| `typeExpr[T]` | type `T` | create a STLC type expression representing the Scala type `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int ⇒ Option[A]`   |
-| `freshVar[T]` | `VarE` | create a STLC variable with assigned Scala type expression `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int ⇒ Option[A]`; the name of the variable will be created automatically; shortcut for `VarE("name", typeExpr[T])`  |
-| `a =>: b` | `VarE ⇒ TermExpr ⇒ TermExpr` | create a STLC function term (lambda-calculus "abstraction" operation) |
-| `a(b)` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` |
-| `a :@ b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | create a STLC "application" term with automatic substitution of type variables in `a` -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` after some type variables in `a` have been substituted |
-| `a andThen b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | compose functions `a` and `b` -- the argument type of `b` must be the same as the result type of `a`; no substitution of type variables is performed |
-| `a :@@ b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | compose functions `a` and `b` -- the argument type of `b` must be the same as the result type of `a` after an automatic substitution of type variables in `a` |
-| `a @@: b` | `TermExpr ⇒ TermExpr ⇒ TermExpr` | compose functions `a` and `b` -- the argument type of `b` must be the same as the result type of `a` after an automatic substitution of type variables in `b` |
-| `a.simplify` | `TermExpr ⇒ TermExpr` | perform symbolic evaluation and simplification of STLC term -- the simplification is recursive and repeated, so that `a.simplify.simplify` is guaranteed to be the same as `a.simplify` |
-| `a equiv b` | `TermExpr ⇒ TermExpr ⇒ Boolean` | check whether two terms are syntactically equal after simplification and `prettyRename` |
-| `a.substTypeVar(b, c)` | `TermExpr ⇒ (TermExpr, TermExpr) ⇒ TermExpr` | replace a type variable in `a`; the type variable is specified as the type of `b`, and the replacement type is specified as the type of `c` |
-| `a.substTypeVars(s)` | `TermExpr ⇒ Map[TP, TypeExpr] ⇒ TermExpr` | replace all type variables in `a` according to the given substitution map `s` -- all type variables are substituted at once |
-| `u()`  | `TermExpr ⇒ () ⇒ TermExpr` and `TypeExpr ⇒ () ⇒ TermExpr` | create a "named Unit" term of type `u.t` -- the type of `u` must be a named unit type, e.g. `None.type` or a case class with no constructors |
-| `c(x...)`  | `TermExpr ⇒ TermExpr* ⇒ TermExpr` and `TypeExpr ⇒ TermExpr* ⇒ TermExpr` | create a named conjunction term of type `c.t` -- the type of `c` must be a conjunction whose parts match the types of the arguments `x...` |
-| `d(x)`  |  `TermExpr ⇒ TermExpr ⇒ TermExpr` and `TypeExpr ⇒ TermExpr ⇒ TermExpr` | create a disjunction term of type `d.t` using term `x` -- the type of `x` must match one of the disjunction parts in the type `d`, which must be a disjunction type |
-| `c(i)` | `TermExpr ⇒ Int ⇒ TermExpr` | project a conjunction term onto part with given zero-based index -- the type of `c` must be a conjunction with sufficiently many parts |
-| `c("id")` | `TermExpr ⇒ String ⇒ TermExpr` | project a conjunction term onto part with given accessor name -- the type of `c` must be a named conjunction that supports this accessor |
-| `d.cases(x =>: ..., y =>: ..., ...)` | `TermExpr ⇒ TermExpr* ⇒ TermExpr` | create a term that pattern-matches on the given disjunction term -- the type of `d` must be a disjunction whose arguments match the arguments `x`, `y`, ... of the given case clauses |
+| `TermExpr.lambdaTerm`  | `Any => Option[TermExpr]` | extract a lambda-term if present  |
+| `a.lambdaTerm`  | `Any => TermExpr`  | extract a lambda-term, throw exception if not present  |
+| `t.prettyPrint` | `TermExpr => String` and `TypeExpr => String` | produce a more readable string representation than `.toString` |
+| `t.prettyPrintVerbose` | `TypeExpr => String` | produce a more verbose string representation for disjunction types |
+| `t.prettyRename` | `TermExpr => TermExpr` | rename all variables in a term to `a`, `b`, `c`, etc., so that the term becomes more readable |
+| `t.prettyRenamePrint` | `TermExpr => String` | shorthand for `.prettyRename.prettyPrint` |
+| `a.t` | `TermExpr => TypeExpr` | get the type expression for a given term |
+| `typeExpr[T]` | type `T` | create a STLC type expression representing the Scala type `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int => Option[A]`   |
+| `freshVar[T]` | `VarE` | create a STLC variable with assigned Scala type expression `T` -- here `T` can be a Scala type parameter or a Scala type expression such as `Int => Option[A]`; the name of the variable will be created automatically; shortcut for `VarE("name", typeExpr[T])`  |
+| `a =>: b` | `VarE => TermExpr => TermExpr` | create a STLC function term (lambda-calculus "abstraction" operation) |
+| `a(b)` | `TermExpr => TermExpr => TermExpr` | create a STLC "application" term -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` |
+| `a :@ b` | `TermExpr => TermExpr => TermExpr` | create a STLC "application" term with automatic substitution of type variables in `a` -- the type of `a` must be a function and the type of `b` must be the same as the argument type of `a` after some type variables in `a` have been substituted |
+| `a andThen b` | `TermExpr => TermExpr => TermExpr` | compose functions `a` and `b` -- the argument type of `b` must be the same as the result type of `a`; no substitution of type variables is performed |
+| `a :@@ b` | `TermExpr => TermExpr => TermExpr` | compose functions `a` and `b` -- the argument type of `b` must be the same as the result type of `a` after an automatic substitution of type variables in `a` |
+| `a @@: b` | `TermExpr => TermExpr => TermExpr` | compose functions `a` and `b` -- the argument type of `b` must be the same as the result type of `a` after an automatic substitution of type variables in `b` |
+| `a.simplify` | `TermExpr => TermExpr` | perform symbolic evaluation and simplification of STLC term -- the simplification is recursive and repeated, so that `a.simplify.simplify` is guaranteed to be the same as `a.simplify` |
+| `a equiv b` | `TermExpr => TermExpr => Boolean` | check whether two terms are syntactically equal after simplification and `prettyRename` |
+| `a.substTypeVar(b, c)` | `TermExpr => (TermExpr, TermExpr) => TermExpr` | replace a type variable in `a`; the type variable is specified as the type of `b`, and the replacement type is specified as the type of `c` |
+| `a.substTypeVars(s)` | `TermExpr => Map[TP, TypeExpr] => TermExpr` | replace all type variables in `a` according to the given substitution map `s` -- all type variables are substituted at once |
+| `u()`  | `TermExpr => () => TermExpr` and `TypeExpr => () => TermExpr` | create a "named Unit" term of type `u.t` -- the type of `u` must be a named unit type, e.g. `None.type` or a case class with no constructors |
+| `c(x...)`  | `TermExpr => TermExpr* => TermExpr` and `TypeExpr => TermExpr* => TermExpr` | create a named conjunction term of type `c.t` -- the type of `c` must be a conjunction whose parts match the types of the arguments `x...` |
+| `d(x)`  |  `TermExpr => TermExpr => TermExpr` and `TypeExpr => TermExpr => TermExpr` | create a disjunction term of type `d.t` using term `x` -- the type of `x` must match one of the disjunction parts in the type `d`, which must be a disjunction type |
+| `c(i)` | `TermExpr => Int => TermExpr` | project a conjunction term onto part with given zero-based index -- the type of `c` must be a conjunction with sufficiently many parts |
+| `c("id")` | `TermExpr => String => TermExpr` | project a conjunction term onto part with given accessor name -- the type of `c` must be a named conjunction that supports this accessor |
+| `d.cases(x =>: ..., y =>: ..., ...)` | `TermExpr => TermExpr* => TermExpr` | create a term that pattern-matches on the given disjunction term -- the type of `d` must be a disjunction whose arguments match the arguments `x`, `y`, ... of the given case clauses |

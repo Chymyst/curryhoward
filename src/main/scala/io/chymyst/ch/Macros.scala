@@ -1,8 +1,8 @@
 package io.chymyst.ch
 
-import scala.language.experimental.macros
 import io.chymyst.ch.Helper._
 
+import scala.language.experimental.macros
 import scala.reflect.macros.whitebox // Does not work with blackbox.
 
 /* http://stackoverflow.com/questions/17494010/debug-scala-macros-with-intellij
@@ -31,7 +31,7 @@ Now make a small change in your code and run compile in sbt, - IntelliJ should s
 - make sure the alpha-conversion is correct on type parameters! This seems to be a deeper problem.
 - think about supporting recursive types beyond the palliative measures implemented currently
 - use blackbox macros instead of whitebox if possible (5) ?? Seems to prevent the " = implement" and "= ofType[]" syntax from working.
-- fix MatchE.simplify so that Option[A] ⇒ Option[A] can be simplified to identity
+- fix MatchE.simplify so that Option[A] => Option[A] can be simplified to identity
 - decide whether we can implement a single function implement[]() that looks up the LHS when the given type is Nothing.
  */
 
@@ -73,7 +73,7 @@ class Macros(val c: whitebox.Context) {
     // Could be the weird type [X, Y] => (type expression).
     // `finalResultType` seems to help here.
     val matchedTypeArgs = finalType.finalResultType.typeArgs
-      .map(s ⇒ tMap.toMap.getOrElse(s.typeSymbol.name.decodedName.toString, buildTypeExpr(s, Seq(), typesSeen))) // `typesSeen` prevents infinite loops when  a type parameter is the same as the recursive type.
+      .map(s => tMap.toMap.getOrElse(s.typeSymbol.name.decodedName.toString, buildTypeExpr(s, Seq(), typesSeen))) // `typesSeen` prevents infinite loops when  a type parameter is the same as the recursive type.
     // Very verbose; enable only when debugging the renaming of type parameters.
     //    if (debug) println(s"DEBUG: buildTypeExpr on $t with $tMap obtained args = ${t.finalResultType.typeArgs.mkString("; ")}")
     //    if (debug) println(s" DEBUG: buildTypeExpr obtained matchedTypeArgs = ${matchedTypeArgs.map(_.prettyPrint).mkString("; ")}")
@@ -83,16 +83,16 @@ class Macros(val c: whitebox.Context) {
     // use something like t.paramLists(0)(0).typeSignature and also .isImplicit to extract types of function parameters
 
     typeName match {
-      case "scala.Function1" | "Function1" ⇒ matchedTypeArgs.head ->: matchedTypeArgs(1)
-      case name if name matches "(scala\\.)?Function[1-9][0-9]*" ⇒
+      case "scala.Function1" | "Function1" => matchedTypeArgs.head ->: matchedTypeArgs(1)
+      case name if name matches "(scala\\.)?Function[1-9][0-9]*" =>
         ConjunctT(matchedTypeArgs.slice(0, matchedTypeArgs.length - 1)) ->: matchedTypeArgs.last
-      case "scala.Any" | "Any" ⇒ BasicT("_")
-      case "scala.Nothing" | "Nothing" ⇒ NothingT("Nothing")
-      case "scala.Unit" | "Unit" ⇒ UnitT("Unit")
-      case _ if matchedTypeArgs.isEmpty && finalType.baseClasses.map(_.fullName) === List("scala.Any") ⇒ TP(finalType.toString)
+      case "scala.Any" | "Any" => BasicT("_")
+      case "scala.Nothing" | "Nothing" => NothingT("Nothing")
+      case "scala.Unit" | "Unit" => UnitT("Unit")
+      case _ if matchedTypeArgs.isEmpty && finalType.baseClasses.map(_.fullName) === List("scala.Any") => TP(finalType.toString)
 
-      case _ if typesSeen contains typeName ⇒ RecurseT(typeName, matchedTypeArgs)
-      case _ if finalTypeSymbol.isClass ⇒
+      case _ if typesSeen contains typeName => RecurseT(typeName, matchedTypeArgs)
+      case _ if finalTypeSymbol.isClass =>
         // A type constructor, a case class, a sealed trait / abstract class with case classes, or other class.
         val typeMap: Seq[(String, TypeExpr)] = finalTypeSymbol.asClass.typeParams
           .map(_.name.decodedName.toString)
@@ -112,7 +112,7 @@ class Macros(val c: whitebox.Context) {
           // Need to assign type parameters to the accessors.
 
           val (accessors, typeExprs) = finalType.decls
-            .collect { case s: MethodSymbol if s.isCaseAccessor ⇒
+            .collect { case s: MethodSymbol if s.isCaseAccessor =>
               val accessorType = buildTypeExpr(s.typeSignature.resultType, Seq(), typesSeenNow)
               val substitutedType = TypeExpr.substNames(accessorType, typeMap.toMap)
               //              if (debug) println(s"  DEBUG: buildTypeExpr on $t with $tMap obtained substitutedType = ${substitutedType.prettyPrint} from accessorType = ${accessorType.prettyPrint}")
@@ -121,9 +121,9 @@ class Macros(val c: whitebox.Context) {
             }
             .toList.unzip
           val wrapped = typeExprs match {
-            case Nil ⇒ List(UnitT(typeName)) // Case class with no arguments is represented by an empty accessors list
+            case Nil => List(UnitT(typeName)) // Case class with no arguments is represented by an empty accessors list
             // and a non-empty type list with a single UnitT in it (a "named unit").
-            case _ ⇒ typeExprs // Case class with some arguments.
+            case _ => typeExprs // Case class with some arguments.
           }
           NamedConjunctT(typeName, matchedTypeArgs, accessors, wrapped)
         } else {
@@ -139,7 +139,7 @@ class Macros(val c: whitebox.Context) {
           // Each subclass must be a case class or case object, otherwise we do not process the type t.
           if ((typeSymbol.asClass.isTrait || typeSymbol.asClass.isAbstract) &&
             subclasses.nonEmpty &&
-            subclasses.forall { s ⇒
+            subclasses.forall { s =>
               val resultClass = s.typeSignature.resultType.typeSymbol.asClass
               resultClass.isCaseClass || resultClass.isModuleClass // `case object` is a "module class".
             }
@@ -147,7 +147,7 @@ class Macros(val c: whitebox.Context) {
             // Detected a trait extended with one or more case classes.
 
             // Note: s.typeSignature does not work correctly here! Need s.asType.toType
-            subclasses.map { s ⇒
+            subclasses.map { s =>
               val subclassType = buildTypeExpr(s.asType.toType, Seq(), typesSeenNow)
               // The type of the subclass maybe a type-Lambda, in which case we need to discover the correct variable substitution and perform it.
               if (subclassType.typeParams.nonEmpty) {
@@ -159,51 +159,51 @@ class Macros(val c: whitebox.Context) {
                 TypeExpr.substNames(subclassType, substMap)
               } else subclassType
             } match {
-              case part :: Nil ⇒ part // A single case class implementing a trait. This is not a disjunction.
-              case parts ⇒
+              case part :: Nil => part // A single case class implementing a trait. This is not a disjunction.
+              case parts =>
                 //                if (debug) println(s"  DEBUG: buildTypeExpr on $t with $tMap returning DisjunctT($fullName, ${matchedTypeArgs.map(_.prettyPrint)}), parts=${parts.map(_.prettyPrint)}")
                 DisjunctT(typeName, matchedTypeArgs, parts.asInstanceOf[List[NamedConjunctT]]) // Several case classes implementing a trait.
             }
           } else if (matchedTypeArgs.isEmpty) BasicT(typeName)
           else ConstructorT(typeName, matchedTypeArgs)
         }
-      case _ ⇒ ConstructorT(finalType.toString, Nil) // Sometimes we get <none> as the type symbol's name... Not sure what to do in that case.
+      case _ => ConstructorT(finalType.toString, Nil) // Sometimes we get <none> as the type symbol's name... Not sure what to do in that case.
     }
   }
 
   // These implicits are required for generating type expressions and term expressions as values.
   object LiftedAST {
     implicit def liftedTypeExpr: Liftable[TypeExpr] = Liftable[TypeExpr] {
-      case DisjunctT(constructor, tParams, terms) ⇒ q"_root_.io.chymyst.ch.DisjunctT($constructor, Seq(..$tParams), Seq(..$terms))"
-      case ConjunctT(terms) ⇒ q"_root_.io.chymyst.ch.ConjunctT(Seq(..$terms))"
-      case #->(head, body) ⇒ q"_root_.io.chymyst.ch.#->($head, $body)"
-      case NothingT(name) ⇒ q"_root_.io.chymyst.ch.NothingT($name)"
-      case UnitT(name) ⇒ q"_root_.io.chymyst.ch.UnitT($name)"
-      case TP(name) ⇒ q"_root_.io.chymyst.ch.TP($name)"
-      case RecurseT(name, tParams) ⇒ q"_root_.io.chymyst.ch.RecurseT($name, Seq(..$tParams))"
-      case BasicT(name) ⇒ q"_root_.io.chymyst.ch.BasicT($name)"
-      case NamedConjunctT(constructor, tParams, accessors, wrapped) ⇒ q"_root_.io.chymyst.ch.NamedConjunctT($constructor, List(..$tParams), List(..$accessors), List(..$wrapped))"
-      case ConstructorT(name, tParams) ⇒ q"_root_.io.chymyst.ch.ConstructorT($name, List(..$tParams))"
+      case DisjunctT(constructor, tParams, terms) => q"_root_.io.chymyst.ch.DisjunctT($constructor, Seq(..$tParams), Seq(..$terms))"
+      case ConjunctT(terms) => q"_root_.io.chymyst.ch.ConjunctT(Seq(..$terms))"
+      case #->(head, body) => q"_root_.io.chymyst.ch.#->($head, $body)"
+      case NothingT(name) => q"_root_.io.chymyst.ch.NothingT($name)"
+      case UnitT(name) => q"_root_.io.chymyst.ch.UnitT($name)"
+      case TP(name) => q"_root_.io.chymyst.ch.TP($name)"
+      case RecurseT(name, tParams) => q"_root_.io.chymyst.ch.RecurseT($name, Seq(..$tParams))"
+      case BasicT(name) => q"_root_.io.chymyst.ch.BasicT($name)"
+      case NamedConjunctT(constructor, tParams, accessors, wrapped) => q"_root_.io.chymyst.ch.NamedConjunctT($constructor, List(..$tParams), List(..$accessors), List(..$wrapped))"
+      case ConstructorT(name, tParams) => q"_root_.io.chymyst.ch.ConstructorT($name, List(..$tParams))"
     }
 
     implicit def liftedTermExpr: Liftable[TermExpr] = Liftable[TermExpr] {
-      case VarE(name, tExpr) ⇒ q"_root_.io.chymyst.ch.VarE($name, $tExpr)"
-      case AppE(head, arg) ⇒ q"_root_.io.chymyst.ch.AppE($head, $arg)"
-      case CurriedE(heads, body) ⇒ q"_root_.io.chymyst.ch.CurriedE(List(..$heads), $body)"
-      case UnitE(tExpr) ⇒ q"_root_.io.chymyst.ch.UnitE($tExpr)"
-      case NamedConjunctE(terms, tExpr) ⇒ q"_root_.io.chymyst.ch.NamedConjunctE(Seq(..$terms), $tExpr)"
-      case ConjunctE(terms) ⇒ q"_root_.io.chymyst.ch.ConjunctE(Seq(..$terms))"
-      case ProjectE(index, term) ⇒ q"_root_.io.chymyst.ch.ProjectE($index, $term)"
-      case MatchE(term, cases) ⇒ q"_root_.io.chymyst.ch.MatchE($term, List(..$cases))"
-      case DisjunctE(index, total, term, tExpr) ⇒ q"_root_.io.chymyst.ch.DisjunctE($index, $total, $term, $tExpr)"
+      case VarE(name, tExpr) => q"_root_.io.chymyst.ch.VarE($name, $tExpr)"
+      case AppE(head, arg) => q"_root_.io.chymyst.ch.AppE($head, $arg)"
+      case CurriedE(heads, body) => q"_root_.io.chymyst.ch.CurriedE(List(..$heads), $body)"
+      case UnitE(tExpr) => q"_root_.io.chymyst.ch.UnitE($tExpr)"
+      case NamedConjunctE(terms, tExpr) => q"_root_.io.chymyst.ch.NamedConjunctE(Seq(..$terms), $tExpr)"
+      case ConjunctE(terms) => q"_root_.io.chymyst.ch.ConjunctE(Seq(..$terms))"
+      case ProjectE(index, term) => q"_root_.io.chymyst.ch.ProjectE($index, $term)"
+      case MatchE(term, cases) => q"_root_.io.chymyst.ch.MatchE($term, List(..$cases))"
+      case DisjunctE(index, total, term, tExpr) => q"_root_.io.chymyst.ch.DisjunctE($index, $total, $term, $tExpr)"
     }
 
     implicit def liftedSubtypeOfTypeExpr[S <: TypeExpr]: Liftable[S] = Liftable[S] {
-      s ⇒ liftedTypeExpr(s)
+      s => liftedTypeExpr(s)
     }
 
     implicit def liftedSubtypeOfTermExpr[S <: TermExpr]: Liftable[S] = Liftable[S] {
-      s ⇒ liftedTermExpr(s)
+      s => liftedTermExpr(s)
     }
   }
 
@@ -225,31 +225,31 @@ class Macros(val c: whitebox.Context) {
 
     typeExpr match {
       // Special case for Java-style arg lists.
-      case ConjunctT(terms) #-> body ⇒ tq"(..${terms.map(emitTypeCode)}) ⇒ ${emitTypeCode(body)}"
-      case head #-> body ⇒ tq"(${emitTypeCode(head)}) ⇒ ${emitTypeCode(body)}"
-      case TP(nameT) ⇒ makeTypeName(nameT)
-      case BasicT(nameT) ⇒ makeTypeName(nameT)
-      case RecurseT(constructor, tParams) ⇒ makeTypeNameWithTypeParams(constructor, tParams)
+      case ConjunctT(terms) #-> body => tq"(..${terms.map(emitTypeCode)}) => ${emitTypeCode(body)}"
+      case head #-> body => tq"(${emitTypeCode(head)}) => ${emitTypeCode(body)}"
+      case TP(nameT) => makeTypeName(nameT)
+      case BasicT(nameT) => makeTypeName(nameT)
+      case RecurseT(constructor, tParams) => makeTypeNameWithTypeParams(constructor, tParams)
 
-      case NamedConjunctT(constructor, tParams, _, _) ⇒
+      case NamedConjunctT(constructor, tParams, _, _) =>
         val constructorT = makeTypeName(constructor)
         val constructorWithTypeParams = makeTypeNameWithTypeParams(constructor, tParams)
         if (typeExpr.caseObjectName.isDefined) {
           tq"$constructorT.type" // case object
         } else constructorWithTypeParams
-      case NothingT(nameT) ⇒ makeTypeName(nameT)
-      case UnitT(nameT) ⇒ makeTypeName(nameT)
-      case ConjunctT(terms) ⇒ // Assuming this is a tuple type.
+      case NothingT(nameT) => makeTypeName(nameT)
+      case UnitT(nameT) => makeTypeName(nameT)
+      case ConjunctT(terms) => // Assuming this is a tuple type.
         val tpts = terms.map(emitTypeCode)
         tq"(..$tpts)"
-      case DisjunctT(constructor, tParams, _) ⇒ makeTypeNameWithTypeParams(constructor, tParams)
-      case ConstructorT(constructor, tParams) ⇒ makeTypeNameWithTypeParams(constructor, tParams)
+      case DisjunctT(constructor, tParams, _) => makeTypeNameWithTypeParams(constructor, tParams)
+      case ConstructorT(constructor, tParams) => makeTypeNameWithTypeParams(constructor, tParams)
     }
   }
 
   // Prepare the tree for a function parameter with the specified type.
   private def emitParamCode(term: VarE): c.Tree = term match {
-    case VarE(name, typeExpr) ⇒
+    case VarE(name, typeExpr) =>
       val tpt = emitTypeCode(typeExpr)
       val termName = TermName(name.toString)
       val param = q"val $termName: $tpt"
@@ -263,61 +263,61 @@ class Macros(val c: whitebox.Context) {
     def conjunctSubstName(p: VarE, i: Int): String = s"${p.name}_$i"
 
     termExpr match {
-      case p@VarE(name, _) ⇒ givenArgs.getOrElse(p, q"${TermName(name.toString)}")
+      case p@VarE(name, _) => givenArgs.getOrElse(p, q"${TermName(name.toString)}")
 
       // A function applied to several arguments Java-style.
-      case AppE(head, ConjunctE(terms)) ⇒ q"${emitTermShort(head)}(..${terms.map(emitTermShort)})"
+      case AppE(head, ConjunctE(terms)) => q"${emitTermShort(head)}(..${terms.map(emitTermShort)})"
 
-      case AppE(head, arg) ⇒ q"${emitTermShort(head)}(${emitTermShort(arg)})"
+      case AppE(head, arg) => q"${emitTermShort(head)}(${emitTermShort(arg)})"
 
-      // If `heads` = List(x, y, z) and `body` = b then the generated code will be x ⇒ y ⇒ z ⇒ b.
-      case CurriedE(heads, body) ⇒
+      // If `heads` = List(x, y, z) and `body` = b then the generated code will be x => y => z => b.
+      case CurriedE(heads, body) =>
         // If one of the heads is a ConjunctT, we need to do a replacement in the entire body.
         // It will be too late to do this once we start emitting code for the terms.
-        val conjunctHeads = heads.collect { case p@VarE(_, ConjunctT(terms)) ⇒ (p, terms) }
+        val conjunctHeads = heads.collect { case p@VarE(_, ConjunctT(terms)) => (p, terms) }
         val replacedBody = conjunctHeads.foldLeft(body) {
-          case (prev, (p, termTypes)) ⇒ TermExpr.subst(
+          case (prev, (p, termTypes)) => TermExpr.subst(
             p,
-            ConjunctE(termTypes.zipWithIndex.map { case (t, i) ⇒ VarE(conjunctSubstName(p, i), t) }),
+            ConjunctE(termTypes.zipWithIndex.map { case (t, i) => VarE(conjunctSubstName(p, i), t) }),
             prev
           ).simplifyOnce(withEta = false)
         }.simplifyOnce(withEta = true)
 
         // Need to be careful to substitute arguments that are of type ConjunctT, because they represent Java-style arg groups.
-        heads.reverse.foldLeft(emitTermShort(replacedBody)) { case (prevTree, paramE) ⇒
+        heads.reverse.foldLeft(emitTermShort(replacedBody)) { case (prevTree, paramE) =>
           conjunctHeads.find(_._1 === paramE) match {
-            case Some((_, terms)) ⇒
-              val args = terms.zipWithIndex.map { case (t, i) ⇒ emitParamCode(VarE(conjunctSubstName(paramE, i), t)) }
-              q"((..$args) ⇒ $prevTree)"
-            case None ⇒ q"(${emitParamCode(paramE)} ⇒ $prevTree)"
+            case Some((_, terms)) =>
+              val args = terms.zipWithIndex.map { case (t, i) => emitParamCode(VarE(conjunctSubstName(paramE, i), t)) }
+              q"((..$args) => $prevTree)"
+            case None => q"(${emitParamCode(paramE)} => $prevTree)"
           }
         }
 
-      case UnitE(_) ⇒ q"()"
-      case ConjunctE(terms) ⇒ q"(..${terms.map(emitTermShort)})"
-      case NamedConjunctE(terms, tExpr) ⇒
+      case UnitE(_) => q"()"
+      case ConjunctE(terms) => q"(..${terms.map(emitTermShort)})"
+      case NamedConjunctE(terms, tExpr) =>
         val constructorE = q"${TermName(tExpr.constructor)}[..${tExpr.typeParams.map(emitTypeCode)}]"
         if (tExpr.isAtomic)
           constructorE // avoid spurious parameter lists for case objects
         else
           q"$constructorE(..${terms.map(emitTermShort)})"
-      case ProjectE(index, term) ⇒
+      case ProjectE(index, term) =>
         val accessor = TermName(term.accessor(index))
         q"${emitTermShort(term)}.$accessor"
-      case DisjunctE(_, _, term, _) ⇒ q"${emitTermShort(term)}" // A disjunct term is always a NamedConjunctE, so we just emit that code.
-      case MatchE(term, cases) ⇒
-        // Each term within `cases` is always a CurriedE because it is of the form fv ⇒ TermExpr(fv, other_premises).
+      case DisjunctE(_, _, term, _) => q"${emitTermShort(term)}" // A disjunct term is always a NamedConjunctE, so we just emit that code.
+      case MatchE(term, cases) =>
+        // Each term within `cases` is always a CurriedE because it is of the form fv => TermExpr(fv, other_premises).
         val casesTrees: Seq[c.Tree] = cases.map {
           // However, at this point a MatchE() could contain a CurriedE() with multiple arguments,
           // as a result of possibly simplifying nested CurriedE().
-          case CurriedE(VarE(fvName, fvType) :: rest, body) ⇒
+          case CurriedE(VarE(fvName, fvType) :: rest, body) =>
             // Generate cq"$pat => $expr" where pat = pq"Constructor(..$Strings)".
             val pat = fvType.caseObjectName match {
-              case Some(constructor) ⇒ pq"${TermName(fvName)} : ${TermName(constructor)}.type" // used to be pq"_ : ${TermName(constructor)}.type"
-              case None ⇒ pq"${TermName(fvName)} : ${emitTypeCode(fvType)}"
+              case Some(constructor) => pq"${TermName(fvName)} : ${TermName(constructor)}.type" // used to be pq"_ : ${TermName(constructor)}.type"
+              case None => pq"${TermName(fvName)} : ${emitTypeCode(fvType)}"
             }
             cq"$pat => ${emitTermShort(if (rest.isEmpty) body else CurriedE(rest, body))}"
-          case cc ⇒ throw new Exception(s"Internal error: `case` term ${cc.prettyRenamePrint} must be a function")
+          case cc => throw new Exception(s"Internal error: `case` term ${cc.prettyRenamePrint} must be a function")
         }
 
         q"${emitTermShort(term)} match { case ..$casesTrees }"
@@ -330,7 +330,6 @@ class Macros(val c: whitebox.Context) {
     if (debug) c.info(c.enclosingPosition, s"Built type expression ${typeUExpr.prettyPrint} from type $typeU", force = true)
     val leftSide = c.internal.enclosingOwner.name.decodedName.toString
     val ident = c.freshName(leftSide).replaceAll(" *\\$macro", "")
-    import LiftedAST._
     c.Expr[VarE](q"VarE($ident, $typeUExpr)")
   }
 
@@ -338,19 +337,18 @@ class Macros(val c: whitebox.Context) {
     val typeT: c.Type = c.weakTypeOf[T]
 
     val s1 = buildTypeExpr(typeT)
-    import LiftedAST._
     c.Expr[TypeExpr](q"$s1")
   }
 
   private def enclosingClassValues = {
     Seq(c.internal.enclosingOwner.owner).find(_.isClass) match {
-      case Some(enclosingClass) ⇒ enclosingClass.asType.toType.decls
+      case Some(enclosingClass) => enclosingClass.asType.toType.decls
         // Select only `val`s that occur before the class declaration we are processing now.
-        .takeWhile(s ⇒ s.name.decodedName !== c.internal.enclosingOwner.name.decodedName)
+        .takeWhile(s => s.name.decodedName !== c.internal.enclosingOwner.name.decodedName)
         // Select only `val`s out of the class declarations.
-        .filter(s ⇒ s.isTerm && !(s.isMethod || s.isClass || s.isConstructor || s.isType || s.isImplementationArtifact || s.isSynthetic))
+        .filter(s => s.isTerm && !(s.isMethod || s.isClass || s.isConstructor || s.isType || s.isImplementationArtifact || s.isSynthetic))
         .toList
-      case None ⇒ List()
+      case None => List()
     }
   }
 
@@ -360,17 +358,17 @@ class Macros(val c: whitebox.Context) {
     // Detect whether we are given a function with arguments.
     // Also detect whether the immediate enclosing class has some declared values that we can use.
     val availableSymbols = (typeU.paramLists.flatten ++ enclosingClassValues)
-      .map(s ⇒ VarE(s.name.decodedName.toString, buildTypeExpr(s.typeSignature)))
+      .map(s => VarE(s.name.decodedName.toString, buildTypeExpr(s.typeSignature)))
       // Reject values containing recursive types. These might kill performance.
-      .filterNot(v ⇒ TypeExpr.findFirst(v.t) { case RecurseT(_, _) ⇒ }.nonEmpty)
+      .filterNot(v => TypeExpr.findFirst(v.t) { case RecurseT(_, _) => }.nonEmpty)
     val result = availableSymbols match {
-      case Nil ⇒ inhabitOneInternal(buildTypeExpr(typeU))()
-      case lists ⇒
+      case Nil => inhabitOneInternal(buildTypeExpr(typeU))()
+      case lists =>
         //        c.info(c.enclosingPosition, s"DEBUG: have availableSymbols=${availableSymbols.map(_.name)}", force = true)
         val givenVars = lists
         val resultType = buildTypeExpr(typeU.finalResultType)
-        val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) ⇒ t.t ->: prev }
-        inhabitOneInternal(typeStructure) { term ⇒ givenVars.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
+        val typeStructure = givenVars.reverse.foldLeft(resultType) { case (prev, t) => t.t ->: prev }
+        inhabitOneInternal(typeStructure) { term => givenVars.foldLeft(term) { case (prev, v) => AppE(prev, v) } }
     }
     result
   }
@@ -393,11 +391,11 @@ class Macros(val c: whitebox.Context) {
     val givenVars: Seq[(VarE, c.Tree)] = values.zipWithIndex
       // The given values will be marked as arguments with name `arg1`, `arg2`, etc.,
       // so that they do not mix with automatic variables in the generated closed term.
-      .map { case (v, i) ⇒ (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
+      .map { case (v, i) => (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
-    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.t ->: prev }
-    inhabitOneInternal(typeStructure, givenVars.toMap) { term ⇒
-      givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) }
+    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) => t.t ->: prev }
+    inhabitOneInternal(typeStructure, givenVars.toMap) { term =>
+      givenVarsAsArgs.foldLeft(term) { case (prev, v) => AppE(prev, v) }
     }
   }
 
@@ -406,19 +404,19 @@ class Macros(val c: whitebox.Context) {
   def allOfTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
     val typeUT: TypeExpr = buildTypeExpr(c.weakTypeOf[U])
     val givenVars: Seq[(VarE, c.Tree)] = values.zipWithIndex
-      .map { case (v, i) ⇒ (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
+      .map { case (v, i) => (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
-    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.t ->: prev }
-    inhabitAllInternal(typeStructure, givenVars.toMap) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
+    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) => t.t ->: prev }
+    inhabitAllInternal(typeStructure, givenVars.toMap) { term => givenVarsAsArgs.foldLeft(term) { case (prev, v) => AppE(prev, v) } }
   }
 
   def anyOfTypeImplWithValues[U: c.WeakTypeTag](values: c.Expr[Any]*): c.Tree = {
     val typeUT: TypeExpr = buildTypeExpr(c.weakTypeOf[U])
     val givenVars: Seq[(VarE, c.Tree)] = values.zipWithIndex
-      .map { case (v, i) ⇒ (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
+      .map { case (v, i) => (VarE(s"arg${i + 1}", buildTypeExpr(v.actualType)), v.tree) }
     val givenVarsAsArgs = givenVars.map(_._1)
-    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) ⇒ t.t ->: prev }
-    inhabitAllInternal(typeStructure, givenVars.toMap, returnAllProofTerms = true) { term ⇒ givenVarsAsArgs.foldLeft(term) { case (prev, v) ⇒ AppE(prev, v) } }
+    val typeStructure = givenVarsAsArgs.reverse.foldLeft(typeUT) { case (prev, t) => t.t ->: prev }
+    inhabitAllInternal(typeStructure, givenVars.toMap, returnAllProofTerms = true) { term => givenVarsAsArgs.foldLeft(term) { case (prev, v) => AppE(prev, v) } }
   }
 
   /** Construct a Scala code tree that implements a type expression tree.
@@ -436,13 +434,13 @@ class Macros(val c: whitebox.Context) {
     typeStructure: TypeExpr,
     givenArgs: Map[VarE, c.Tree] = Map()
   )(
-    transform: TermExpr ⇒ TermExpr = identity
+    transform: TermExpr => TermExpr = identity
   ): c.Tree = {
     TheoremProver.inhabitInternal(typeStructure) match {
-      case Right((messageOpt, foundTerm)) ⇒
-        messageOpt.foreach(message ⇒ if (verbose) c.warning(c.enclosingPosition, message))
+      case Right((messageOpt, foundTerm)) =>
+        messageOpt.foreach(message => if (verbose) c.warning(c.enclosingPosition, message))
         returnTerm(transform(foundTerm), givenArgs)
-      case Left(errorMessage) ⇒
+      case Left(errorMessage) =>
         c.error(c.enclosingPosition, errorMessage)
         q"null"
     }
@@ -450,7 +448,6 @@ class Macros(val c: whitebox.Context) {
   }
 
   private def returnTerm(termFound: TermExpr, givenArgs: Map[VarE, c.Tree]): c.Tree = {
-    import LiftedAST._
     val prettyTerm = if (showReturningTerm) termFound.toString else termFound.prettyPrintWithParentheses(0)
     if (verbose) c.info(c.enclosingPosition, s"Returning term: $prettyTerm", force = true)
     val resultCodeTree = emitTermCode(termFound, givenArgs)
@@ -458,14 +455,14 @@ class Macros(val c: whitebox.Context) {
     val result = {
       lazy val wrapper = q"object Wrapper { val expr = $termFound }"
       termFound match {
-        case CurriedE(VarE(_, ConjunctT(termTypes)) :: _, _) ⇒
+        case CurriedE(VarE(_, ConjunctT(termTypes)) :: _, _) =>
           if (termTypes.length <= 3) {
             val functionName = TypeName(s"Function${termTypes.length}Lambda")
             val functionNameType = tq"$functionName"
             q"$wrapper; new $functionNameType($resultCodeTree, Wrapper.expr)"
           } else resultCodeTree
-        case CurriedE(VarE(_, _) :: _, _) ⇒ q"$wrapper; new _root_.io.chymyst.ch.Function1Lambda($resultCodeTree, Wrapper.expr)"
-        case _ ⇒ resultCodeTree
+        case CurriedE(VarE(_, _) :: _, _) => q"$wrapper; new _root_.io.chymyst.ch.Function1Lambda($resultCodeTree, Wrapper.expr)"
+        case _ => resultCodeTree
       }
     }
     if (debug) c.info(c.enclosingPosition, s"Returning code: ${showCode(result)}", force = true)
@@ -477,16 +474,16 @@ class Macros(val c: whitebox.Context) {
     givenArgs: Map[VarE, c.Tree],
     returnAllProofTerms: Boolean = false
   )(
-    transform: TermExpr ⇒ TermExpr
+    transform: TermExpr => TermExpr
   ): c.Tree = {
     val (lowestScoreTerms, allTerms) = TheoremProver.findProofs(typeStructure)
     val foundTerms = if (returnAllProofTerms) {
-      if (debug) allTerms.foreach { t ⇒ c.info(c.enclosingPosition, s"[DEBUG] Score: ${t.informationLossScore}\tTerm: ${t.prettyPrint}", force = true) }
+      if (debug) allTerms.foreach { t => c.info(c.enclosingPosition, s"[DEBUG] Score: ${t.informationLossScore}\tTerm: ${t.prettyPrint}", force = true) }
       allTerms
     } else {
       lowestScoreTerms
     }
-    val terms = foundTerms.map { foundTerm ⇒
+    val terms = foundTerms.map { foundTerm =>
       returnTerm(transform(foundTerm), givenArgs)
     }
     q"Seq(..$terms)"

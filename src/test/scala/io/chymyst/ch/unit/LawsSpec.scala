@@ -11,29 +11,29 @@ class LawsSpec extends LawChecking {
   behavior of "generated type class methods"
 
   it should "check laws for Reader monad" in {
-    def pointReader[E, A]: A ⇒ (E ⇒ A) = implement
+    def pointReader[E, A]: A => (E => A) = implement
 
-    def mapReader[E, A, B]: (E ⇒ A) ⇒ (A ⇒ B) ⇒ (E ⇒ B) = implement
+    def mapReader[E, A, B]: (E => A) => (A => B) => (E => B) = implement
 
-    def fmapReader[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = flip(mapReader)
+    def fmapReader[E, A, B]: (A => B) => (E => A) => (E => B) = flip(mapReader)
 
     // Check identity law with E = Int and A = String.
-    forAll { (reader: Int ⇒ String) ⇒
+    forAll { (reader: Int => String) =>
       // fmap id = id
       fEqual(mapReader(reader)(identity[String]), reader)
     }
 
-    type Reader[A] = Int ⇒ A
+    type Reader[A] = Int => A
 
-    implicit def readersEqual[A](r1: Reader[A], r2: Reader[A]): Assertion = forAll { x: Int ⇒ r1(x) shouldEqual r2(x) }
+    implicit def readersEqual[A](r1: Reader[A], r2: Reader[A]): Assertion = forAll { x: Int => r1(x) shouldEqual r2(x) }
 
     // Same check, using the helper methods.
-    hofEqual((reader: Int ⇒ String) ⇒ mapReader(reader)(identity[String]), identity[Int ⇒ String])
+    hofEqual((reader: Int => String) => mapReader(reader)(identity[String]), identity[Int => String])
 
-    def flatMapReader[E, A, B]: (E ⇒ A) ⇒ (A ⇒ E ⇒ B) ⇒ (E ⇒ B) = implement
+    def flatMapReader[E, A, B]: (E => A) => (A => E => B) => (E => B) = implement
 
     // r.flatMap(pure) = r
-    forAll { (reader: Int ⇒ String) ⇒
+    forAll { (reader: Int => String) =>
       val flatMap_pure = flatMapReader(reader)(pointReader)
       fEqual(flatMap_pure, reader)
     }
@@ -41,7 +41,7 @@ class LawsSpec extends LawChecking {
     // Same checks using the universal helper method.
 
     val fmapR = new FMap[Reader] {
-      override def f[A, B]: (A ⇒ B) ⇒ (Reader[A]) ⇒ Reader[B] = fmapReader[Int, A, B]
+      override def f[A, B]: (A => B) => (Reader[A]) => Reader[B] = fmapReader[Int, A, B]
     }
 
     val pointR = new FPoint[Reader] {
@@ -55,7 +55,7 @@ class LawsSpec extends LawChecking {
     checkMonadLaws[Int, Long, String, Reader](pointR, fmapR, flatmapR)
   }
 
-  def checkMonadLaws[A: Arbitrary, B: Arbitrary, C: Arbitrary, F[_]](pointS: FPoint[F], fmapS: FMap[F], flatmapS: FFlatMap[F])(implicit frec: (F[C], F[C]) ⇒ Assertion, fab: Arbitrary[A ⇒ B], fac: Arbitrary[A ⇒ C], fa: Arbitrary[F[A]], fc: Arbitrary[F[C]], evBC: Arbitrary[B ⇒ C], evAfC: Arbitrary[A ⇒ F[C]], evAfB: Arbitrary[A ⇒ F[B]], evBfC: Arbitrary[B ⇒ F[C]]): Assertion = {
+  def checkMonadLaws[A: Arbitrary, B: Arbitrary, C: Arbitrary, F[_]](pointS: FPoint[F], fmapS: FMap[F], flatmapS: FFlatMap[F])(implicit frec: (F[C], F[C]) => Assertion, fab: Arbitrary[A => B], fac: Arbitrary[A => C], fa: Arbitrary[F[A]], fc: Arbitrary[F[C]], evBC: Arbitrary[B => C], evAfC: Arbitrary[A => F[C]], evAfB: Arbitrary[A => F[B]], evBfC: Arbitrary[B => F[C]]): Assertion = {
 
     fmapLawIdentity[C, F](fmapS)
 
@@ -69,7 +69,7 @@ class LawsSpec extends LawChecking {
   }
 
   it should "check laws for State monad" in {
-    case class State[S, A](st: S ⇒ (A, S))
+    case class State[S, A](st: S => (A, S))
 
     case class IntState[A](st: State[Int, A])
 
@@ -77,7 +77,7 @@ class LawsSpec extends LawChecking {
 
     implicit def genCaseClass[A: Arbitrary]: Arbitrary[IntState[A]] = Arbitrary {
       for {
-        n <- arbitrary[Int ⇒ (A, Int)]
+        n <- arbitrary[Int => (A, Int)]
       } yield IntState(State(n))
     }
 
@@ -117,13 +117,13 @@ class LawsSpec extends LawChecking {
   }
 
   it should "check laws for Continuation monad" in {
-    case class Cont[X](c: (X ⇒ Int) ⇒ Int)
+    case class Cont[X](c: (X => Int) => Int)
 
-    implicit def contEqual[A: Arbitrary](s1: Cont[A], s2: Cont[A])(implicit ai: Arbitrary[A ⇒ Int]): Assertion = fEqual(s1.c, s2.c)
+    implicit def contEqual[A: Arbitrary](s1: Cont[A], s2: Cont[A])(implicit ai: Arbitrary[A => Int]): Assertion = fEqual(s1.c, s2.c)
 
     implicit def genCaseClass[A: Arbitrary]: Arbitrary[Cont[A]] = Arbitrary {
       for {
-        n <- arbitrary[(A ⇒ Int) ⇒ Int]
+        n <- arbitrary[(A => Int) => Int]
       } yield Cont(n)
     }
 
@@ -143,13 +143,13 @@ class LawsSpec extends LawChecking {
   }
 
   it should "check laws for Center-of-mass monad" in {
-    case class CenterOfMass[X](c: (X ⇒ Int) ⇒ X)
+    case class CenterOfMass[X](c: (X => Int) => X)
 
-    implicit def contEqual[A: Arbitrary](s1: CenterOfMass[A], s2: CenterOfMass[A])(implicit ai: Arbitrary[A ⇒ Int]): Assertion = fEqual(s1.c, s2.c)
+    implicit def contEqual[A: Arbitrary](s1: CenterOfMass[A], s2: CenterOfMass[A])(implicit ai: Arbitrary[A => Int]): Assertion = fEqual(s1.c, s2.c)
 
     implicit def genCaseClass[A: Arbitrary]: Arbitrary[CenterOfMass[A]] = Arbitrary {
       for {
-        n <- arbitrary[(A ⇒ Int) ⇒ A]
+        n <- arbitrary[(A => Int) => A]
       } yield CenterOfMass(n)
     }
 
@@ -181,7 +181,7 @@ class LawsSpec extends LawChecking {
     // All implementations should transform a non-empty option correctly.
     maps.length shouldEqual 1
     val mapsIntString = maps[Int, String]
-    mapsIntString.foreach { m ⇒
+    mapsIntString.foreach { m =>
       m(_.toString + "abc")(OOption(Some(Some(123)))) shouldEqual OOption(Some(Some("123abc")))
     }
 
@@ -219,10 +219,10 @@ class LawsSpec extends LawChecking {
     fmapLawIdentity[Int, Data](fmap)
     fmapLawComposition[Int, String, Boolean, Data](fmap)
 
-//    fmap.f[Int, Int](x ⇒ x + 1)(Data(Some((123, Value(456))))) shouldEqual Data(Some((124, Value(457))))
-//    fmap.f[Int, Int](x ⇒ x + 1)(Data(Some((123, Message(10, "20"))))) shouldEqual Data(Some((124, Message(10, "20"))))
+//    fmap.f[Int, Int](x => x + 1)(Data(Some((123, Value(456))))) shouldEqual Data(Some((124, Value(457))))
+//    fmap.f[Int, Int](x => x + 1)(Data(Some((123, Message(10, "20"))))) shouldEqual Data(Some((124, Message(10, "20"))))
 */
-    def fmaps[A, B] = allOfType[(A ⇒ B) ⇒ Data[A] ⇒ Data[B]]
+    def fmaps[A, B] = allOfType[(A => B) => Data[A] => Data[B]]
 
     fmaps.length shouldEqual 2
   }

@@ -2,9 +2,10 @@ package io.chymyst.ch.unit
 
 import io.chymyst.ch.LJT.followsFromAxioms
 import io.chymyst.ch._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class LJTSpec extends FlatSpec with Matchers {
+class LJTSpec extends AnyFlatSpec with Matchers {
 
   private val freshVars = new FreshIdents(prefix = "x")
 
@@ -16,15 +17,15 @@ class LJTSpec extends FlatSpec with Matchers {
     private val freshSubformulas = new FreshIdents(prefix = "f")
 
     def subformulas[T](typeStructure: TypeExpr[T]): Set[TypeExpr[T]] = Set(typeStructure) ++ (typeStructure match {
-      case DisjunctT(terms) ⇒ terms.flatMap(subformulas)
-      case ConjunctT(terms) ⇒ terms.flatMap(subformulas)
-      case head :-> body ⇒ subformulas(head) ++ subformulas(body) ++ (head match {
-        case DisjunctT(terms) ⇒ terms.flatMap(t ⇒ subformulas(:->(t, body)))
-        case ConjunctT(terms) ⇒ subformulas(terms.foldRight(body) { case (t, prev) ⇒ t :-> prev })
-        case _ :-> bd ⇒ subformulas(bd :-> body) // Special subformula case for implication of the form (hd ⇒ bd) ⇒ body
-        case _ ⇒ Seq() // `head` is an atomic type
+      case DisjunctT(terms) => terms.flatMap(subformulas)
+      case ConjunctT(terms) => terms.flatMap(subformulas)
+      case head :-> body => subformulas(head) ++ subformulas(body) ++ (head match {
+        case DisjunctT(terms) => terms.flatMap(t => subformulas(:->(t, body)))
+        case ConjunctT(terms) => subformulas(terms.foldRight(body) { case (t, prev) => t :-> prev })
+        case _ :-> bd => subformulas(bd :-> body) // Special subformula case for implication of the form (hd => bd) => body
+        case _ => Seq() // `head` is an atomic type
       })
-      case _ ⇒ Seq() // `typeStructure` is an atomic type
+      case _ => Seq() // `typeStructure` is an atomic type
     }).toSet
   }
 
@@ -185,11 +186,11 @@ class LJTSpec extends FlatSpec with Matchers {
   }
 
   it should "inhabit type using +Rn" in {
-    def f[X]: X ⇒ Option[X] = implement
+    def f[X]: X => Option[X] = implement
 
     f(1) shouldEqual Some(1)
 
-    def g[X, Y]: X ⇒ Either[X, Y] = implement
+    def g[X, Y]: X => Either[X, Y] = implement
 
     g("abc") shouldEqual Left("abc")
   }
