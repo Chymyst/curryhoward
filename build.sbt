@@ -1,10 +1,7 @@
 lazy val common = Seq(
-  //  scalaVersion := "2.12.6",
   scalaVersion := "2.13.6",
-  crossScalaVersions := Seq("2.11.12", "2.12.6"),
+  crossScalaVersions := Seq("2.11.12", "2.12.12", "2.13.6"),
   libraryDependencies ++= Seq(
-    //    "org.scalatest" %% "scalatest" % "3.0.4" % Test,
-    //    "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
     "org.scalatest" %% "scalatest" % "3.2.9" % Test,
     "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0"  % Test
   )
@@ -135,7 +132,6 @@ lazy val curryhoward: Project = (project in file("."))
     libraryDependencies ++= Seq(
       // We need scala-reflect because we use macros.
       "org.scala-lang" % "scala-reflect" % scalaVersion.value
-      //      , "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test
       , "com.github.alexarchambault" %% "scalacheck-shapeless_1.15" % "1.3.0" % Test
     )
   )
