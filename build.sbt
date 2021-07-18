@@ -1,18 +1,18 @@
 lazy val common = Seq(
-  scalaVersion := "2.12.6",
-  crossScalaVersions := Seq("2.11.12", "2.12.6"),
+  scalaVersion := "2.13.6",
+  crossScalaVersions := Seq("2.11.12", "2.12.12", "2.13.6"),
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.4" % Test,
-    "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
+    "org.scalatest" %% "scalatest" % "3.0.8" % Test,
+    "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
   )
 )
 
 // Do `sbt tut` to build the tutorial.
-enablePlugins(TutPlugin)
+//enablePlugins(TutPlugin)
 
-tutSourceDirectory := (sourceDirectory in curryhoward in Compile).value / "tut"
-tutTargetDirectory := baseDirectory.value / "docs" //(crossTarget in core).value / "tut"
-scalacOptions in Tut := scalacOptions.value.filterNot(disableWarningsForTut.contains)
+//tutSourceDirectory := (sourceDirectory in curryhoward in Compile).value / "tut"
+//tutTargetDirectory := baseDirectory.value / "docs" //(crossTarget in core).value / "tut"
+//scalacOptions in Tut := scalacOptions.value.filterNot(disableWarningsForTut.contains)
 
 lazy val disableWarningsForTut = Set(
   "-Ywarn-unused"
@@ -22,9 +22,9 @@ lazy val disableWarningsForTut = Set(
   , "-Xlint"
 )
 
-lazy val errorsForWartRemover = Seq(Wart.ArrayEquals, Wart.EitherProjectionPartial, Wart.Enumeration, Wart.Equals, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal, Wart.LeakingSealed, Wart.Return, Wart.StringPlusAny, Wart.TryPartial)
+lazy val errorsForWartRemover = Seq(Wart.ArrayEquals, Wart.EitherProjectionPartial, Wart.Enumeration, Wart.Equals, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal, Wart.LeakingSealed, Wart.Return, Wart.TryPartial)
 
-lazy val warningsForWartRemover = Seq(Wart.Any, Wart.AnyVal, Wart.JavaConversions, Wart.IsInstanceOf, Wart.Option2Iterable, Wart.OptionPartial, Wart.TraversableOps) //Seq(Wart.AsInstanceOf, Wart.ImplicitConversion, Wart.NoNeedForMonad, Wart.Nothing, Wart.Product, Wart.Serializable, Wart.ToString, Wart.While)
+lazy val warningsForWartRemover = Seq(Wart.Any, Wart.AnyVal, Wart.JavaConversions, Wart.IsInstanceOf, Wart.Option2Iterable, Wart.OptionPartial, Wart.StringPlusAny, Wart.TraversableOps) //Seq(Wart.AsInstanceOf, Wart.ImplicitConversion, Wart.NoNeedForMonad, Wart.Nothing, Wart.Product, Wart.Serializable, Wart.ToString, Wart.While)
 
 // See http://tpolecat.github.io/2017/04/25/scalac-flags.html
 lazy val scalacOptionsRobNorris = Seq(
@@ -67,7 +67,24 @@ lazy val scalacOptionsRobNorris = Seq(
   "-Ywarn-value-discard" // Warn when non-Unit expression results are unused.
 )
 
-lazy val scalacOptionsRobNorris212AndAbove = Seq(
+lazy val scalacOptionsRobNorrisExtra212AndAbove = Seq(
+  "-Xlint:constant", // Evaluation of a constant arithmetic expression results in an error.
+  "-Ywarn-extra-implicit", // Warn when more than one implicit parameter section is defined.
+  "-Ywarn-unused:implicits", // Warn if an implicit parameter is unused.
+  "-Ywarn-unused:imports", // Warn if an import selector is not referenced.
+  "-Ywarn-unused:locals", // Warn if a local definition is unused.
+  "-Ywarn-unused:params", // Warn if a value parameter is unused.
+  "-Ywarn-unused:patvars", // Warn if a variable bound in a pattern is unused.
+  "-Ywarn-unused:privates" // Warn if a private member is unused.
+)
+
+lazy val scalacOptionsExtra212 = Seq(
+  "-opt:l:inline",
+  "-Ypartial-unification",
+  "-Yvirtpatmat"
+)
+
+lazy val scalacOptionsExtra213 = scalacOptionsExtra212 ++ Seq(
   "-Xlint:constant", // Evaluation of a constant arithmetic expression results in an error.
   "-Ywarn-extra-implicit", // Warn when more than one implicit parameter section is defined.
   "-Ywarn-unused:implicits", // Warn if an implicit parameter is unused.
@@ -99,6 +116,24 @@ lazy val myScalacOptions = Seq(
   "-target:jvm-1.8"
 )
 
+lazy val scalacOptions212RemovedIn213 = Seq(
+  "-Xlint:by-name-right-associative",
+  "-Xlint:nullary-override",
+  "-Xlint:unsound-match",
+  "-Yno-adapted-args",
+  "-Ywarn-unused-import",
+  "-Ypartial-unification",
+  "-Yvirtpatmat",
+  "-Ywarn-inaccessible",
+  "-Ywarn-infer-any",
+  "-Ywarn-nullary-override",
+  "-Ywarn-nullary-unit",
+)
+
+lazy val scalacOptionsBelow212 = (myScalacOptions ++ scalacOptionsRobNorris).distinct
+lazy val scalacOptions212 = (myScalacOptions ++ scalacOptionsRobNorris ++ scalacOptionsRobNorrisExtra212AndAbove ++ scalacOptionsExtra212).distinct
+lazy val scalacOptions213 = (myScalacOptions ++ scalacOptionsRobNorris ++ scalacOptionsRobNorrisExtra212AndAbove ++ scalacOptionsExtra213).distinct diff scalacOptions212RemovedIn213
+
 lazy val curryhoward: Project = (project in file("."))
   .settings(common)
   .settings(
@@ -110,19 +145,13 @@ lazy val curryhoward: Project = (project in file("."))
     description := "Automatic code generation from function types using the Curry-Howard correspondence",
 
     //    scalacOptions += "-Ymacro-debug-lite",
-    scalacOptions ++= (scalacOptionsRobNorris ++ myScalacOptions ++ (
-      // Accommodate weird versions such as 2.12.1-933bab2-nightly.
-      if (CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((x, y)) if x >= 2 && y >= 12 ⇒ true;
-        case _ ⇒ false
-      })
-        scalacOptionsRobNorris212AndAbove ++ Seq(
-          "-opt:l:inline",
-          "-Ypartial-unification",
-          "-Yvirtpatmat"
-        )
-      else Nil
-      )).distinct, // (SI-2712 pertains to partial-unification)
+    scalacOptions ++= {
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((x, y)) if x == 2 && y == 13 ⇒ scalacOptions213
+        case Some((x, y)) if x == 2 && y == 12 ⇒ scalacOptions212
+        case _ ⇒ scalacOptionsBelow212
+      }
+    }, // (SI-2712 pertains to partial-unification)
 
     wartremoverWarnings in(Compile, compile) ++= warningsForWartRemover,
     wartremoverErrors in(Compile, compile) ++= errorsForWartRemover,
@@ -130,8 +159,12 @@ lazy val curryhoward: Project = (project in file("."))
 
     libraryDependencies ++= Seq(
       // We need scala-reflect because we use macros.
-      "org.scala-lang" % "scala-reflect" % scalaVersion.value
-      , "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test
+      "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+      (if (scalaBinaryVersion.value startsWith "2.13")
+        "com.github.alexarchambault" %% "scalacheck-shapeless_1.15" % "1.3.0" % Test
+      else
+        "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test
+        ),
     )
   )
 

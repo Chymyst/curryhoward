@@ -31,3 +31,4 @@ logs/
 *.log.txt.xz
 
 *.jfr
+.bsp
