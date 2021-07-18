@@ -6,22 +6,6 @@ lazy val common = Seq(
     "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
   )
 )
-
-// Do `sbt tut` to build the tutorial.
-//enablePlugins(TutPlugin)
-
-//tutSourceDirectory := (sourceDirectory in curryhoward in Compile).value / "tut"
-//tutTargetDirectory := baseDirectory.value / "docs" //(crossTarget in core).value / "tut"
-//scalacOptions in Tut := scalacOptions.value.filterNot(disableWarningsForTut.contains)
-
-lazy val disableWarningsForTut = Set(
-  "-Ywarn-unused"
-  , "-Ywarn-unused-import"
-  , "-Ywarn-unused:imports"
-  , "-Ywarn-unused:params"
-  , "-Xlint"
-)
-
 lazy val errorsForWartRemover = Seq(Wart.ArrayEquals, Wart.EitherProjectionPartial, Wart.Enumeration, Wart.Equals, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal, Wart.LeakingSealed, Wart.Return, Wart.TryPartial)
 
 lazy val warningsForWartRemover = Seq(Wart.Any, Wart.AnyVal, Wart.JavaConversions, Wart.IsInstanceOf, Wart.Option2Iterable, Wart.OptionPartial, Wart.StringPlusAny, Wart.TraversableOps) //Seq(Wart.AsInstanceOf, Wart.ImplicitConversion, Wart.NoNeedForMonad, Wart.Nothing, Wart.Product, Wart.Serializable, Wart.ToString, Wart.While)
