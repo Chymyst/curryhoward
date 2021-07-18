@@ -1,9 +1,10 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class MacrosSpec extends FlatSpec with Matchers {
+class MacrosSpec extends AnyFlatSpec with Matchers {
   /* Not used now.
     behavior of "syntax for untyped functions"
 

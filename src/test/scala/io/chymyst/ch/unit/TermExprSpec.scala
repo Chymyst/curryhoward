@@ -1,9 +1,10 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class TermExprSpec extends FlatSpec with Matchers {
+class TermExprSpec extends AnyFlatSpec with Matchers {
 
   val var12 = VarE("x1", TP("2"))
   val var23 = VarE("x2", TP("3"))

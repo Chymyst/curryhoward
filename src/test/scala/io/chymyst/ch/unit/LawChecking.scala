@@ -2,8 +2,10 @@ package io.chymyst.ch.unit
 
 import io.chymyst.ch.implement
 import org.scalacheck.Arbitrary
-import org.scalatest.{Assertion, FlatSpec, Matchers}
-import org.scalatest.prop.GeneratorDrivenPropertyChecks
+import org.scalatest.Assertion
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 trait FMap[F[_]] {
   def f[A, B]: (A ⇒ B) ⇒ F[A] ⇒ F[B]
@@ -17,7 +19,7 @@ trait FFlatMap[F[_]] {
   def f[A, B]: (A ⇒ F[B]) ⇒ F[A] ⇒ F[B]
 }
 
-trait LawChecking extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks {
+trait LawChecking extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
 
   def fEqual[A: Arbitrary, B](f1: A ⇒ B, f2: A ⇒ B): Assertion = {
     forAll { (x: A) ⇒ f1(x) shouldEqual f2(x) }

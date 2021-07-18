@@ -1,9 +1,10 @@
 package io.chymyst.ch.unit
 
-import org.scalatest.{FlatSpec, Matchers}
 import io.chymyst.ch._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class OrderingSpec extends FlatSpec with Matchers {
+class OrderingSpec extends AnyFlatSpec with Matchers {
 
   behavior of "ordering heuristics"
 

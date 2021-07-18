@@ -2,9 +2,10 @@ package io.chymyst.ch.unit
 
 import io.chymyst.ch.LJT.followsFromAxioms
 import io.chymyst.ch._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class LJTSpec extends FlatSpec with Matchers {
+class LJTSpec extends AnyFlatSpec with Matchers {
 
   private val freshVars = new FreshIdents(prefix = "x")
 

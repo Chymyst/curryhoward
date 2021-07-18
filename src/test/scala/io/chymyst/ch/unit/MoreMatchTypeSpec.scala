@@ -1,10 +1,10 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
-import io.chymyst.ch.Macros._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class MoreMatchTypeSpec extends FlatSpec with Matchers {
+class MoreMatchTypeSpec extends AnyFlatSpec with Matchers {
 
   behavior of "tuples"
 

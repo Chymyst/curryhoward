@@ -1,9 +1,10 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch.typeExpr
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class MatchTypeSpec extends FlatSpec with Matchers {
+class MatchTypeSpec extends AnyFlatSpec with Matchers {
   behavior of "type parameter introspection"
 
   it should "get printable representation of fixed types with _" in {

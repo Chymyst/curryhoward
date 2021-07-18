@@ -1,7 +1,9 @@
 package io.chymyst.ch.unit
 
 import io.chymyst.ch._
-import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.BeforeAndAfterEach
 
 case class Wrap1[A, B](x: Int, a: A, b: B)
 
@@ -29,7 +31,7 @@ case class Wrap2d[A]() extends Wrap2
 
 case class Wrap2e[A](a: A) extends Wrap2
 
-class LJTSpec3 extends FlatSpec with Matchers with BeforeAndAfterEach {
+class LJTSpec3 extends AnyFlatSpec with Matchers with BeforeAndAfterEach {
 
   override def beforeEach(): Unit = System.setProperty("curryhoward.log", "prover,macros,terms,trace")
 

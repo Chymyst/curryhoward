@@ -2,9 +2,11 @@ package io.chymyst.ch.unit
 
 import io.chymyst.ch._
 import io.chymyst.ch.data.{LawChecking => LC}
-import org.scalatest.{Assertion, FlatSpec, Matchers}
+import org.scalatest.Assertion
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class LambdaTermsSpec extends FlatSpec with Matchers {
+class LambdaTermsSpec extends AnyFlatSpec with Matchers {
 
   behavior of ".lambdaTerm API"
 

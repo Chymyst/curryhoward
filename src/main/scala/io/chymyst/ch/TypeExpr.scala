@@ -193,7 +193,7 @@ object TypeExpr {
       val unmappedVars = (usedVars intersect allTypeParams(fullSrc)) -- substitutions.keySet
       val alphaConversions: Map[TP, TypeExpr] = unmappedVars.toSeq.map {
         _ → TP(freshTypeVarIdents())
-      }(scala.collection.breakOut)
+      }.to(Map)
       substitutions ++ alphaConversions
     }
   }
@@ -207,7 +207,7 @@ object TypeExpr {
     * @return An updated substitution map, or an error message if unification cannot succeed.
     */
   private def leftUnifyRec(src: TypeExpr, dst: TypeExpr, substitutions: Map[TP, TypeExpr]): UnifyResult = {
-    import MonadEither._ // This is necessary to support Scala 2.11. Do not remove this import.
+//    import MonadEither._ // This is necessary to support Scala 2.11. Do not remove this import.
     def wrapResult(tuples: Seq[(TypeExpr, TypeExpr)]): UnifyResult = tuples.foldLeft[UnifyResult](Right(substitutions)) { case (prev, (t, t2)) ⇒
       prev.flatMap(p ⇒ leftUnifyRec(t, t2, p))
     }
