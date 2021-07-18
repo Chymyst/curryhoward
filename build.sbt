@@ -130,7 +130,6 @@ lazy val curryhoward: Project = (project in file("."))
     homepage := Some(url("https://github.com/Chymyst/curryhoward")),
     description := "Automatic code generation from function types using the Curry-Howard correspondence",
 
-    //    scalacOptions += "-Ymacro-debug-lite",
     scalacOptions ++= {
       CrossVersion.partialVersion(scalaVersion.value) match {
         case Some((x, y)) if x == 2 && y == 13 ⇒ scalacOptions213
