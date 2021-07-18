@@ -63,13 +63,13 @@ We see that the type of the function `makeUser[N, I]` constrains its algorithm t
 The `curryhoward` library can generate the code of functions of this sort using the macro `implement`:
 
 ```scala mdoc
-case class User[N, I](name: N, id: I)
-def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
+case class User1[N, I](name: N, id: I)
+def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User1[N, I] = implement
 makeUser(123, (n: Int) ⇒ "id:" + (n * 100).toString)
 ```
 
 With the `verbose` option set, the library will print the lambda-calculus term corresponding to the generated code.
-In this example, the term is `User(userName, userIdGenerator userName)`.
+In this example, the term is `User1(userName, userIdGenerator userName)`.
 
 The chosen notation for lambda-calculus terms supports tuples and named case classes.
 Below we will see more examples of the generated terms printed using the lambda-calculus notation.
@@ -80,9 +80,9 @@ The `curryhoward` library, of course, works with _curried_ functions as well:
 
 ```scala mdoc
 def const[A, B]: A ⇒ B ⇒ A = implement
-val f: String ⇒ Int = const(10)
+val fcurried: String ⇒ Int = const(10)
 
-f("abc")
+fcurried("abc")
 ```
 
 The returned lambda-calculus term is `(a ⇒ b ⇒ a)`.
@@ -90,9 +90,9 @@ The returned lambda-calculus term is `(a ⇒ b ⇒ a)`.
 Here is a more complicated example that automatically implements the `fmap` function for the Reader monad:
 
 ```scala mdoc
-def fmap[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
-val f: Int ⇒ Int = _ + 10
-def eaeb[E]: (E ⇒ Int) ⇒ (E ⇒ Int) = fmap(f)
+def fmapReader[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
+val f1: Int ⇒ Int = _ + 10
+def eaeb[E]: (E ⇒ Int) ⇒ (E ⇒ Int) = fmapReader(f1)
 val ea: Double ⇒ Int = x ⇒ (x + 0.5).toInt
 
 eaeb(ea)(1.9)
@@ -104,7 +104,7 @@ One can freely mix the curried and the conventional Scala function syntax.
 Here is the applicative `map2` function for the Reader monad:
 
 ```scala mdoc
-def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
+def map2Reader[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
 ```
 
 ## Using class values
@@ -154,7 +154,7 @@ makeUser(123, (n: Int) ⇒ "id:" + (n * 100).toString)
 we now write
 
 ```scala mdoc
-ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
+ofType[User1[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
 ```
 
 The macro `ofType[T](x, y, ..., z)` generates an expression of type `T` built up from the given values `x`, `y`, ..., `z`.
@@ -218,17 +218,19 @@ The `curryhoward` library implements the "information loss" heuristic for choosi
 As an example, consider the `map` function for the State monad:
 
 ```scala mdoc
-def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
+{
+    def mapSt[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
+}
 ```
 
-The warning shows that there exist two inequivalent implementations of the `map` function.
+The warning shows that there exist two inequivalent implementations of the `mapSt` function.
 The first implementation was automatically chosen and returned as code.
 
 The difference between the two implementations is that the initial state `s: S` can be either transformed using the given function `S ⇒ (A, S)`, or it can be left unchanged and returned in the pair `(B, S)`.
 The first implementation is the correct functor instance for the State monad.
 The second implementation "loses information" because the transformed value of type `S` has been computed but then ignored.
 
-The warning message lists all found implementations together with their "information loss score"
+The warning message lists all found implementations together with their "information loss score".
 
 It appears that information-losing functions are less likely to be useful in practice.
 The implementation having the smallest "information loss score" will be more likely, for instance, to satisfy equational laws.
@@ -402,9 +404,11 @@ To consider an easy example, let us generate the functor method `fmap` for the p
 We begin by auto-generating `fmap` using the `implement` macro:
 
 ```scala mdoc
-def fmap[A, B]: (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] = implement 
-
-val fmapT = fmap.lambdaTerm // No need to specify type parameters here.
+def fmapE[A, B]: (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] = {
+ def fmap[A, B]: (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] = implement
+ fmap[A, B] 
+}
+val fmapT = fmapE.lambdaTerm // No need to specify type parameters here.
 fmapT.prettyPrint
 fmapT.t.prettyPrint // The type of fmap.
 ```
@@ -423,10 +427,10 @@ We can create an identity function by first creating an STLC variable of type `A
 
 ```scala mdoc
 def a[A] = freshVar[A]
-val idA = a =>: a
+val identA = a =>: a
 ```
 
-The type parameter name `A` is fixed in the variable `a` since it is defined at compile time by the `freshVar` macro.
+The type parameter name `A` is fixed in the variable `a` since it is defined at *compile time* by the `freshVar` macro.
 For the same reason, calling `a[Int]` will return the same variable, still having type `A`.
 Repeated calls to `a` will also return the same variable.
 
@@ -508,8 +512,10 @@ In the operators `:@`, `:@@`, and `@@:`, the colon `:` mnemonically shows the si
 To illustrate the use of these operators, consider the function `pure`, which is standard for the `Either` monad and can be implemented automatically:
 
 ```scala mdoc
-def pure[A]: A ⇒ Either[Int, A] = implement
-val pureT = pure.lambdaTerm
+val pureT = {
+    def pure[A]: A ⇒ Either[Int, A] = implement
+    pure.lambdaTerm
+}
 ```
 
 Why didn't we write `implement.lambdaTerm` directly?
@@ -685,8 +691,10 @@ We have obtained the resulting term, and we can see that it is what we expected 
 We will now check that the same lambda-term is obtained when implementing the function `getId` automatically using `curryhoward`.
 
 ```scala mdoc
-val getIdAuto: Option[User] ⇒ Option[Long] = implement
-val getIdAutoTerm = getIdAuto.lambdaTerm
+val getIdAutoTerm = {
+    val getIdAuto: Option[User] ⇒ Option[Long] = implement
+    getIdAuto.lambdaTerm
+}
 getIdAutoTerm.prettyPrint
 getId.prettyPrint
 ``` 

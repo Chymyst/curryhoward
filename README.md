@@ -45,7 +45,7 @@ def f[X, Y]: (X ⇒ Y) ⇒ (Int ⇒ X) ⇒ (Int ⇒ Y) = implement
 - Emit a compile-time error when a type can be implemented in more than one way despite using heuristics
 - Debugging and logging options are available
 - DSL for inspecting the generated code (STLC lambda-terms) at run time; facilities are provided for symbolic evaluation and checking equational laws
-- [Tutorial](docs/Tutorial.md) explains how to do that in detail
+- A [tutorial](docs/Tutorial.md) explains how to do that in detail
 
 # Usage
 
