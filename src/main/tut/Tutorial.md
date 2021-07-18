@@ -11,7 +11,7 @@ libraryDependencies += "io.chymyst" %% "curryhoward" % "latest.integration"
 
 The `curryhoward` functionality becomes available once you add this import declaration:
 
-```tut:silent
+```scala mdoc:silent
 import io.chymyst.ch._
 ```
 
@@ -19,7 +19,7 @@ This imports all the necessary symbols such as `implement`, `ofType`, `allOfType
 
 In this tutorial, we will activate the `verbose` logging option:
 
-```tut:silent
+```scala mdoc:silent
 System.setProperty("curryhoward.log", "verbose")
 ```
 
@@ -62,7 +62,7 @@ We see that the type of the function `makeUser[N, I]` constrains its algorithm t
 
 The `curryhoward` library can generate the code of functions of this sort using the macro `implement`:
 
-```tut
+```scala mdoc
 case class User[N, I](name: N, id: I)
 def makeUser[N, I](userName: N, userIdGenerator: N ⇒ I): User[N, I] = implement
 makeUser(123, (n: Int) ⇒ "id:" + (n * 100).toString)
@@ -78,7 +78,7 @@ Below we will see more examples of the generated terms printed using the lambda-
 
 The `curryhoward` library, of course, works with _curried_ functions as well:
 
-```tut
+```scala mdoc
 def const[A, B]: A ⇒ B ⇒ A = implement
 val f: String ⇒ Int = const(10)
 
@@ -89,7 +89,7 @@ The returned lambda-calculus term is `(a ⇒ b ⇒ a)`.
 
 Here is a more complicated example that automatically implements the `fmap` function for the Reader monad:
 
-```tut
+```scala mdoc
 def fmap[E, A, B]: (A ⇒ B) ⇒ (E ⇒ A) ⇒ (E ⇒ B) = implement
 val f: Int ⇒ Int = _ + 10
 def eaeb[E]: (E ⇒ Int) ⇒ (E ⇒ Int) = fmap(f)
@@ -103,7 +103,7 @@ In this example, the returned lambda-calculus term is `(a ⇒ b ⇒ c ⇒ a (b c
 One can freely mix the curried and the conventional Scala function syntax.
 Here is the applicative `map2` function for the Reader monad:
 
-```tut
+```scala mdoc
 def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E ⇒ C = implement
 ```
 
@@ -111,7 +111,7 @@ def map2[E, A, B, C](readerA: E ⇒ A, readerB: E ⇒ B, f: A ⇒ B ⇒ C): E �
 
 If the `implement` macro is used to generate a class method or `val` class member, value members from the class will be used automatically:
 
-```tut
+```scala mdoc
 import io.chymyst.ch._
 
 final case class User2[A](name: String, id: A) {
@@ -153,7 +153,7 @@ makeUser(123, (n: Int) ⇒ "id:" + (n * 100).toString)
 
 we now write
 
-```tut
+```scala mdoc
 ofType[User[Int, String]](123, (n: Int) ⇒ "id:" + (n * 100).toString)
 ```
 
@@ -163,7 +163,7 @@ The values `x`, `y`, ..., `z` can have any type (but their type must be known or
 Unlike `implement`, the macro `ofType()` is designed to be used within expressions, and so we are required to write an explicit type parameter that designates the desired result type.
 The macro `ofType()` will not work without specifying a type expression as its type parameter:
 
-```tut:fail
+```scala mdoc:fail
 val x: Int = ofType(123)
 ```
 
@@ -217,7 +217,7 @@ The `curryhoward` library implements the "information loss" heuristic for choosi
 
 As an example, consider the `map` function for the State monad:
 
-```tut
+```scala mdoc
 def map[S, A, B]: (S ⇒ (A, S)) ⇒ (A ⇒ B) ⇒ (S ⇒ (B, S)) = implement
 ```
 
@@ -236,7 +236,7 @@ The implementation having the smallest "information loss score" will be more lik
 In the hopes of producing a sensible and useful answer, `curryhoward` will choose the implementation with the smallest information loss score.
 If there are several such implementations then no automatic choice is possible, and the macro will generate a compile-time error:
 
-```tut:fail
+```scala mdoc:fail
 def ff[A, B]: A ⇒ A ⇒ (A ⇒ B) ⇒ B = implement
 ```
 
@@ -249,7 +249,7 @@ User's code can then examine each of them and check laws or other properties, se
 
 As a simple example, consider a function of type `Int ⇒ Int ⇒ Int`: 
 
-```tut
+```scala mdoc
 val fs = allOfType[Int ⇒ Int ⇒ Int]
 fs.map(f ⇒ f(1)(2))
 ```
@@ -318,7 +318,7 @@ The STLC term can be extracted using one of these two methods:
 Consider the function of type `Int ⇒ Int ⇒ Int` whose implementations we have just computed as `fs`.
 Let us now look at the STLC terms corresponding to these implementations:
 
-```tut
+```scala mdoc
 fs(0).lambdaTerm
 fs(1).lambdaTerm
 
@@ -330,7 +330,7 @@ There are several ways in which we can use lambda-terms:
 
 - print them in shorter or in longer form:
 
-```tut
+```scala mdoc
 fs(0).lambdaTerm.prettyPrint
 fs(0).lambdaTerm.toString
 ```
@@ -347,32 +347,32 @@ To perform this symbolic computation, we need to create two symbolic variables `
 
 Creating symbolic variables with known types is easy with the macro `freshVar`:
 
-```tut
+```scala mdoc
 val x = freshVar[Int]
 val y = freshVar[Int]
 ```
 
 Now we can apply `fs(0)` and `fs(1)` to these variables and obtain the resulting symbolic terms:
 
-```tut
+```scala mdoc
 val results = fs.map ( f ⇒ f.lambdaTerm(x)(y) )    
 ```
 
 Note that the results are unevaluated STLC terms representing function applications:
 
-```tut
+```scala mdoc
 results.map(_.prettyPrint)
 ```
 
 We can use the `.simplify` method to perform symbolic evaluation of these terms:
 
-```tut
+```scala mdoc
 results.map(_.simplify)
 ```
 
 To determine whether the required law holds, we can use the `.equiv` method that automatically performs simplification:
 
-```tut
+```scala mdoc
 results.filter(r ⇒ r equiv x)
 ```
 
@@ -380,13 +380,13 @@ This leaves only one implementation that satisfies the law.
 
 We can now rewrite this computation working directly on the functions `fs(0)` and `fs(1)` and selecting the one that satisfies the law:
 
-```tut
+```scala mdoc
 val goodF = fs.find { f ⇒ x equiv f.lambdaTerm(x)(y) }.get
 ```
 
 Now we can use the good implementation:
 
-```tut
+```scala mdoc
 goodF(123)(456)
 ```
 
@@ -401,7 +401,7 @@ To consider an easy example, let us generate the functor method `fmap` for the p
 
 We begin by auto-generating `fmap` using the `implement` macro:
 
-```tut
+```scala mdoc
 def fmap[A, B]: (A ⇒ B) ⇒ Either[Int, A] ⇒ Either[Int, B] = implement 
 
 val fmapT = fmap.lambdaTerm // No need to specify type parameters here.
@@ -421,7 +421,7 @@ The identity law is `fmap id = id`. To verify this law, we need to apply `fmap` 
 
 We can create an identity function by first creating an STLC variable of type `A`, and then creating a function expression using the operator `=>:`:
 
-```tut
+```scala mdoc
 def a[A] = freshVar[A]
 val idA = a =>: a
 ```
@@ -432,7 +432,7 @@ Repeated calls to `a` will also return the same variable.
 
 The operator `=>:` is right-associative:
 
-```tut
+```scala mdoc
 val b = freshVar[Int]
 a =>: b =>: a
 ```
@@ -440,7 +440,7 @@ a =>: b =>: a
 Identity functions are often required when checking algebraic laws.
 For convenience, the `TermExpr.id()` and `typeExpr` methods are provided, so that we could define `idA` like this:
 
-```tut
+```scala mdoc
 def idA[A] = TermExpr.id(typeExpr[A])
 ```
 
@@ -448,7 +448,7 @@ The macro `typeExpr[...]` returns the STLC type expression corresponding to the 
 
 Let us now apply the lambda-term `fmapT` to `idA`. Our first try fails:
 
-```tut:fail
+```scala mdoc:fail
 val result = fmapT(idA)
 ```
 
@@ -461,7 +461,7 @@ The general methods `.substTypeVar` and `.substTypeVars` are available for this 
 
 To do the type variable reassignment easier, we can use the method `:@` like this:
 
-```tut
+```scala mdoc
 val f2 = fmapT :@ idA
 f2.t.prettyPrint
 ```
@@ -475,7 +475,7 @@ The most straightforward way of verifying that `f2` is an identity function is t
 
 Let us define a new variable of type `Either[Int, A]` and apply `f2` to that variable.
 
-```tut
+```scala mdoc
 def optA[A] = freshVar[Either[Int, A]]
 f2(optA).simplify
 ```
@@ -483,7 +483,7 @@ f2(optA).simplify
 We see that, after simplification, we obtain the original term `optA`.
 We can also check this quicker by using the `.equiv()` method, which will automatically perform simplification:
 
-```tut
+```scala mdoc
 assert(optA equiv f2(optA))
 ```
 
@@ -507,7 +507,7 @@ In the operators `:@`, `:@@`, and `@@:`, the colon `:` mnemonically shows the si
 
 To illustrate the use of these operators, consider the function `pure`, which is standard for the `Either` monad and can be implemented automatically:
 
-```tut
+```scala mdoc
 def pure[A]: A ⇒ Either[Int, A] = implement
 val pureT = pure.lambdaTerm
 ```
@@ -528,13 +528,13 @@ Let us verify the naturality law for the function `pure`:
 
 In this law, `f` is an arbitrary function of type `A ⇒ B`. Let us therefore create a STLC variable of this type:
 
-```tut
+```scala mdoc
 def f[A,B] = freshVar[A ⇒ B]
 ```
 
 We will now compute both sides of the naturality equation, reassigning type variables automatically:
 
-```tut
+```scala mdoc
 val leftSide = f @@: pureT
 val rightSide = pureT :@@ (fmapT :@ f)
 assert(leftSide equiv rightSide)
@@ -554,7 +554,7 @@ The extension of STLC supported by `curryhoward` supports sealed traits and case
 A case class is represented as a **named conjunction**, that is, a conjunction that has a name for each part, and also a name for itself.
 For example, consider the following case class:
 
-```tut
+```scala mdoc
 final case class User(fullName: String, id: Long) 
 ```
 
@@ -582,7 +582,7 @@ We will then implement this function automatically using the `curryhoward` libra
 
 We begin by creating a fresh variable of type `Option[User]`.
 
-```tut
+```scala mdoc
 val ou = freshVar[Option[User]]
 ```
 
@@ -608,7 +608,7 @@ The argument types of these functions are `None.type` and `Some[User]`.
 Therefore, the next step for us is to create these functions as lambda-terms.
 For that, we will need to create new fresh variables of these types.
 
-```tut
+```scala mdoc
 val n = freshVar[None.type]
 val su = freshVar[Some[User]]
 ```
@@ -630,7 +630,7 @@ This is done in three steps:
 - create a value of type `None.type` using `n.t()` -- note that `None.type` is essentially a "named `Unit`", and we can always create values of a `Unit` type with no extra data required
 - using the `apply` method of the type expression `ol`, lift the value of type `None.type` into the disjunction type `Option[Long]`
 
-```tut
+```scala mdoc
 val ol = typeExpr[Option[Long]]
 val case1 = n =>: ol(n.t())
 ```
@@ -654,14 +654,14 @@ This is done using the following steps:
 - using that type expression's `apply` method, create a named conjunction of type `Some[Long]` containing `id` as its only part
 - inject that value into the disjunction type `Option[Long]`
 
-```tut
+```scala mdoc
 val sl = typeExpr[Some[Long]]
 val case2 = su =>: ol(sl(su(0)("id")))
 ```
 
 Now we are ready to write the match statement, which is done by using the `.cases` function on the disjunction value `u`:
 
-```tut
+```scala mdoc
 val getId = ou =>: ou.cases(case1, case2)
 getId.prettyPrint
 ```
@@ -672,7 +672,7 @@ In STLC there are no concrete values of type `String` or `Long`; so we need to u
 When constructing conjunction and disjunction terms, we may use a shortcut -- call `.apply` on the fresh variables themselves, rather than on their type expressions.
 So, `dUser(dString, dLong)` is the same as `dUser.t(dString, dLong)` and constructs a new named conjunction term of type `User`. 
 
-```tut
+```scala mdoc
 val dString = freshVar[String]
 val dLong = freshVar[Long]
 val u = freshVar[User]
@@ -684,7 +684,7 @@ We have obtained the resulting term, and we can see that it is what we expected 
 
 We will now check that the same lambda-term is obtained when implementing the function `getId` automatically using `curryhoward`.
 
-```tut
+```scala mdoc
 val getIdAuto: Option[User] ⇒ Option[Long] = implement
 val getIdAutoTerm = getIdAuto.lambdaTerm
 getIdAutoTerm.prettyPrint
@@ -697,7 +697,7 @@ Note that `prettyRenamePrint` performs a `prettyRename` before printing the term
 For terms we constructed ourselves, such as `getId`, we need to run `prettyRename` so that the term becomes syntactically equal to `getIdAutoTerm`.
 The method `equiv` will do this automatically:
 
-```tut
+```scala mdoc
 getIdAutoTerm equiv getId.prettyRename
 ```
 

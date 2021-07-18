@@ -18,7 +18,7 @@ addons:
       - oracle-java8-set-default
 
 script:
-  - sbt clean coverage test coverageReport package package-doc
+  - sbt clean mdoc coverage test coverageReport package package-doc
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)

@@ -136,14 +136,17 @@ lazy val scalacOptions213 = (myScalacOptions ++ scalacOptionsRobNorris ++ scalac
 
 lazy val curryhoward: Project = (project in file("."))
   .settings(common)
+  .enablePlugins(MdocPlugin)
   .settings(
     organization := "io.chymyst",
-    version := "0.3.7",
+    version := "0.3.8",
 
     licenses := Seq("Apache License, Version 2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
     homepage := Some(url("https://github.com/Chymyst/curryhoward")),
     description := "Automatic code generation from function types using the Curry-Howard correspondence",
 
+    mdocIn := (sourceDirectory in Compile).value / "tut",
+    mdocOut := baseDirectory.value / "docs",
     //    scalacOptions += "-Ymacro-debug-lite",
     scalacOptions ++= {
       CrossVersion.partialVersion(scalaVersion.value) match {
