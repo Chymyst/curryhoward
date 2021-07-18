@@ -128,6 +128,8 @@ lazy val scalacOptions212RemovedIn213 = Seq(
   "-Ywarn-infer-any",
   "-Ywarn-nullary-override",
   "-Ywarn-nullary-unit",
+  "-Xexperimental",
+  "-Xfuture",
 )
 
 lazy val scalacOptionsBelow212 = (myScalacOptions ++ scalacOptionsRobNorris).distinct

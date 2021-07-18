@@ -104,7 +104,8 @@ class MoreMatchTypeSpec extends FlatSpec with Matchers {
     f.lambdaTerm.prettyPrint shouldEqual "a ⇒ (0 + Nil())"
   }
 
-  it should "process List[A] ⇒ List[A]" in {
+  // This depends on implementation details of List.
+  ignore should "process List[A] ⇒ List[A]" in {
     freshVar[List[Int] ⇒ List[Int]].t shouldEqual #->(DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(BasicT("Int")), List("head", "tl$access$1"), List(BasicT("Int"), RecurseT("List", List(BasicT("Int"))))), NamedConjunctT("Nil", List(), List(), List()))), DisjunctT("List", List(BasicT("Int")), List(NamedConjunctT("::", List(BasicT("Int")), List("head", "tl$access$1"), List(BasicT("Int"), RecurseT("List", List(BasicT("Int"))))), NamedConjunctT("Nil", List(), List(), List()))))
 
 
