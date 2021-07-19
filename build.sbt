@@ -124,7 +124,7 @@ lazy val curryhoward: Project = (project in file("."))
   .settings(common)
   .settings(
     organization := "io.chymyst",
-    version := "0.3.7",
+    version := "0.3.8",
 
     licenses := Seq("Apache License, Version 2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
     homepage := Some(url("https://github.com/Chymyst/curryhoward")),
@@ -157,18 +157,14 @@ lazy val curryhoward: Project = (project in file("."))
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Publishing to Sonatype Maven repository
 publishMavenStyle := true
-//
-// pomIncludeRepository := { _ => false } // not sure we need this.
-// http://www.scala-sbt.org/release/docs/Using-Sonatype.html says we might need it
-// because "sometimes we have optional dependencies for special features".
-//
-publishTo := {
+publishTo := sonatypePublishToBundle.value
+/*{
   val nexus = "https://oss.sonatype.org/"
   if (isSnapshot.value)
     Some("snapshots" at nexus + "content/repositories/snapshots")
   else
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
-}
+}*/
 //
 publishArtifact in Test := false
 //
