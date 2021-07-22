@@ -153,6 +153,15 @@ lazy val curryhoward: Project = (project in file("."))
     )
   )
 
+lazy val tutorial = (project in file("tutorial"))
+  .settings(common)
+  .enablePlugins(MdocPlugin)
+  .settings(
+    mdocIn := baseDirectory.value / "src",
+    mdocOut := baseDirectory.value / "docs",
+  )
+  .dependsOn(curryhoward)
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Publishing to Sonatype Maven repository
