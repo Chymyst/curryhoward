@@ -157,14 +157,14 @@ lazy val curryhoward: Project = (project in file("."))
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Publishing to Sonatype Maven repository
 publishMavenStyle := true
-publishTo := sonatypePublishToBundle.value
-/*{
+publishTo := //sonatypePublishToBundle.value
+{
   val nexus = "https://oss.sonatype.org/"
   if (isSnapshot.value)
     Some("snapshots" at nexus + "content/repositories/snapshots")
   else
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
-}*/
+}
 //
 publishArtifact in Test := false
 //
