@@ -1,6 +1,6 @@
 lazy val common = Seq(
   scalaVersion := "2.13.6",
-  crossScalaVersions := Seq("2.11.12", "2.12.12", "2.13.6"),
+  crossScalaVersions := Seq("2.11.12", "2.12.13", "2.13.6"),
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.8" % Test,
     "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
