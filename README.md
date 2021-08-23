@@ -37,12 +37,12 @@ def f[X, Y]: (X ⇒ Y) ⇒ (Int ⇒ X) ⇒ (Int ⇒ Y) = implement
 
 - Automatically fill in the function body, given the function's type alone (`implement`)
 - Automatically generate an expression of a specified type from given arguments (`ofType`)
-- Works as a macro at compile time; when a type cannot be implemented, emit a compile-time error
+- Works as a macro at compile time; when a type cannot be implemented, emits a compile-time error
 - Supports function types, tuples, sealed traits / case classes / case objects
-- Both conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T` can be used equivalently
+- Can use conventional Scala syntax `def f[T](x: T): T` and curried syntax `def f[T]: T ⇒ T`
 - Java-style argument groups can be used, e.g. `A ⇒ (B, C) ⇒ D`, in addition to using a tuple type, e.g. `A ⇒ ((B, C)) ⇒ D`
 - When a type can be implemented in more than one way, heuristics ("least information loss") are used to prefer implementations that are more likely to satisfy algebraic laws
-- Emit a compile-time error when a type can be implemented in more than one way despite using heuristics
+- Emits a compile-time error when a type can be implemented in more than one way despite using heuristics
 - Debugging and logging options are available
 - DSL for inspecting the generated code (STLC lambda-terms) at run time; facilities are provided for symbolic evaluation and checking equational laws
 - [Tutorial](docs/Tutorial.md) explains how to do that in detail
