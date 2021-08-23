@@ -193,7 +193,7 @@ object TypeExpr {
       val unmappedVars = (usedVars intersect allTypeParams(fullSrc)) -- substitutions.keySet
       val alphaConversions: Map[TP, TypeExpr] = unmappedVars.toSeq.map {
         _ → TP(freshTypeVarIdents())
-      }(scala.collection.breakOut)
+      }.toMap
       substitutions ++ alphaConversions
     }
   }
