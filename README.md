@@ -158,6 +158,7 @@ Build the tutorial (thanks to the [tut plugin](https://github.com/tpolecat/tut))
 
 # Revision history
 
+- 0.3.8 Support Scala 2.13 (keep supporting Scala 2.11 and 2.12)
 - 0.3.7 Implement the `typeExpr` macro instead of the old test-only API. Detect and use `val`s from the immediately enclosing class. Minor performance improvements and bug fixes (alpha-conversion for STLC terms). Tests for automatic discovery of some monads.
 - 0.3.6 STLC terms are now emitted for `implement` as well; the JVM bytecode limit is obviated; fixed bug with recognizing `Function10`.
 - 0.3.5 Added `:@@` and `@@:` operations to the STLC interpreter. Fixed a bug whereby `Tuple2(x._1, x._2)` was not simplified to `x`. Fixed other bugs in alpha-conversion of type parameters.
