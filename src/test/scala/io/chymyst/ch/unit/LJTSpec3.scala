@@ -126,7 +126,9 @@ class LJTSpec3 extends FlatSpec with Matchers with BeforeAndAfterEach {
   it should "generate methods for State monad with Int state" in {
     final case class S_int[A](run: Int => (A, Int)) // State monad with internal state of type Int.
     val wu1: S_int[Unit] = S_int { i => ((), i) }
+    wu1.run(123) shouldEqual (((), 123))
     val wu2: S_int[Unit] = implement // Expect the same
+    wu2.run(123) shouldEqual (((), 123))
   }
 
   it should "generate methods for Continuation monad with no ambiguity" in {
