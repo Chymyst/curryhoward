@@ -93,9 +93,10 @@ object TheoremProver {
       val transformedProofs = explodedNewProofs.map(ruleResult.backTransform)
       val t1 = System.currentTimeMillis()
 
-      val result = transformedProofs.sortBy(_.informationLossScore).take(maxTermsToSelect(sequent))
+      val result = transformedProofs.map(_.simplifyOnce(withEta = false)).distinct.sortBy(_.informationLossScore).take(maxTermsToSelect(sequent))
       // Note: at this point, it is a mistake to do prettyRename, because we are calling this function recursively.
       // We will call prettyRename() at the very end of the proof search.
+      // It is also a mistake to do a `.simplifyOnce(withEta = true)`. The eta-conversion produces incorrect code here.
       if (debug) {
         println(s"DEBUG: elapsed ${System.currentTimeMillis() - t0} ms, .map(_.simplify()).distinct took ${System.currentTimeMillis() - t1} ms, produced ${result.size} terms out of ${transformedProofs.size} back-transformed terms; after rule ${ruleResult.ruleName} for sequent $sequent")
         //        println(s"DEBUG: for sequent $sequent, after rule ${ruleResult.ruleName}, transformed ${transformedProofs.length} proof terms:\n ${transformedProofs.mkString(" ;\n ")} ,\nafter simplifying:\n ${result.mkString(" ;\n ")} .")

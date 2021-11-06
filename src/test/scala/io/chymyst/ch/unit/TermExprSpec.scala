@@ -15,8 +15,43 @@ class TermExprSpec extends FlatSpec with Matchers {
 
   behavior of "TermExpr miscellaneous methods"
 
+  it should "generate variables for disjunction subtypes" in {
+    val p = freshVar[Either[Option[Option[(Int, Int)]], Option[(Option[Int], Option[Int])]]]
+
+    val subtypeVars = TermExpr.subtypeVars(p.t).map(_.prettyPrint)
+
+    val indices = "z([0-9]+)".r.findAllMatchIn(subtypeVars.mkString("")).map(_.group(1).toInt).toList
+    indices.map(_ - indices.min) shouldEqual Seq(0, 1, 3, 2, 2, 3)
+
+    subtypeVars.map(_.replaceAll("z[0-9]+", "z")) shouldEqual List(
+      "(Left((None() + 0)) + 0)",
+      "(Left((0 + Some((None() + 0)))) + 0)",
+      "(Left((0 + Some((0 + Some(Tuple2(z, z)))))) + 0)",
+      "(0 + Right((None() + 0)))", "(0 + Right((0 + Some(Tuple2((None() + 0), (None() + 0))))))",
+      "(0 + Right((0 + Some(Tuple2((None() + 0), (0 + Some(z)))))))",
+      "(0 + Right((0 + Some(Tuple2((0 + Some(z)), (None() + 0))))))",
+      "(0 + Right((0 + Some(Tuple2((0 + Some(z)), (0 + Some(z)))))))"
+    )
+
+    val subtypeVarsScala = TermExpr.subtypeVars(p.t).map(_.printScala).map(_.replaceAll("z[0-9]+", "z")) shouldEqual
+      List("Left(None)", "Left(Some(None))", "Left(Some(Some(Tuple2(z, z))))", "Right(None)", "Right(Some(Tuple2(None, None)))", "Right(Some(Tuple2(None, Some(z))))", "Right(Some(Tuple2(Some(z), None)))", "Right(Some(Tuple2(Some(z), Some(z))))")
+  }
+
+  it should "compute Scala code of flatten for Option" in {
+    def flattenOpt[A]: Option[Option[A]] ⇒ Option[A] = implement
+    
+    val flattenScala = flattenOpt.lambdaTerm.printScala
+    
+    flattenScala shouldEqual "a: Option[Option[A]] ⇒ a match { case b: None.type ⇒ None; case c: Some[Option[A]] ⇒ c.value }"
+  }
+  
+  it should "compute extensional equality of functions" in {
+    TermExpr.extEqual(TermExpr.id(typeExpr[Int]), TermExpr.id(typeExpr[Int])) shouldEqual true
+  }
+
   it should "compute identity function" in {
     def idAB[A, B] = TermExpr.id(typeExpr[A ⇒ B])
+
     idAB.prettyPrint shouldEqual "x ⇒ x"
     idAB.toString shouldEqual "\\((x:A ⇒ B) ⇒ x)"
     idAB.t.prettyPrint shouldEqual "(A ⇒ B) ⇒ A ⇒ B"
@@ -41,7 +76,7 @@ class TermExprSpec extends FlatSpec with Matchers {
 
     the[Exception] thrownBy {
       TermExpr.subst(var23, termExpr1, var32 =>: var23.copy(t = TP("1"))) shouldEqual (var32 =>: termExpr1)
-    } should have message "In subst(x2, \\((x2:3) ⇒ (x3:2) ⇒ (x4:1) ⇒ x3), \\((x3:2) ⇒ x2)), found variable(s) (x2:1) with incorrect type(s), expected variable type 3"
+    } should have message "In subst(x2:3, \\((x2:3) ⇒ (x3:2) ⇒ (x4:1) ⇒ x3), \\((x3:2) ⇒ x2)), found variable(s) (x2:1) with incorrect type(s), expected variable type 3"
   }
 
   it should "recover from incorrect substitution" in {
@@ -56,6 +91,15 @@ class TermExprSpec extends FlatSpec with Matchers {
       case VarE(_, _) ⇒ pair
     } should // The `subst` tries to replace `var23` in `var23 =>: var12` with `pair`, which is a NamedConjunctE.
       have message "Incorrect substitution of bound variable x2 by non-variable Tuple2(x, x) in substMap(x2 ⇒ x1){...}"
+  }
+
+  behavior of "printScala"
+
+  it should "print functions in Scala syntax" in {
+    termExpr1.printScala shouldEqual "x2 ⇒ x3 ⇒ x4 ⇒ x3"
+    termExpr2.printScala shouldEqual "x2 ⇒ x3 ⇒ x4 ⇒ x1"
+    termExpr3.printScala shouldEqual "x1 ⇒ x2 ⇒ x3 ⇒ x4 ⇒ x1"
+
   }
 
   behavior of "TermExpr#renameVar"
@@ -274,9 +318,9 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
 
     //    println(flattens.size)
 
-    def f[A] = allOfType[Option[(A, A, A)] ⇒ Option[(A, A, A)]]()
+    def f[A] = anyOfType[Option[(A, A, A)] ⇒ Option[(A, A, A)]]()
 
-    println(f.size)
+    f.size shouldEqual 28
     //    f[Int].map(_.lambdaTerm.prettyPrint).sorted.foreach(println)
     //    f.size shouldEqual factorial(4)
   }
@@ -284,9 +328,7 @@ a ⇒ Tuple2(a._2._2, a._2._2) // Choose second element of second inner tuple.
   it should "generate match clauses" in {
     def f[A] = anyOfType[Option[Option[A]] ⇒ Option[Option[A]]]().map(_.lambdaTerm)
 
-    println(f.size)
-    f.map(_.prettyPrint).foreach(println)
-
+    f.size shouldEqual 13
+    //    f.map(_.prettyPrint).foreach(println)
   }
-
 }
