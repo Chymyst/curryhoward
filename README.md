@@ -33,6 +33,10 @@ def f[X, Y]: (X ⇒ Y) ⇒ (Int ⇒ X) ⇒ (Int ⇒ Y) = implement
 
 ```
 
+## AI-generated documentation
+
+[See here](https://deepwiki.com/Chymyst/curryhoward/)
+
 ## Features
 
 - Automatically fill in the function body, given the function's type alone (`implement`)
