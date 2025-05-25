@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Github Tag](https://img.shields.io/github/tag/Chymyst/curryhoward.svg?label=release&colorB=blue)](https://github.com/Chymyst/curryhoward/tags)
 [![Maven Central](https://img.shields.io/maven-central/v/io.chymyst/curryhoward_2.12.svg)](http://search.maven.org/#search%7Cga%7C1%7Cio.chymyst)
-
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Chymyst/curryhoward)
 # Quotation
 
 _These are all interesting examples, but is there a practical side to Curry-Howard isomorphism? Probably not in everyday programming._ -- Bartosz Milewski (2015), [Category Theory for Programmers, Chapter 9: Function types.](https://bartoszmilewski.com/2015/03/13/function-types/)
